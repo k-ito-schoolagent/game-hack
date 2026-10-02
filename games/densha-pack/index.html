@@ -2,227 +2,826 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>満員電車パッキング | GAME HACK</title>
-<meta name="description" content="ドア係として乗客を物理で詰め込め。赤いドアラインを越えたら「ドアが閉まりません」。乗客の並びは固定＝覚えれば上手くなる技術介入型パズル。">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚃</text></svg>">
+<meta name="description" content="平日朝の中央線快速。ホームに並んだ会社員・学生・リュックの人・ベビーカーを、つまんで車内の好きな場所へ押し込む。ドアラインからはみ出したら「ドアが閉まりません」。">
+<meta name="theme-color" content="#3A3833">
+<!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>詰</text></svg>">
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#0d1526;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:#eaf3fc}
-  #wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none}
-  canvas{display:block;width:100%;height:100%}
-  #hud{position:absolute;left:10px;right:10px;top:10px;display:flex;justify-content:space-between;pointer-events:none;font-size:14px}
-  #hud div{background:rgba(6,26,52,.78);border-radius:8px;padding:6px 10px}
-  #station{font-size:16px;font-weight:700}
-  #popup{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:min(84vw,340px);background:rgba(255,255,255,.97);color:#12233f;border-radius:16px;padding:24px 20px;text-align:center;box-shadow:0 10px 34px rgba(0,0,0,.5)}
-  #popup.hidden{display:none}
-  #popup h1{margin:0 0 10px;font-size:20px}
-  #popup p{margin:0 0 16px;font-size:14px;line-height:1.8;white-space:pre-line}
-  #popup button{display:block;width:100%;height:46px;margin-top:8px;font-size:15px;font-weight:700;border:none;border-radius:10px;background:#ffb300;color:#12233f;cursor:pointer}
-  #popup button.ghost{background:#e8eef6;font-weight:500}
-  a{color:inherit}
+/* ================================================================
+ * GAME HACK 共通UI（ここから）— 全ゲームで同じものをコピーして使う
+ * 世界観: 業務帳票。紙 × 墨 × 朱（ハンコの赤）。
+ * - 朱は「判子」と「失敗」にだけ使う。ボタンや装飾には使わない
+ * - 角丸は 2px まで。影・グラデーション・絵文字は使わない
+ * ================================================================ */
+:root{
+  --paper:#F3EFE4; --paper2:#E8E1CF; --ink:#22201C; --ink2:#5E584D; --rule:#CDC3AC; --shu:#C8372D;
+  --font:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--scene,#2b2a27);font-family:var(--font);color:var(--ink);-webkit-text-size-adjust:100%}
+#wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+canvas{display:block;width:100%;height:100%}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+/* HUD: 帳票の見出し帯。左=どこ / 中=いまの数値 / 右=一時停止 */
+#hud{position:absolute;left:0;right:0;top:0;padding-top:var(--safe-t);background:var(--paper);border-bottom:1px solid var(--ink);display:none;grid-template-columns:1fr auto 52px;align-items:center;height:calc(48px + var(--safe-t));box-sizing:border-box;font-feature-settings:"tnum";z-index:5}
+#hud.on{display:grid}
+#hudL{padding-left:14px;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hudL small{font-weight:500;color:var(--ink2);font-size:12px;margin-left:6px}
+#hudC{padding:0 12px;font-size:15px;font-weight:700;text-align:right;white-space:nowrap}
+#hudC .warn{color:var(--shu)}
+#pauseBtn{width:52px;height:48px;border:0;border-left:1px solid var(--rule);background:transparent;display:grid;place-items:center}
+#pauseBtn i{display:block;width:12px;height:14px;border-left:4px solid var(--ink);border-right:4px solid var(--ink);box-sizing:border-box}
+/* シート: 下から出る帳票。親指で押せる位置にボタンを置く */
+#sheetBg{position:absolute;inset:0;background:rgba(34,32,28,.5);display:none;z-index:10}
+#sheetBg.on{display:block}
+#sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
+#sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
+#sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
+#sheet dt{color:var(--ink2)}
+#sheet dd{margin:0;font-weight:600;font-feature-settings:"tnum"}
+#sheet .acts{display:grid;gap:8px}
+.btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
+.btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn:active{transform:translateY(1px);opacity:.9}
+.sub{display:flex;justify-content:center;gap:4px}
+.sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
+/* 判子: 結果シートの右上に押される。中身は最大4字 */
+.stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
+.stamp.round{border-radius:50%}
+.stamp span{display:block}
+@keyframes stampIn{from{transform:rotate(-8deg) scale(1.9);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:.92}}
+@media (prefers-reduced-motion:reduce){#sheet,.stamp{animation:none}}
+/* ===== GAME HACK 共通UI（ここまで）===== */
+/* ---- ゲーム固有の見た目: 駅の発車標（HUD）と、駅務の帳票（シート。中央線の橙の帯・罫で囲んだ記載欄） ---- */
+:root{--scene:#3A3833;--paper:#FBFAF6;--paper2:#EEEBE2;--ink:#22201C;--ink2:#5A564D;--rule:#C9C4B8;--line:#E8822A;--eki:#2E4A7A}
+#hud{background:#1B1B1D;border-bottom:2px solid #6B6A66;color:#F2EEE2}
+#hudL{color:#F2EEE2;letter-spacing:.04em}
+#hudL small{color:#BDB9AE}
+#hudC{color:#F2EEE2;font-weight:600;font-size:14px;padding:0 10px}
+#hudC b{color:#FF9A2E;font-weight:800;margin:0 1px}
+#hudL small{margin-left:4px}
+#hudC .warn{color:#FF7A66}
+#pauseBtn{border-left:1px solid #3A3A3D}
+#pauseBtn i{border-left-color:#F2EEE2;border-right-color:#F2EEE2}
+#pauseBtn:focus-visible{outline-color:#F2EEE2}
+#sheet{border-top:0;padding-top:30px;box-shadow:inset 0 7px 0 var(--line),inset 0 9px 0 var(--paper),inset 0 10px 0 var(--ink)}
+#sheet .no{letter-spacing:.12em;color:var(--ink);font-weight:700;border-bottom:1px solid var(--rule);padding-bottom:6px;margin-bottom:10px;padding-right:92px}
+#sheet > .no:first-child + h1{padding-right:0}
+#sheet h1{font-weight:800}
+#sheet .lead{font-size:14.5px}
+#sheet dl{border:1px solid var(--ink)}
+#sheet dl div{padding:0;grid-template-columns:7.4em 1fr}
+#sheet dl div:last-child{border-bottom:0}
+#sheet dt{background:var(--paper2);border-right:1px solid var(--rule);padding:8px;font-size:13px}
+#sheet dd{padding:8px 10px;overflow-wrap:anywhere}
+.btn{border-radius:0;background:#1B1B1D;color:#F2EEE2}
+/* 判子: 失敗は駅長の朱の角印、発車は駅スタンプの紺の丸印 */
+.stamp.round{color:var(--eki);border-color:var(--eki);box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--eki)}
 </style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="cv"></canvas>
-  <div id="hud">
-    <div id="station">-</div>
-    <div id="timer">-</div>
-  </div>
-  <div id="popup">
-    <h1 id="ptitle"></h1><p id="ptext"></p>
-    <button id="pbtnMain"></button>
-    <button id="pbtnSub" class="ghost"></button>
-  </div>
+  <!-- 共通UI: ここから -->
+  <div id="hud"><div id="hudL"></div><div id="hudC"></div><button id="pauseBtn" aria-label="一時停止"><i></i></button></div>
+  <div id="sheetBg"><div id="sheet" role="dialog" aria-modal="true"></div></div>
+  <!-- 共通UI: ここまで -->
 </div>
 <script>
 'use strict';
-/* 満員電車パッキング
- * 型: 現実(満員電車) × 物理化(乗客=積み上がる箱) × 技術(固定シーケンス暗記+詰め方) × 見せ場(ドアが閉まらない)
- * 乱数なし。駅ごとの乗客シーケンスは固定。 */
-const W=420,H=700;
+/* ============================================================
+ * 満員電車パッキング
+ * 型: 題材(平日朝の通勤快速) × 物理化(奥へお詰めください=乗客は奥へ進み、人か壁に当たって止まる)
+ *     × 権限(乗客をつまんで車内の好きな位置へ置ける) × 技術(固定の列と既乗客の隙間を読む) × 見せ場(ドアが閉まらない)
+ * 乱数なし。駅ごとの「既に乗っている客」「ホームの列」は固定。全駅ノーミスで詰め切れることをソルバーで確認済み。
+ * ============================================================ */
+
+// ================================================================
+// GAME HACK 共通UI（ここから）— 書き換えずにコピーする
+// ================================================================
+// 論理座標: 横幅 W=420 固定。高さ H は端末の縦横比に合わせて 700〜920 で伸びる（上下の黒帯を出さない）
+// 描画は H を見てレイアウトする（上端=HUD 下、下端=親指ゾーン）
+const W=420; let H=760;
+const HUD_H=48;
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
-let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0;
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0,SAFE_T=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=window.innerWidth; VH=window.innerHeight;
+  cv.width=Math.round(VW*DPR); cv.height=Math.round(VH*DPR);
+  H=Math.max(700,Math.min(920,Math.round(W*VH/VW)));
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+  SAFE_T=(parseFloat(getComputedStyle($('hud')).paddingTop)||0)/SC;
+  if(typeof onResize==='function')onResize();
+}
+// 画面座標 → 論理座標
+function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
+// DOM 要素の中心 → 論理座標（下部ボタンとの距離判定などに使う）
+function elCenter(el){ const r=el.getBoundingClientRect(); return toGame({clientX:r.left+r.width/2,clientY:r.top+r.height/2}); }
+// HUD の下端（論理座標）。ゲームの描画はここから下に置く
+function topY(){ return HUD_H+SAFE_T; }
+// 振動（対応端末のみ）
+function buzz(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(_){} }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-// 車両ジオメトリ
-const CAR={x0:44,x1:376,floor:618,door:402}; // door=この高さより上に積むとドアが閉まらない
-// 乗客タイプ（幅・高さ・色・名前）
-const TYPES={
-  slim:{w:34,h:78,c:'#7fb069',n:'細身の人'},
-  std:{w:44,h:78,c:'#5b8dd9',n:'標準の人'},
-  big:{w:56,h:78,c:'#d9855b',n:'大柄な人'},
-  pack:{w:62,h:64,c:'#b05bd9',n:'リュックの人'},
-  kid:{w:34,h:56,c:'#ffd166',n:'子ども'},
+const UI={
+  hud(l,lSmall,c){ $('hud').classList.add('on'); $('hudL').innerHTML=esc(l)+(lSmall?'<small>'+esc(lSmall)+'</small>':''); $('hudC').innerHTML=c||''; },
+  hideHud(){ $('hud').classList.remove('on'); },
+  /* シートを開く
+   * o = { no:'No.01 · 乗務報告', title, lead, rows:[[ラベル,値],...], stamp:'不可'|'発車'(最大4字), round:true(丸印),
+   *       main:[ラベル,fn], subs:[[ラベル,fn],...] } */
+  sheet(o){
+    const s=$('sheet');
+    let h='';
+    if(o.stamp){ const t=[...o.stamp]; const lines=t.length===4?[t.slice(0,2).join(''),t.slice(2).join('')]:t.length===3?[t.join('')]:[t.join('')];
+      const fs=t.length<=2?27:t.length===3?20:22;
+      h+='<div class="stamp'+(o.round?' round':'')+'" style="font-size:'+fs+'px">'+lines.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'; }
+    if(o.no)h+='<p class="no">'+esc(o.no)+'</p>';
+    h+='<h1>'+esc(o.title)+'</h1>';
+    if(o.lead)h+='<p class="lead">'+esc(o.lead)+'</p>';
+    if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
+    h+='<div class="acts">';
+    if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
+    h+='</div>';
+    s.innerHTML=h; s.scrollTop=0;
+    s.querySelectorAll('button').forEach(b=>{
+      const k=b.dataset.k, fn=k==='main'?o.main[1]:o.subs[+k.slice(1)][1];
+      b.addEventListener('click',e=>{ e.stopPropagation(); fn(); });
+    });
+    $('sheetBg').classList.add('on');
+    const m=s.querySelector('.btn'); if(m)setTimeout(()=>m.focus({preventScroll:true}),50);
+  },
+  close(){ $('sheetBg').classList.remove('on'); },
+  open(){ return $('sheetBg').classList.contains('on'); },
 };
-// 駅ごとの固定シーケンス（覚えられる＝技術）
-const STAGES=[
-  {station:'新宿', time:40, seq:['std','slim','std','big','slim','std']},
-  {station:'渋谷', time:42, seq:['pack','std','slim','big','std','kid','std']},
-  {station:'池袋', time:44, seq:['big','std','pack','slim','std','big','kid','std']},
-  {station:'東京', time:46, seq:['std','pack','big','std','slim','pack','std','kid','std']},
-  {station:'品川', time:48, seq:['big','pack','std','big','slim','std','pack','std','kid','std']},
-  {station:'横浜', time:50, seq:['pack','big','pack','std','slim','big','std','kid','std','pack','std']},
-  {station:'大阪', time:52, seq:['big','std','big','pack','std','slim','big','pack','std','kid','std','std']},
-  {station:'博多', time:55, seq:['pack','big','std','pack','big','std','slim','big','pack','std','kid','std','big']},
-];
+// 共有（𝕏）とポータルへ
+function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function toPortal(){ location.href='../../'; }
+// 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
+let pausedFrom=null;
+function pause(){
+  if(G.screen!=='play')return;
+  pausedFrom='play'; G.screen='pause';
+  UI.sheet({no:GAME_NO+' · 一時停止中',title:'一時停止',main:['再開する',resume],subs:[['この面をやり直す',()=>{UI.close();restart();}],['一覧へ戻る',toPortal]]});
+}
+function resume(){ if(G.screen!=='pause')return; UI.close(); G.screen='play'; lastTs=0; }
+$('pauseBtn').addEventListener('click',e=>{ e.stopPropagation(); G.screen==='pause'?resume():pause(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden)pause(); });
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ G.screen==='pause'?resume():pause(); } });
+// ===== GAME HACK 共通UI（ここまで）=====
 
-const G={screen:'title',stage:0,queue:[],cur:null,pile:[],time:0,total:0,miss:0,shake:0,doorAnim:0};
+
+// ---- ゲーム固有 ----------------------------------------------
+const GAME_NO='No.01';
+const TAG='満員電車パッキング';
+const FONT='"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif';
+// 文字は枠の幅 maxW を実測して収める（縮小の下限 10px）。収まらなかったものは AUDIT に残す
+const AUDIT={on:false,txt:[],ppl:[]};
+function fitText(t,x,y,maxW,size,weight){
+  let fs=size; ctx.font=weight+' '+fs+'px '+FONT;
+  while(fs>10&&ctx.measureText(t).width>maxW){ fs=Math.max(10,fs-0.5); ctx.font=weight+' '+fs+'px '+FONT; }
+  const w=ctx.measureText(t).width;
+  if(AUDIT.on&&w>maxW+0.5)AUDIT.txt.push({t,w:Math.round(w),maxW,fs});
+  ctx.fillText(t,x,y); return w;
+}
+
+// ---- 共有コア（ゲームとソルバーで同一）----
+const X0=14,X1=406,SD=220;           // 車内の左右端 / 立ち席の奥行き（奥=0 → ドアライン=SD）
+const PT={                             // 真上から見た占有（w=左右, h=前後）
+  sal:{w:50,h:28}, stu:{w:40,h:24}, big:{w:62,h:36}, pack:{w:50,h:42},
+  kid:{w:30,h:30}, eld:{w:44,h:38}, baby:{w:44,h:76}, suit:{w:72,h:30}, pole:{w:10,h:10},
+};
+// スカイライン: [[x0,x1,d],...] 左から連続。d=そこまで埋まった奥行き
+function skyNew(){ return [[X0,X1,0]]; }
+function skyLand(sky,x,w){ let d=0; const a=x-w/2,b=x+w/2; for(const s of sky){ if(Math.min(b,s[1])-Math.max(a,s[0])>0.5&&s[2]>d)d=s[2]; } return d; }
+function skyPut(sky,x,w,top){ const a=x-w/2,b=x+w/2,out=[];
+  for(const s of sky){ if(s[1]<=a||s[0]>=b){out.push(s);continue;} if(s[0]<a)out.push([s[0],a,s[2]]); if(s[1]>b)out.push([b,s[1],s[2]]); }
+  out.push([a,b,top]); out.sort((p,q)=>p[0]-q[0]);
+  const m=[]; for(const s of out){ const l=m[m.length-1]; if(l&&l[2]===s[2]&&Math.abs(l[1]-s[0])<1e-6)l[1]=s[1]; else if(s[1]-s[0]>1e-6)m.push(s.slice()); } return m; }
+// ピタッと寄せる候補: 左端か右端をスカイラインの段差・壁に合わせた位置
+function skyCands(sky,w){ const c=new Set(); const add=v=>{ v=Math.round(v*2)/2; if(v>=X0+w/2-1e-6&&v<=X1-w/2+1e-6)c.add(v); };
+  add(X0+w/2); add(X1-w/2); for(const s of sky){ add(s[0]+w/2); add(s[1]-w/2); add(s[0]-w/2); add(s[1]+w/2); } return [...c].sort((p,q)=>p-q); }
+// ---- ここまで ----
+
+// 乗客の種類: 名前・服の色（種類ごとに固定）・横から見た背丈
+const KIND={
+  sal: {n:'会社員',      c:'#3A4256', c2:'#2B3142', hair:'#2A2522', tall:78},
+  stu: {n:'学生',        c:'#24262C', c2:'#16171B', hair:'#1C1816', tall:74},
+  big: {n:'大柄な人',    c:'#8A5A3C', c2:'#6E452D', hair:'#3A2E28', tall:82},
+  pack:{n:'リュックの人',c:'#5E7D5A', c2:'#4A6447', hair:'#4A3A2C', tall:76},
+  kid: {n:'小学生',      c:'#8DB8D8', c2:'#6E9CBE', hair:'#2A2522', tall:48},
+  eld: {n:'杖の高齢者',  c:'#C2AE8A', c2:'#A6926F', hair:'#CFCFCB', tall:66},
+  baby:{n:'ベビーカーの親',c:'#3E8A84',c2:'#2F6E69', hair:'#5A3E2E', tall:74},
+  suit:{n:'旅行者',      c:'#7FA3C9', c2:'#6588AD', hair:'#6B4A32', tall:76},
+};
+const SKIN='#EBC9A6', SKIN2='#D6AD86';
+const PX_CM=0.9;   // 論理1px ≒ 0.9cm（肩幅50px ≒ 45cm）
+
+// 平日朝 中央線快速 東京行（上り）。快速は平日のみ西荻窪・阿佐ケ谷・高円寺に停車
+// track: 番線（Wikipedia各駅記事で上り快速が1線だけと読める駅のみ。それ以外は null で表示しない）
+const STAGES=[
+  {name:'国分寺',dep:'7:32',kana:'こくぶんじ',roma:'Kokubunji',prev:'西国分寺',next:'武蔵小金井',track:null,time:40,
+   seq:'sal stu sal sal stu sal',
+   poles:[],
+   base:[["pack",57],["eld",174],["sal",309],["eld",108],["big",369],["big",231],["stu",292],["stu",214],["stu",106],["big",345],["eld",42],["pack",153],["eld",288],["stu",100],["eld",240],["stu",358],["big",177],["sal",39],["big",321],["sal",105],["kid",377],["stu",256],["sal",51],["big",177],["stu",100],["stu",382],["sal",261]]},
+  {name:'三鷹',dep:'7:39',kana:'みたか',roma:'Mitaka',prev:'武蔵境',next:'吉祥寺',track:null,time:44,
+   seq:'sal big stu sal big stu sal',
+   poles:[],
+   base:[["sal",195],["pack",45],["big",333],["stu",94],["big",117],["sal",273],["big",231],["big",339],["big",69],["stu",286],["sal",153],["sal",231],["sal",363],["stu",286],["stu",280],["sal",171],["kid",323],["sal",51],["eld",114],["pack",333],["sal",255],["pack",177],["pack",45]]},
+  {name:'吉祥寺',dep:'7:42',kana:'きちじょうじ',roma:'Kichijoji',prev:'三鷹',next:'西荻窪',track:4,time:48,
+   seq:'pack sal stu big pack sal stu sal',
+   poles:[],
+   base:[["big",159],["stu",64],["pack",285],["stu",346],["big",345],["big",81],["big",171],["pack",285],["stu",232],["sal",381],["sal",231],["big",99],["sal",39],["sal",207],["sal",285],["stu",346],["sal",99],["stu",34],["sal",165],["stu",220],["sal",297],["sal",351],["sal",99],["eld",42],["stu",238],["kid",155],["sal",285],["kid",197]]},
+  {name:'西荻窪',dep:'7:44',kana:'にしおぎくぼ',roma:'Nishi-Ogikubo',prev:'吉祥寺',next:'荻窪',track:4,time:52,
+   seq:'sal kid eld sal pack stu big kid sal',
+   poles:[],
+   base:[["stu",256],["stu",340],["eld",204],["stu",100],["sal",39],["eld",276],["sal",351],["sal",153],["kid",83],["stu",46],["stu",154],["big",213],["sal",327],["pack",99],["sal",273],["big",213],["kid",383],["eld",42],["big",345],["pack",285],["sal",141],["kid",47],["eld",90],["sal",195],["stu",34],["big",351],["big",129],["stu",244],["big",57],["stu",292],["stu",370],["kid",191]]},
+  {name:'荻窪',dep:'7:46',kana:'おぎくぼ',roma:'Ogikubo',prev:'西荻窪',next:'阿佐ケ谷',track:4,time:56,
+   seq:'baby sal stu big pack sal eld stu sal kid',
+   poles:[],
+   base:[["stu",226],["sal",285],["pack",363],["sal",69],["sal",177],["eld",228],["sal",309],["eld",126],["eld",36],["eld",84],["stu",178],["stu",130],["eld",360],["eld",294],["sal",183],["big",111],["stu",250],["big",357],["stu",238],["kid",65],["sal",171],["sal",297],["stu",52],["big",117],["sal",351],["eld",180],["stu",232],["big",285],["big",357],["sal",51]]},
+  {name:'阿佐ケ谷',dep:'7:48',kana:'あさがや',roma:'Asagaya',prev:'荻窪',next:'高円寺',track:4,time:60,
+   seq:'suit sal pack stu big sal baby stu sal pack stu',
+   poles:[[150,150]],
+   base:[["sal",267],["big",339],["stu",142],["sal",213],["sal",39],["pack",135],["kid",95],["big",51],["pack",213],["pack",297],["sal",375],["sal",45],["kid",389],["stu",148],["kid",359],["big",201],["sal",267],["sal",99],["stu",322],["kid",95],["sal",375],["big",261],["stu",58],["sal",171],["stu",40],["big",351]]},
+  {name:'高円寺',dep:'7:50',kana:'こうえんじ',roma:'Koenji',prev:'阿佐ケ谷',next:'中野',track:4,time:64,
+   seq:'big pack sal suit stu eld sal big kid pack stu sal',
+   poles:[[124,140],[296,120]],
+   base:[["sal",39],["eld",120],["sal",195],["pack",255],["sal",381],["kid",83],["sal",321],["stu",310],["big",375],["pack",177],["sal",51],["stu",238],["stu",100],["sal",297],["sal",69],["eld",360],["sal",237],["sal",165],["sal",291],["pack",81],["kid",29],["kid",125],["sal",183],["sal",381],["big",273],["sal",189],["stu",136],["pack",69],["sal",363]]},
+  {name:'中野',dep:'7:52',kana:'なかの',roma:'Nakano',prev:'高円寺',next:'新宿',track:null,time:68,
+   seq:'pack big sal suit baby stu big sal pack eld stu kid sal',
+   poles:[[112,150],[308,134]],
+   base:[["stu",364],["pack",111],["sal",201],["big",267],["stu",64],["stu",40],["pack",327],["kid",389],["sal",207],["sal",99],["sal",267],["pack",153],["sal",39],["pack",381],["sal",249],["stu",202],["sal",303],["big",63],["stu",166],["big",345],["eld",252],["pack",51],["pack",177],["sal",123],["sal",321]]},
+];
+const SOURCE="混雑率＝国土交通省「東京圏における主要区間の混雑率」令和7年度 中央線快速 中野→新宿 7:35〜8:35 158%／番線＝Wikipedia各駅記事（概略値）／発車時刻は架空、人と車内の寸法は概略値";
+
+const G={screen:'title',stage:0,time:0,queue:[],cur:null,placed:[],base:[],sky:null,fx:null,shake:0,guide:0,total:0,lineup:[]};
 let lastTs=0;
+const L={}; // レイアウト（H から計算）
+function onResize(){
+  L.CB=H-28;                // 車体の外板（反対側）
+  L.wallB=L.CB-8;           // 反対側の内壁
+  L.back=L.wallB-46;        // 奥（座っている客のひざ先）= 奥行き0
+  L.door=L.back-SD;         // ドアライン
+  L.wallT=L.door-44;        // ホーム側の内壁
+  L.CT=L.wallT-10;          // ホーム側の外板
+  L.edge=L.CT-7;            // ホームの端
+  L.ps=Math.max(1,Math.min(1.6,(L.edge-topY()-200)/130)); // ホームの人の拡大率（縦に余裕がある端末で大きく）
+  L.floor=L.edge-34*L.ps;   // ホームの床の奥
+  L.feet=L.edge-20*L.ps;    // 列に並ぶ人の足元
+}
+const yOf=d=>L.back-d;      // 奥行き → 画面y
+const DOOR0=150, DOOR1=270, DOORC=210;
 
 function startStage(i){
   const st=STAGES[i];
-  G.stage=i; G.queue=st.seq.map(k=>({...TYPES[k],k})); G.pile=[]; G.time=st.time;
-  G.miss=0; G.screen='play'; nextPassenger();
-  $('popup').classList.add('hidden');
+  G.stage=i; G.time=st.time; G.screen='play'; UI.close();
+  G.fx=null; G.shake=0; G.guide=2.6; G.hand=i===0?4:0;
+  const b=buildBase(st); G.sky=b.sky; G.base=b.objs; G.placed=[];
+  G.queue=st.seq.split(' ');
+  G.lineup=G.queue.map((k,j)=>({k,x:null,lane:j%2})); G.qNeed=queueNeed();
+  G.doorOpen=1; G.carX=0;
+  nextPassenger();
+}
+function restart(){ startStage(G.stage); }
+// 既に乗っている客（固定）: 奥から順に詰まった状態を再現。握り棒は最後に立てる
+function buildBase(st){
+  let sky=skyNew(); const objs=[];
+  st.base.forEach(([k,x],i)=>{ const {w,h}=PT[k]; const d=skyLand(sky,x,w); sky=skyPut(sky,x,w,d+h); objs.push({k,x,d,face:(i*7)%3===0?-1:1}); });
+  for(const p of st.poles){ const d=Math.max(skyLand(sky,p[0],PT.pole.w),p[1]); sky=skyPut(sky,p[0],PT.pole.w,d+PT.pole.h); objs.push({k:'pole',x:p[0],d}); }
+  return {sky,objs};
 }
 function nextPassenger(){
   if(!G.queue.length){ G.cur=null; return; }
-  const p=G.queue.shift();
-  G.cur={...p,x:(CAR.x0+CAR.x1)/2,y:120,vy:0,state:'aim',rot:0};
+  const k=G.queue.shift(), lane=G.lineup.shift().lane;
+  const {w,h}=PT[k];
+  const x=G.cur&&G.cur.x!=null?clampX(G.cur.x,w):DOORC;
+  G.cur={k,w,h,x,lane,state:'aim',t:0,y0:0,y1:0};
 }
-function dropCur(){ if(G.cur&&G.cur.state==='aim'){G.cur.state='fall';G.cur.vy=0;} }
+const clampX=(x,w)=>Math.max(X0+w/2,Math.min(X1-w/2,x));
+// 指の位置 → 立つ位置。隣の人・壁にピタッと寄せる（12px以内）
+function aimAt(px){
+  const c=G.cur; if(!c||c.state!=='aim')return;
+  let x=clampX(px,c.w), best=null, bd=12;
+  for(const v of skyCands(G.sky,c.w)){ const dd=Math.abs(v-x); if(dd<bd){bd=dd;best=v;} }
+  c.x=best!=null?best:Math.round(x*2)/2;
+}
+function stepCand(dir){
+  const c=G.cur; if(!c||c.state!=='aim')return;
+  const cs=skyCands(G.sky,c.w);
+  const n=dir<0?cs.filter(v=>v<c.x-0.25).pop():cs.find(v=>v>c.x+0.25);
+  if(n!=null)c.x=n;
+}
+function holdY(c){ return L.door-c.h/2-4; }
+function release(){
+  const c=G.cur; if(!c||c.state!=='aim'||G.fx)return;
+  c.d=skyLand(G.sky,c.x,c.w); c.state='move'; c.t=0; c.y0=holdY(c); c.y1=yOf(c.d)-c.h/2;
+}
+// 着地（ソルバーと同じ式で確定）
+function settle(){
+  const c=G.cur; const top=c.d+c.h;
+  G.sky=skyPut(G.sky,c.x,c.w,top);
+  G.placed.push({k:c.k,x:c.x,d:c.d,face:1}); G.cur=null; G.shake=0.12; buzz(12);
+  if(top>SD+1e-6){ G.over={k:c.k,cm:Math.max(1,Math.round((top-SD)*PX_CM))}; G.fx={type:'door',t:0}; buzz([30,40,60]); return; }
+  if(!G.queue.length){ G.fx={type:'depart',t:0}; return; }
+  nextPassenger();
+}
 
-// 積み上げ判定: 落下物が床または最も高い接地矩形の上に乗る
-function landingY(p){
-  let top=CAR.floor;
-  for(const b of G.pile){
-    const overlap=Math.min(p.x+p.w/2,b.x+b.w/2)-Math.max(p.x-p.w/2,b.x-b.w/2);
-    if(overlap>4){ top=Math.min(top,b.y-b.h/2); }
-  }
-  return top;
-}
 function update(dt){
-  G.time-=dt;
-  if(G.time<=0){ return fail('発車時刻です','乗せきれませんでした。\n残り '+ (G.queue.length+(G.cur?1:0)) +' 人がホームに取り残されました。'); }
-  const p=G.cur;
-  if(p&&p.state==='fall'){
-    p.vy+=1400*dt; p.y+=p.vy*dt;
-    const land=landingY(p)-p.h/2;
-    if(p.y>=land){
-      p.y=land; p.state='settled'; G.shake=0.15;
-      G.pile.push(p); G.cur=null;
-      if(p.y-p.h/2<CAR.door){ return fail('ドアが閉まりません','積み上がった乗客がドアラインを越えました。\n安全確認のため '+STAGES[G.stage].station+' をやり直します。'); }
-      if(!G.queue.length){ return stageClear(); }
-      nextPassenger();
+  if(G.shake>0)G.shake=Math.max(0,G.shake-dt);
+  if(G.guide>0)G.guide-=dt;
+  if(G.hand>0)G.hand-=dt;
+  if(G.fx){ return updateFx(dt); }
+  const c=G.cur;
+  G.time=Math.max(0,G.time-dt);
+  if(G.time<=0&&!(c&&c.state==='move')){
+    if(c){ G.lineup.unshift({k:c.k,x:DOORC+(c.lane?-30:30),lane:c.lane}); G.queue.unshift(c.k); G.cur=null; }
+    G.fx={type:'bell',t:0,left:G.queue.length}; return; }
+  if(c&&c.state==='move'){ c.t+=dt/0.26; if(c.t>=1)settle(); }
+}
+function updateFx(dt){
+  const f=G.fx; f.t+=dt;
+  if(f.type==='door'){
+    // 閉まりかけ → はさまる → 開く を2回
+    const ph=f.t%0.55, n=Math.floor(f.t/0.55);
+    G.doorOpen=n<2?(ph<0.22?1-ph/0.22*0.72:ph<0.3?0.28:0.28+(ph-0.3)/0.25*0.72):1;
+    if(n<2&&Math.abs(ph-0.22)<dt)G.shake=0.18;
+    if(f.t>=1.25&&!f.done){ f.done=true; failDoor(); }
+  } else if(f.type==='depart'){
+    G.doorOpen=Math.max(0,1-f.t/0.3);
+    if(f.t>0.45)G.carX=-Math.pow(f.t-0.45,2)*520;
+    if(f.t>=1.5&&!f.done){ f.done=true; stageClear(); }
+  } else if(f.type==='bell'){
+    G.doorOpen=f.t<0.55?1:Math.max(0,1-(f.t-0.55)/0.25);
+    if(f.t>0.85)G.carX=-Math.pow(f.t-0.85,2)*520;
+    if(f.t>=1.75&&!f.done){ f.done=true; failBell(); }
+  }
+}
+function boardedNow(){ return G.placed.length; }
+function marginCm(){ let m=SD; for(const s of G.sky)m=Math.min(m,SD-s[2]); return Math.round(m*PX_CM); }
+function trainOf(st){ return '快速 東京行 10両　'+st.dep+'発'; }
+function stTrack(st){ return st.track?st.track+'番線':''; }
+
+function failDoor(){
+  const st=STAGES[G.stage], o=G.over, n=KIND[o.k].n;
+  G.screen='result';
+  UI.sheet({no:GAME_NO+' · 遅延証明書',title:'ドアが閉まりません',stamp:'閉扉不能',
+    lead:'「'+st.name+'、'+(st.track?stTrack(st)+'、':'')+'ドアが閉まりません。無理なご乗車はおやめください」\n最後に押し込んだ'+n+'が、ドアラインから '+o.cm+'cm はみ出していました。',
+    rows:[['列車',trainOf(st)],['駅',st.name+'（'+(G.stage+1)+'/'+STAGES.length+'）'],['乗せた人数',boardedNow()+' / '+st.seq.split(' ').length+' 人'],['はみ出し',n+' '+o.cm+'cm'],['累計乗車',(G.total+boardedNow())+' 人']],
+    main:['この駅をやり直す',restart],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+'で'+n+'がドアラインから'+o.cm+'cmはみ出して「ドアが閉まりません」。乗せた人数 '+boardedNow()+'人',TAG)],['一覧へ',toPortal]]});
+}
+function failBell(){
+  const st=STAGES[G.stage], left=G.fx.left;
+  const names=[...new Set(G.lineup.map(p=>KIND[p.k].n))].slice(0,2).join('・');
+  G.screen='result';
+  UI.sheet({no:GAME_NO+' · 乗務報告',title:'積み残しのまま発車',stamp:'積残',
+    lead:'発車ベルが鳴り終わりました。\n「'+st.name+'、ホームに '+left+' 人残っています。次の電車をお待ちください」\n'+names+'が乗れませんでした。',
+    rows:[['列車',trainOf(st)],['駅',st.name+'（'+(G.stage+1)+'/'+STAGES.length+'）'],['乗せた人数',boardedNow()+' / '+st.seq.split(' ').length+' 人'],['積み残し',left+' 人'],['累計乗車',(G.total+boardedNow())+' 人']],
+    main:['この駅をやり直す',restart],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+'でホームに'+left+'人積み残して発車。乗せた人数 '+boardedNow()+'人',TAG)],['一覧へ',toPortal]]});
+}
+function stageClear(){
+  const st=STAGES[G.stage], last=G.stage>=STAGES.length-1, n=boardedNow(), m=marginCm();
+  G.total+=n; G.screen='result';
+  const rows=[['列車',trainOf(st)],['駅',st.name+'（'+(G.stage+1)+'/'+STAGES.length+'）'],['乗せた人数',n+' 人'],['発車まで',Math.ceil(G.time)+' 秒残し'],['ドア前の余裕','最も出ている人で あと '+m+'cm'],['累計乗車',G.total+' 人']];
+  if(last){
+    UI.sheet({no:GAME_NO+' · 乗務報告',title:'中野 発車　東京行',stamp:'発車',round:true,
+      lead:'国分寺から中野まで 8駅、ひとりも積み残さずに押し込みました。\n「この先、新宿まで止まりません」',
+      rows:[['乗せた人数','合計 '+G.total+' 人（8駅）'],['最後の駅',st.name+'　ドアラインまで あと '+m+'cm'],['この先の混雑','中野→新宿 158%（国土交通省 令和7年度 7:35〜8:35）']],
+      main:['国分寺からもう一度',()=>{G.total=0;startStage(0);}],
+      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】国分寺〜中野の8駅で '+G.total+'人を押し込んで発車させた。最後の中野はドアラインまで'+m+'cm',TAG)],['一覧へ',toPortal]]});
+  } else {
+    UI.sheet({no:GAME_NO+' · 乗務報告',title:st.name+' 発車',stamp:'発車',round:true,
+      lead:'「ドアが閉まります。ご注意ください」\n次の持ち場は '+STAGES[G.stage+1].name+' 駅。',
+      rows, main:['次の駅へ',()=>startStage(G.stage+1)],
+      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+'で '+n+'人を押し込んで発車。ドアラインまで'+m+'cm',TAG)],['一覧へ',toPortal]]});
+  }
+}
+function showTitle(){
+  G.screen='title'; UI.hideHud();
+  const st=STAGES[0]; G.stage=0; const b=buildBase(st); G.sky=b.sky; G.base=b.objs; G.placed=[]; G.queue=st.seq.split(' ');
+  G.lineup=G.queue.map((k,j)=>({k,x:null,lane:j%2})); G.qNeed=queueNeed(); G.cur=null; G.fx=null; G.doorOpen=1; G.carX=0;
+  UI.sheet({no:GAME_NO+' · 業務内容',title:'満員電車パッキング',
+    lead:'平日朝の中央線快速、東京行。\nあなたは駅の押し屋。ホームに並んだ人を、発車までに全員車内へ。',
+    rows:[['あなたの権限','乗客を指でつまんで、車内の好きな位置へ押し込める'],
+          ['操作','指を置いて左右にずらし、離すと乗り込む（キーは ←→ と ↓）'],
+          ['失敗','ドアラインからはみ出すとドアが閉まらない。発車ベルまでに乗せきれないと積み残し'],
+          ['出典',SOURCE]],
+    main:['国分寺から乗務する',()=>{G.total=0;startStage(0);}],subs:[['一覧へ',toPortal]]});
+}
+
+// ---- 入力: 指を置いた瞬間にその横位置へ。ずらして決め、離すと乗車 ----
+let drag=null;
+$('wrap').addEventListener('pointerdown',e=>{
+  if(G.screen!=='play'||G.fx||!G.cur||G.cur.state!=='aim')return;
+  if(e.target.closest&&e.target.closest('#hud'))return;
+  drag=e.pointerId; G.hand=0; try{$('wrap').setPointerCapture(e.pointerId);}catch(_){}
+  aimAt(toGame(e).x); e.preventDefault();
+});
+$('wrap').addEventListener('pointermove',e=>{ if(drag===e.pointerId)aimAt(toGame(e).x); });
+function endDrag(e,go){ if(drag!==e.pointerId)return; drag=null; if(go&&G.screen==='play')release(); }
+$('wrap').addEventListener('pointerup',e=>endDrag(e,true));
+$('wrap').addEventListener('pointercancel',e=>endDrag(e,false));
+window.addEventListener('keydown',e=>{
+  if(G.screen!=='play'||G.fx)return;
+  if(['ArrowLeft','ArrowRight','ArrowDown',' '].includes(e.key))G.hand=0;
+  if(e.key==='ArrowLeft'){stepCand(-1);e.preventDefault();}
+  if(e.key==='ArrowRight'){stepCand(1);e.preventDefault();}
+  if(e.key===' '||e.key==='ArrowDown'){release();e.preventDefault();}
+});
+// 検証用: 位置の列を渡すと、その面を即座に乗せ切る（スクリーンショットとソルバー照合に使う）
+// 検証用: 全駅 × 状態（着地予測・ドア・ベル・発車）を描いて、文字のはみ出しと列の人のはみ出し・重なりを数える
+window.__audit=()=>{
+  const out={txt:[],ppl:[],hud:[],minHead:1e9};
+  const one=tag=>{ AUDIT.txt=[]; AUDIT.ppl=[]; AUDIT.on=true; ctx.save(); draw(); ctx.restore(); AUDIT.on=false;
+    AUDIT.txt.forEach(t=>out.txt.push(tag+' '+JSON.stringify(t)));
+    for(const p of AUDIT.ppl){ if(p.x0<0||p.x1>W)out.ppl.push(tag+' 端 '+JSON.stringify(p)); }
+    for(const lane of [0,1]){ const a=AUDIT.ppl.filter(p=>p.lane===lane).sort((p,q)=>p.i-q.i);
+      for(let j=1;j<a.length;j++){ const d=Math.abs(a[j].hx-a[j-1].hx); out.minHead=Math.min(out.minHead,d); if(d<10)out.ppl.push(tag+' 頭の間隔'+d.toFixed(1)+' '+a[j].k); } }
+    for(const id of ['hudL','hudC']){ const e=$(id); if(e.scrollWidth>e.clientWidth+1)out.hud.push(tag+' '+id+' '+e.textContent); } };
+  STAGES.forEach((st,i)=>{
+    startStage(i); one(st.name+' 開始');
+    for(const x of skyCands(G.sky,G.cur.w)){ G.cur.x=x; one(st.name+' 予測x'+x); }
+    G.fx={type:'door',t:0.3}; G.doorOpen=0.3; G.placed.push({k:G.cur.k,x:G.cur.x,d:0,face:1}); one(st.name+' ドア');
+    G.placed.pop(); G.fx={type:'bell',t:0.3,left:G.queue.length+1}; one(st.name+' ベル');
+    G.fx={type:'depart',t:0.2}; one(st.name+' 発車');
+    G.fx=null; G.time=5; one(st.name+' 残り5秒');
+  });
+  showTitle(); one('タイトル');
+  return {W,H,txt:out.txt.length,ppl:out.ppl.length,hud:out.hud.length,minHead:+out.minHead.toFixed(1),detail:[...out.txt,...out.ppl,...out.hud].slice(0,30)};
+};
+window.__play=xs=>{ for(const x of xs){ if(!G.cur)break; G.cur.x=x; release(); settle(); if(G.fx)break; } return {fx:G.fx&&G.fx.type,sky:Math.max(...G.sky.map(s=>s[2])),SD}; };
+
+// ---- 描画 ----------------------------------------------------
+function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function ell(x,y,rx,ry,fill){ ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2); ctx.fillStyle=fill; ctx.fill(); }
+function circ(x,y,r,fill){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=fill; ctx.fill(); }
+
+// 真上から見た人。face=1: 顔が奥（画面下）向き、-1: ドア向き
+function drawTop(k,cx,cy,face){
+  const K=KIND[k];
+  ctx.save(); ctx.translate(cx,cy); if(face<0)ctx.scale(1,-1);
+  const head=(x,y,r,hair)=>{ circ(x,y,r,hair); ell(x,y+r*0.45,r*0.72,r*0.5,SKIN); circ(x,y-r*0.1,r*0.78,hair); ell(x,y+r*0.95,r*0.16,r*0.12,SKIN2); };
+  const torso=(x,y,rx,ry,c,c2)=>{ ell(x,y,rx,ry,c2); ell(x,y+1.5,rx-1,ry-1.5,c); };
+  const arm=(x,y,rx,ry,c)=>ell(x,y,rx,ry,c);
+  if(k==='sal'){
+    arm(-20,5,5,8,K.c2); arm(20,5,5,8,K.c2); torso(0,1,22,11,K.c,K.c2);
+    ctx.beginPath(); ctx.moveTo(-4,10); ctx.lineTo(0,13); ctx.lineTo(4,10); ctx.fillStyle='#F1EFEA'; ctx.fill();
+    head(0,2,8.5,K.hair);
+  } else if(k==='stu'){
+    arm(-16,4,4,7,K.c2); arm(16,4,4,7,K.c2); torso(0,1,17,9.5,K.c,K.c2);
+    ctx.strokeStyle='#4B4F5A'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-12,-6); ctx.lineTo(10,8); ctx.stroke();
+    rr(9,3,10,8,1.5); ctx.fillStyle='#3B4A6B'; ctx.fill();
+    circ(0,10.5,1.2,'#C9A548');
+    head(0,1.5,8,K.hair);
+  } else if(k==='big'){
+    arm(-27,5,6,11,K.c2); arm(27,5,6,11,K.c2); torso(0,1,28,15,K.c,K.c2);
+    head(0,2,9.5,K.hair);
+  } else if(k==='pack'){
+    arm(-20,10,5,8,K.c2); arm(20,10,5,8,K.c2); torso(0,7,21,11.5,K.c,K.c2);
+    rr(-15,-21,30,18,4); ctx.fillStyle='#2F3135'; ctx.fill(); rr(-11,-19,22,7,3); ctx.fillStyle='#45484E'; ctx.fill();
+    ctx.strokeStyle='#2F3135'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(-10,-4); ctx.lineTo(-11,8); ctx.moveTo(10,-4); ctx.lineTo(11,8); ctx.stroke();
+    head(0,8,8.5,K.hair);
+  } else if(k==='kid'){
+    arm(-11,6,3.5,5,K.c2); arm(11,6,3.5,5,K.c2);
+    rr(-10,-15,20,13,3); ctx.fillStyle='#6E3A2E'; ctx.fill(); rr(-10,-15,20,4,2); ctx.fillStyle='#57291F'; ctx.fill();
+    torso(0,4,12,8,K.c,K.c2);
+    circ(0,5,9,'#E0B12A'); circ(0,5,7,'#F2C230'); ell(0,11.5,5,2,SKIN);
+  } else if(k==='eld'){
+    arm(-17,1,4.5,7,K.c2); arm(16,4,4.5,8,K.c2); torso(0,-3,19,11,K.c,K.c2);
+    ctx.strokeStyle='#6B4A2E'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(16,9); ctx.lineTo(17,16); ctx.stroke(); circ(17,16.5,2,'#4A3220');
+    head(0,1,8,K.hair);
+  } else if(k==='baby'){
+    // 親（奥側=ドア寄り）とベビーカー（進行方向=奥）
+    arm(-17,-18,4.5,8,K.c2); arm(17,-18,4.5,8,K.c2); torso(0,-25,19,10,K.c,K.c2); head(0,-24,8,K.hair);
+    ctx.fillStyle='#2E2E30'; [[-20,-9],[16,-9],[-20,30],[16,30]].forEach(([x,y])=>{ rr(x,y,4,7,1); ctx.fill(); });
+    rr(-16,-12,32,46,5); ctx.fillStyle='#4A4C50'; ctx.fill(); rr(-13,-9,26,40,4); ctx.fillStyle='#D8D2C4'; ctx.fill();
+    ctx.strokeStyle='#2E2E30'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(-15,-12); ctx.lineTo(15,-12); ctx.stroke();
+    ell(0,6,9,10,'#9CC3A8'); circ(0,-3,5.5,SKIN);
+    ctx.beginPath(); ctx.ellipse(0,20,15,16,0,0,Math.PI); ctx.fillStyle='#D9A441'; ctx.fill(); ctx.beginPath(); ctx.ellipse(0,20,15,4,0,0,Math.PI*2); ctx.fillStyle='#BF8C30'; ctx.fill();
+  } else if(k==='suit'){
+    arm(-32,4,5,8,K.c2); arm(8,4,5,8,K.c2); torso(-12,1,21,11,K.c,K.c2); head(-12,2,8.5,K.hair);
+    ctx.strokeStyle='#555'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(10,3); ctx.lineTo(15,0); ctx.stroke();
+    rr(14,-12,21,24,3); ctx.fillStyle='#A9AEB5'; ctx.fill(); rr(15,-11,19,22,2); ctx.fillStyle='#C3C7CD'; ctx.fill();
+    ctx.fillStyle='#A9AEB5'; ctx.fillRect(20,-11,1.5,22); ctx.fillRect(27,-11,1.5,22);
+  }
+  ctx.restore();
+}
+
+// 横から見た人（ホームの列）。dir=1: 右向き
+function drawSide(k,x,fy,dir,sc){
+  const K=KIND[k];
+  ctx.save(); ctx.translate(x,fy); ctx.scale(dir*(sc||1),sc||1);
+  const tall=K.tall;
+  const pants=k==='stu'?'#1D1E22':k==='kid'?'#2F3F5C':k==='eld'?'#6E6A60':k==='sal'?'#2E3444':'#3E3E44';
+  const legs=(h,sp,w)=>{ ctx.fillStyle=pants; rr(-sp-w/2,-h,w,h,2); ctx.fill(); rr(sp-w/2,-h,w,h,2); ctx.fill(); ctx.fillStyle='#1E1C1A'; rr(-sp-w/2,-3,w+5,3,1.5); ctx.fill(); rr(sp-w/2,-3,w+5,3,1.5); ctx.fill(); };
+  const head=(hx,hy,r,hair)=>{ circ(hx,hy,r,SKIN); ctx.beginPath(); ctx.arc(hx,hy,r+0.6,Math.PI*0.95,Math.PI*2.05); ctx.fillStyle=hair; ctx.fill(); ctx.fillRect(hx-r-0.6,hy-1,r*0.7,r*0.9); circ(hx+r*0.98,hy+r*0.15,1.6,SKIN2); };
+  if(k==='kid'){
+    legs(18,3,6);
+    rr(-9,-38,16,21,4); ctx.fillStyle=K.c; ctx.fill();
+    rr(-15,-38,9,15,3); ctx.fillStyle='#6E3A2E'; ctx.fill();
+    head(0,-45,7.5,K.hair); ctx.beginPath(); ctx.ellipse(0,-50,9.5,3.5,0,Math.PI,Math.PI*2); ctx.fillStyle='#F2C230'; ctx.fill(); ctx.fillStyle='#E0B12A'; ctx.fillRect(-10,-50,20,2.5);
+  } else if(k==='eld'){
+    legs(26,3,7);
+    ctx.save(); ctx.translate(0,-26); ctx.rotate(0.22); rr(-9,-26,18,28,6); ctx.fillStyle=K.c; ctx.fill(); ctx.restore();
+    head(8,-58,7.5,K.hair);
+    ctx.strokeStyle='#6B4A2E'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(13,-36); ctx.lineTo(17,0); ctx.stroke();
+    ctx.strokeStyle=K.c2; ctx.lineWidth=5; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(4,-46); ctx.lineTo(13,-36); ctx.stroke();
+  } else {
+    const wide=k==='big'?1.3:k==='stu'?0.85:1;
+    legs(tall*0.46,3,7*wide);
+    rr(-10*wide,-tall*0.82,20*wide,tall*0.42,6); ctx.fillStyle=K.c; ctx.fill();
+    ctx.fillStyle=K.c2; rr(-10*wide,-tall*0.82,7*wide,tall*0.42,5); ctx.fill();
+    if(k==='sal'){ ctx.fillStyle='#F1EFEA'; ctx.beginPath(); ctx.moveTo(4,-tall*0.82); ctx.lineTo(9,-tall*0.82); ctx.lineTo(6,-tall*0.7); ctx.fill(); }
+    if(k==='pack'){ rr(-20,-tall*0.8,11,tall*0.34,4); ctx.fillStyle='#2F3135'; ctx.fill(); }
+    if(k==='stu'){ ctx.fillStyle='#C9A548'; circ(7,-tall*0.72,1,'#C9A548'); circ(7,-tall*0.63,1,'#C9A548'); }
+    head(1,-tall*0.82-9,8.5*(k==='big'?1.1:1),K.hair);
+    // 腕・持ち物
+    ctx.strokeStyle=K.c2; ctx.lineWidth=5*wide; ctx.lineCap='round';
+    if(k==='baby'){
+      ctx.beginPath(); ctx.moveTo(2,-tall*0.76); ctx.lineTo(16,-tall*0.5); ctx.stroke();
+      ctx.strokeStyle='#2E2E30'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(16,-tall*0.5); ctx.lineTo(24,-6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(22,-12); ctx.lineTo(40,-12); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(32,-26,11,12,0,Math.PI,Math.PI*1.95); ctx.fillStyle='#D9A441'; ctx.fill();
+      rr(22,-26,20,12,3); ctx.fillStyle='#4A4C50'; ctx.fill(); circ(25,-3,3.2,'#2E2E30'); circ(39,-3,3.2,'#2E2E30');
+    } else if(k==='suit'){
+      ctx.beginPath(); ctx.moveTo(-4,-tall*0.74); ctx.lineTo(-14,-tall*0.42); ctx.stroke();
+      ctx.strokeStyle='#555'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-14,-tall*0.42); ctx.lineTo(-20,-30); ctx.stroke();
+      rr(-34,-31,18,30,3); ctx.fillStyle='#B8BCC2'; ctx.fill(); ctx.fillStyle='#9EA3AA'; ctx.fillRect(-29,-31,1.5,30); ctx.fillRect(-23,-31,1.5,30);
+      circ(-31,-1,2,'#2E2E30'); circ(-19,-1,2,'#2E2E30');
+    } else if(k==='sal'){
+      ctx.beginPath(); ctx.moveTo(0,-tall*0.76); ctx.lineTo(2,-tall*0.44); ctx.stroke();
+      rr(-6,-tall*0.44,18,13,2); ctx.fillStyle='#2A2522'; ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.moveTo(0,-tall*0.76); ctx.lineTo(3,-tall*0.44); ctx.stroke();
+      if(k==='stu'){ rr(-12,-tall*0.5,16,12,2); ctx.fillStyle='#3B4A6B'; ctx.fill(); }
+    }
+  }
+  ctx.restore();
+}
+// 横から見た人の左右の広がり（右向き・等倍）。持ち物・杖・ベビーカー込み
+const SIDE_EXT={sal:[-11,13],stu:[-12,11],big:[-14,14],pack:[-21,11],kid:[-16,10],eld:[-11,19],baby:[-12,43],suit:[-36,11]};
+const sideExtW=k=>SIDE_EXT[k][1]-SIDE_EXT[k][0];
+// 列の立ち位置: ドアの脇から外へ。端（x=4 / W-4）を越えるときは間を詰める（k<1）
+function laneLayout(list,lane,qs){
+  const gap=3, edge=lane===0?W-4:4;
+  for(let k=1;;k-=0.01){
+    let at=lane===0?DOOR1+8:DOOR0-8, far=at;
+    const pos=list.map(p=>{ const [l,r]=SIDE_EXT[p.k]; let tx;
+      // lane0 は左向き（左右が反転する）
+      if(lane===0){ tx=at+r*qs*k; at=tx-l*qs*k+gap*k; far=Math.max(far,tx-l*qs); }
+      else { tx=at-r*qs*k; at=tx+l*qs*k-gap*k; far=Math.min(far,tx+l*qs); }
+      return tx; });
+    if((lane===0?far<=edge:far>=edge)||k<=0.3)return {pos,k};
+  }
+}
+// 駅に着いた時点の列の長さで、列の人の大きさを決める（端からはみ出さない・重なりすぎない）
+function queueNeed(){ let n=0;
+  for(const lane of [0,1]){ const list=G.lineup.filter(p=>p.lane===lane); n=Math.max(n,list.reduce((a,p)=>a+sideExtW(p.k)+3,0)); }
+  return n; }
+const queueScale=()=>G.qNeed>0?Math.min(L.ps,Math.max(0.9,136/(0.62*G.qNeed))):L.ps;
+
+function drawPlatform(){
+  const t0=topY(), e=L.edge;
+  // 高架ホームの向こうの空と街（中央線 三鷹〜中野は高架）
+  const fl=L.floor, sky=ctx.createLinearGradient(0,t0,0,fl);
+  sky.addColorStop(0,'#BFD6E4'); sky.addColorStop(1,'#E6EDEE');
+  ctx.fillStyle=sky; ctx.fillRect(0,t0,W,fl-t0);
+  const gl=fl-34*L.ps; // ホーム奥の柵の上端
+  const BLD=[[0,70,'#AEB8BF'],[60,120,'#9FAAB2'],[96,52,'#B6BFC5'],[150,96,'#A7B1B8'],[214,140,'#98A3AB'],[262,66,'#B2BBC1'],[310,108,'#A2ACB4'],[360,80,'#AAB4BA'],[392,130,'#9AA5AD']];
+  for(const [x,h,c] of BLD){ const hh=Math.min(h*L.ps,gl-t0-70); if(hh<=0)continue; ctx.fillStyle=c; ctx.fillRect(x,gl-hh,48,hh);
+    ctx.fillStyle='rgba(255,255,255,.28)'; for(let y=gl-hh+8;y<gl-6;y+=12)for(let wx=x+6;wx<x+44;wx+=10)ctx.fillRect(wx,y,5,5); }
+  // ホーム奥の柵・上屋
+  ctx.fillStyle='#C9C3B6'; ctx.fillRect(0,gl,W,fl-gl); ctx.fillStyle='#B5AE9F'; ctx.fillRect(0,gl,W,3);
+  ctx.fillStyle='#ADA696'; for(let x=10;x<W;x+=24)ctx.fillRect(x,gl+3,2,fl-gl-3);
+  ctx.fillStyle='#4E4C46'; ctx.fillRect(0,t0,W,16); ctx.fillStyle='#62605A'; ctx.fillRect(0,t0+16,W,4);
+  ctx.fillStyle='#ECEBE4'; for(let x=18;x<W;x+=92){ ctx.fillRect(x,t0+20,56,3); }
+  for(const px of [64,356]){ ctx.fillStyle='#7C8187'; ctx.fillRect(px-5,t0+20,10,fl-t0-20); ctx.fillStyle='#6A6F75'; ctx.fillRect(px+2,t0+20,3,fl-t0-20); }
+  const st=STAGES[G.stage];
+  // 発車標（吊り下げ）
+  // 発車標（吊り下げ）: 先発・次発の 種別／発車時刻／行先／両数（＋番線）だけ
+  const bx=12,by=t0+30,bw=252,bh=50;
+  ctx.fillStyle='#4A4840'; ctx.fillRect(bx+30,t0+16,2,14); ctx.fillRect(bx+bw-32,t0+16,2,14);
+  ctx.fillStyle='#1B1B1D'; ctx.fillRect(bx,by,bw,bh); ctx.strokeStyle='#6B6A66'; ctx.lineWidth=2; ctx.strokeRect(bx,by,bw,bh);
+  ctx.fillStyle='#2C2C2F'; ctx.fillRect(bx+3,by+bh/2-0.5,bw-6,1);
+  ctx.textBaseline='middle';
+  const [hh,mm]=st.dep.split(':').map(Number), dep2=hh+':'+String(mm+2).padStart(2,'0');
+  // 列: [左端, 幅, 揃え]
+  const C=[[6,26,'left'],[34,34,'left'],[70,40,'right'],[118,36,'left'],[156,38,'right'],[200,46,'right']];
+  const cell=(i,t,y,col,sz,wt)=>{ const [cx,cw,al]=C[i]; ctx.textAlign=al; ctx.fillStyle=col; fitText(t,al==='left'?bx+cx:bx+cx+cw,y,cw,sz,wt); };
+  [['先発',st.dep,by+13],['次発',dep2,by+37]].forEach(([lab,tm,y])=>{
+    cell(0,lab,y,'#BDB9AE',11,'600'); cell(1,'快速',y,'#FF9A2E',14,'700'); cell(2,tm,y,'#F2EEE2',14,'700');
+    cell(3,'東京',y,'#F2EEE2',14,'700'); cell(4,'10両',y,'#F2EEE2',13,'600');
+    if(st.track)cell(5,st.track+'番線',y,'#9FD38A',12,'600');
+  });
+  // 駅名標（壁）
+  const nx=272,ny=by,nw=W-8-272,nh=76;
+  ctx.fillStyle='#4A4840'; ctx.fillRect(nx+20,t0+16,2,ny-t0-16); ctx.fillRect(nx+nw-22,t0+16,2,ny-t0-16);
+  if(e-t0>190){
+    ctx.fillStyle='#FBFAF6'; ctx.fillRect(nx,ny,nw,nh); ctx.strokeStyle='#9C968A'; ctx.lineWidth=1; ctx.strokeRect(nx,ny,nw,nh);
+    ctx.textAlign='center'; ctx.fillStyle='#22201C'; fitText(st.name,nx+nw/2,ny+15,nw-10,19,'800');
+    ctx.fillStyle='#4A463E'; fitText(st.kana,nx+nw/2,ny+34,nw-8,10,'500'); fitText(st.roma,nx+nw/2,ny+47,nw-8,10,'500');
+    ctx.fillStyle='#E8822A'; ctx.fillRect(nx,ny+55,nw,6);
+    ctx.fillStyle='#22201C'; ctx.textAlign='left'; fitText('←'+st.next,nx+4,ny+68,nw/2-6,10,'500'); ctx.textAlign='right'; fitText(st.prev+'→',nx+nw-4,ny+68,nw/2-6,10,'500');
+  }
+  // ホームの床・点字ブロック・乗車位置
+  const fh=e-fl;
+  ctx.fillStyle='#A8A398'; ctx.fillRect(0,fl,W,fh); ctx.fillStyle='#B8B3A8'; ctx.fillRect(0,fl,W,3);
+  ctx.fillStyle='#E9C21C'; ctx.fillRect(0,e-15,W,9);
+  for(let x=3;x<W;x+=7){ circ(x,e-12.5,1.3,'#D2AC12'); circ(x+3.5,e-8.5,1.3,'#D2AC12'); }
+  ctx.fillStyle='#ECEBE4'; ctx.fillRect(0,e-3,W,3);
+  // 乗車位置の足元表示（ドアの両脇に2列で並ぶ）
+  ctx.fillStyle='#3E7A4E';
+  for(const x of [DOOR0-8,DOOR1+8]){ ctx.beginPath(); ctx.moveTo(x-7,e-17); ctx.lineTo(x+7,e-17); ctx.lineTo(x,e-27); ctx.closePath(); ctx.fill(); }
+  ctx.textBaseline='middle'; ctx.textAlign='center'; ctx.fillStyle='#2F5E3B'; fitText('乗車位置',DOORC,e-21,DOOR1-DOOR0-40,10,'700');
+  // 列: 右の列（左向き）と左の列（右向き）に交互に並ぶ
+  const now=performance.now()/1000;
+  // 列の人の大きさは駅ごとに固定（最初の列の長さで決める）。並びきれない分は一人おきに半歩うしろへずれて立つ
+  const qs=queueScale();
+  for(const lane of [0,1]){
+    const list=G.lineup.filter(p=>p.lane===lane), dir=lane===0?-1:1;
+    const {pos,k}=laneLayout(list,lane,qs);
+    // 後ろの人から描く（手前=ドア寄りが上に重なる）
+    for(let i=list.length-1;i>=0;i--){ const p=list[i], tx=pos[i], back=k<0.999&&i%2===1;
+      if(p.x==null)p.x=tx; p.x+=(tx-p.x)*0.18;
+      const bob=Math.abs(tx-p.x)>1?Math.abs(Math.sin(now*12+i))*1.5:0;
+      const fy=L.feet-bob-(back?9*qs:0), sc=qs*(back?0.94:1);
+      drawSide(p.k,p.x,fy,dir,sc);
+      if(AUDIT.on){ const [l,r]=SIDE_EXT[p.k]; AUDIT.ppl.push({lane,i,k:p.k,x0:dir>0?tx+l*sc:tx-r*sc,x1:dir>0?tx+r*sc:tx-l*sc,hx:tx+dir*sc,back,st:G.stage}); }
     }
   }
 }
-function stageClear(){
-  G.screen='clear';
-  const last=G.stage>=STAGES.length-1;
-  showPopup(
-    STAGES[G.stage].station+' 発車！',
-    last?'全8駅を乗せ切りました。お疲れさまでした！\n総乗車 '+G.total+' 人':'ドアが閉まりました。次の駅へ進みます。\n乗車 '+G.pile.length+' 人・残り時間 '+Math.ceil(G.time)+' 秒',
-    last?'タイトルへ':'次の駅へ',
-    ()=>{ if(last){G.screen='title';showTitle();} else {G.total+=G.pile.length; startStage(G.stage+1);} },
-    true
-  );
-}
-function fail(title,text){
-  G.screen='over'; G.shake=0.6;
-  showPopup(title,text+'\n（駅: '+STAGES[G.stage].station+' / 総乗車 '+(G.total+G.pile.length)+' 人）','もう一度',()=>startStage(G.stage),true);
-}
-function showTitle(){
-  G.screen='title';
-  showPopup('満員電車パッキング',
-    'ドア係になって乗客を詰め込め。\n\n・ドラッグで位置を決め、離すと落下\n・赤いドアラインを越えたらアウト\n・乗客の並びは毎回同じ。覚えれば強い\n・矢印キー←→で移動、↓かスペースで落下',
-    '乗務開始',()=>{G.total=0;startStage(0);},false);
-}
-function showPopup(t,x,btn,fn,share){
-  $('ptitle').textContent=t; $('ptext').textContent=x;
-  const m=$('pbtnMain'); m.textContent=btn; m.onclick=fn;
-  const s=$('pbtnSub'); s.textContent=share?'𝕏 で共有':'ポータルへ';
-  s.onclick=share?shareX:()=>location.href='../../';
-  $('popup').classList.remove('hidden');
-}
-function shareX(){
-  const st=STAGES[G.stage];
-  const text=G.screen==='clear'
-    ?'【満員電車パッキング】'+st.station+' 発車成功！総乗車 '+(G.total+G.pile.length)+' 人。'
-    :'【満員電車パッキング】'+st.station+' で「ドアが閉まりません」。総乗車 '+(G.total+G.pile.length)+' 人で力尽きる。';
-  window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#満員電車パッキング #GAMEHACK\n'+location.href),'_blank');
-}
 
-// 入力
-let dragging=false;
-function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
-$('wrap').addEventListener('pointerdown',e=>{
-  if(G.screen!=='play'||!G.cur||G.cur.state!=='aim')return;
-  dragging=true; e.preventDefault();
-});
-$('wrap').addEventListener('pointermove',e=>{
-  if(!dragging||!G.cur)return;
-  const g=toGame(e);
-  G.cur.x=Math.max(CAR.x0+G.cur.w/2,Math.min(CAR.x1-G.cur.w/2,g.x));
-});
-$('wrap').addEventListener('pointerup',()=>{ if(dragging){dragging=false; dropCur();} });
-window.addEventListener('keydown',e=>{
-  if(G.screen!=='play'||!G.cur||G.cur.state!=='aim')return;
-  if(e.key==='ArrowLeft')G.cur.x=Math.max(CAR.x0+G.cur.w/2,G.cur.x-14);
-  if(e.key==='ArrowRight')G.cur.x=Math.min(CAR.x1-G.cur.w/2,G.cur.x+14);
-  if(e.key===' '||e.key==='ArrowDown'){dropCur();e.preventDefault();}
-});
-
-// 描画
-function drawPerson(p,ghost){
-  ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot||0);
-  ctx.globalAlpha=ghost?0.5:1;
-  ctx.fillStyle=p.c;
-  ctx.beginPath(); ctx.roundRect(-p.w/2,-p.h/2,p.w,p.h,8); ctx.fill();
-  ctx.fillStyle='rgba(13,21,38,.85)'; // 顔
-  ctx.beginPath(); ctx.arc(0,-p.h/2+14,Math.min(9,p.w*0.22),0,Math.PI*2); ctx.fill();
+function drawSeated(x,yWall,face,k){
+  // 座席の客: 背もたれ側に胴、ひざ先が通路へ
+  const K=KIND[k]; ctx.save(); ctx.translate(x,yWall); if(face<0)ctx.scale(1,-1);
+  // face=1: 壁は上、ひざは下
+  ctx.fillStyle=k==='stu'?'#1D1E22':k==='eld'?'#6E6A60':'#2E3444';
+  rr(-11,10,9,26,3); ctx.fill(); rr(2,10,9,26,3); ctx.fill();
+  ctx.fillStyle='#1E1C1A'; rr(-12,33,10,7,2); ctx.fill(); rr(2,33,10,7,2); ctx.fill();
+  ell(0,10,18,9,K.c2); ell(0,11,17,7.5,K.c);
+  if(k==='sal'||k==='stu'){ rr(-10,16,20,12,2); ctx.fillStyle=k==='sal'?'#2A2522':'#3B4A6B'; ctx.fill(); }
+  circ(0,10,7.5,K.hair); ell(0,13.5,5.4,3.6,SKIN); circ(0,9.2,5.8,K.hair);
   ctx.restore();
 }
-function draw(){
-  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='#0d1526'; ctx.fillRect(0,0,VW,VH);
-  const shx=G.shake>0?(Math.random()-0.5)*G.shake*14:0;
-  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR+shx*DPR,TY*DPR);
-  // 背景
-  ctx.fillStyle='#101d33'; ctx.fillRect(0,0,W,H);
-  // NEXT キュー
-  ctx.fillStyle='#a9c2de'; ctx.font='600 12px system-ui'; ctx.textAlign='left';
-  ctx.fillText('つぎの乗客',16,26);
-  G.queue.slice(0,3).forEach((p,i)=>{ drawPerson({...p,x:36+i*56,y:66,w:p.w*0.62,h:p.h*0.62}); });
-  // 車両
-  ctx.fillStyle='#1c2f4d'; ctx.fillRect(CAR.x0-14,CAR.door-60,CAR.x1-CAR.x0+28,CAR.floor-CAR.door+74);
-  ctx.fillStyle='#264066'; ctx.fillRect(CAR.x0-14,CAR.floor,CAR.x1-CAR.x0+28,14);
+const SEAT_B=['sal','eld','stu','sal','big','sal','stu','sal','eld'];
+const SEAT_T=['stu','sal','sal','eld','sal','stu'];
+
+function drawCar(){
+  ctx.save(); ctx.translate(G.carX,0); drawCarBody(true); ctx.restore();
+  // 発車すると後ろの車両が続いて流れていく
+  if(G.carX<0){ for(let n=1;n<=3;n++){ const ox=G.carX+n*(W+24); if(ox>W)break; ctx.save(); ctx.translate(ox,0); drawCarBody(false); ctx.restore();
+    ctx.fillStyle='#55585C'; ctx.fillRect(ox-24,L.CT+20,24,L.CB-L.CT-30); ctx.fillStyle='#3F4245'; for(let y=L.CT+24;y<L.CB-14;y+=8)ctx.fillRect(ox-22,y,20,3); } }
+}
+function drawCarBody(main){
+  const x0=-8,x1=W+8;
+  ctx.save();
+  // 外板（ホーム側）と帯
+  ctx.fillStyle='#B9BEC3'; ctx.fillRect(x0,L.CT,x1-x0,10); ctx.fillStyle='#E8822A'; ctx.fillRect(x0,L.CT+2,x1-x0,3);
+  ctx.fillStyle='#B9BEC3'; ctx.fillRect(x0,L.wallB,x1-x0,10); ctx.fillStyle='#E8822A'; ctx.fillRect(x0,L.wallB+5,x1-x0,3);
+  // 床
+  ctx.fillStyle='#BDB7AA'; ctx.fillRect(x0,L.wallT,x1-x0,L.wallB-L.wallT);
+  ctx.fillStyle='#B3AD9F'; for(let y=L.wallT+12;y<L.wallB;y+=24)ctx.fillRect(x0,y,x1-x0,1);
+  // ドア付近の黄色い床
+  ctx.fillStyle='#D9BF4E'; ctx.fillRect(DOOR0,L.wallT,DOOR1-DOOR0,L.door-L.wallT);
+  ctx.fillStyle='#C9AE3E'; for(let x=DOOR0+4;x<DOOR1;x+=10)ctx.fillRect(x,L.wallT+2,5,L.door-L.wallT-4);
+  // ロングシート（ホーム側: ドアの左右 / 反対側: 全面）
+  ctx.fillStyle='#3B5B9A'; ctx.fillRect(x0,L.wallT,DOOR0-14-x0,24); ctx.fillRect(DOOR1+14,L.wallT,x1-DOOR1-14,24);
+  ctx.fillRect(x0,L.wallB-24,x1-x0,24);
+  ctx.fillStyle='#2F4C84'; ctx.fillRect(x0,L.wallT,DOOR0-14-x0,6); ctx.fillRect(DOOR1+14,L.wallT,x1-DOOR1-14,6); ctx.fillRect(x0,L.wallB-6,x1-x0,6);
+  // 袖仕切りと握り棒
+  ctx.fillStyle='#8E949B'; ctx.fillRect(DOOR0-14,L.wallT,6,36); ctx.fillRect(DOOR1+8,L.wallT,6,36);
+  // 座っている客
+  SEAT_T.forEach((k,i)=>{ const x=i<3?18+i*42:DOOR1+40+(i-3)*42; drawSeated(x,L.wallT,1,k); });
+  SEAT_B.forEach((k,i)=>drawSeated(28+i*46,L.wallB,-1,k));
   // ドアライン
-  ctx.setLineDash([8,6]); ctx.strokeStyle='#e24b4a'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.moveTo(CAR.x0-14,CAR.door); ctx.lineTo(CAR.x1+14,CAR.door); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle='#e24b4a'; ctx.font='700 11px system-ui'; ctx.textAlign='left';
-  ctx.fillText('ドアライン',CAR.x0-8,CAR.door-6);
-  // ドア（左右のパネル）
-  ctx.fillStyle='rgba(255,255,255,.14)';
-  ctx.fillRect(CAR.x0-14,CAR.door,20,CAR.floor-CAR.door);
-  ctx.fillRect(CAR.x1-6,CAR.door,20,CAR.floor-CAR.door);
-  // 積み上がった乗客
-  for(const p of G.pile) drawPerson(p);
-  // 操作中の乗客
-  if(G.cur){
-    if(G.cur.state==='aim'){
-      ctx.setLineDash([4,4]); ctx.strokeStyle='rgba(255,255,255,.4)';
-      ctx.beginPath(); ctx.moveTo(G.cur.x,G.cur.y+G.cur.h/2); ctx.lineTo(G.cur.x,landingY(G.cur)); ctx.stroke(); ctx.setLineDash([]);
-      drawPerson(G.cur,true);
-    } else drawPerson(G.cur);
+  ctx.fillStyle='#7A7468'; ctx.fillRect(x0,L.door,x1-x0,1.5);
+  ctx.font='600 10px '+FONT; ctx.textAlign='right'; ctx.textBaseline='middle';
+  const lw=ctx.measureText('ドアライン').width+8; ctx.fillStyle='rgba(243,239,228,.92)'; ctx.fillRect(W-6-lw,L.door-8,lw,14);
+  ctx.fillStyle='#5E584D'; fitText('ドアライン',W-10,L.door-1,lw-6,10,'600');
+  // 既に乗っている客・乗せた客
+  for(const o of G.base){ if(o.k!=='pole')drawTop(o.k,o.x,yOf(o.d)-PT[o.k].h/2,o.face); }
+  if(main)for(const o of G.placed){ drawTop(o.k,o.x,yOf(o.d)-PT[o.k].h/2,o.face); }
+  else for(const o of G.placed){ drawTop(o.k,W-o.x,yOf(o.d)-PT[o.k].h/2,-o.face); }
+  if(main&&G.fx&&G.fx.type==='door'&&G.placed.length){ const o=G.placed[G.placed.length-1],p=PT[o.k];
+    if(Math.floor(G.fx.t*6)%2===0){ ctx.strokeStyle='#C8372D'; ctx.lineWidth=2.5; rr(o.x-p.w/2,yOf(o.d)-p.h,p.w,p.h,4); ctx.stroke(); } }
+  // 握り棒（床から天井まで）
+  for(const o of G.base){ if(o.k==='pole'){ const y=yOf(o.d)-5; circ(o.x,y,5,'#6F757C'); circ(o.x,y,3.6,'#C9CED3'); circ(o.x-1,y-1,1.2,'#F4F5F6'); } }
+  // つり革（頭上）
+  ctx.strokeStyle='rgba(70,74,80,.55)'; ctx.lineWidth=1.5;
+  for(const y of [L.door+12,L.back-12]){ ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke(); }
+  ctx.strokeStyle='rgba(245,245,240,.75)'; ctx.lineWidth=2;
+  for(let x=24;x<W;x+=34){ for(const y of [L.door+12,L.back-12]){ if(y===L.door+12&&x>DOOR0-10&&x<DOOR1+10)continue; ctx.beginPath(); ctx.arc(x,y,4.5,0,Math.PI*2); ctx.stroke(); } }
+  // ホーム側の壁（窓）とドア
+  ctx.fillStyle='#8E949B'; ctx.fillRect(x0,L.wallT-10,DOOR0-x0,10); ctx.fillRect(DOOR1,L.wallT-10,x1-DOOR1,10);
+  ctx.fillStyle='#9DB3C2'; for(const [a,b] of [[14,124],[296,406]])ctx.fillRect(a,L.wallT-7,b-a,4);
+  const o=G.doorOpen, dw=(DOOR1-DOOR0)/2;
+  ctx.fillStyle='#A9AFB5'; ctx.fillRect(DOOR0-dw*o,L.wallT-10,dw,10); ctx.fillRect(DOORC+dw*o,L.wallT-10,dw,10);
+  ctx.fillStyle='#9DB3C2'; ctx.fillRect(DOOR0-dw*o+12,L.wallT-7,dw-24,4); ctx.fillRect(DOORC+dw*o+12,L.wallT-7,dw-24,4);
+  ctx.fillStyle='#22201C'; ctx.fillRect(DOORC-dw*o-1,L.wallT-10,2,10); ctx.fillRect(DOORC+dw*o-1,L.wallT-10,2,10);
+  ctx.fillStyle='#8E949B'; ctx.fillRect(DOOR0-dw,L.wallT-10,dw,10); ctx.fillRect(DOOR1,L.wallT-10,dw,10);
+  if(main&&G.fx&&G.fx.type==='door'&&G.doorOpen<0.5){
+    ctx.font='800 22px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#22201C';
+    ctx.save(); ctx.translate(DOORC,(L.wallT+L.door)/2-2); ctx.rotate(-0.08); ctx.lineWidth=5; ctx.strokeStyle='#F3EFE4'; ctx.strokeText('ガタン',0,0); fitText('ガタン',0,0,DOOR1-DOOR0-10,22,'800'); ctx.restore(); }
+  // 反対側の壁の窓
+  ctx.fillStyle='#9DB3C2'; for(let x=14;x<W;x+=130)ctx.fillRect(x,L.wallB+1,100,3);
+  ctx.restore();
+}
+
+function drawCur(){
+  const c=G.cur; if(!c||G.fx)return;
+  if(c.state==='aim'){
+    const d=skyLand(G.sky,c.x,c.w), bad=d+c.h>SD+1e-6, gy=yOf(d)-c.h/2;
+    // 着地予測
+    ctx.save(); ctx.globalAlpha=0.38; drawTop(c.k,c.x,gy,1); ctx.restore();
+    ctx.strokeStyle=bad?'#C8372D':'rgba(34,32,28,.7)'; ctx.lineWidth=bad?2.5:1.5; ctx.setLineDash(bad?[]:[5,4]);
+    rr(c.x-c.w/2,gy-c.h/2,c.w,c.h,4); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle='rgba(34,32,28,.35)'; ctx.lineWidth=1.5; ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(c.x,holdY(c)+c.h/2); ctx.lineTo(c.x,gy-c.h/2); ctx.stroke(); ctx.setLineDash([]);
+    // つまみ上げられている本人
+    const y=holdY(c);
+    ell(c.x+4,y+7,c.w/2,c.h/2,'rgba(34,32,28,.22)');
+    ctx.save(); ctx.translate(c.x,y); ctx.scale(1.06,1.06); drawTop(c.k,0,0,1); ctx.restore();
+    // 最初の駅だけ、乗り始めの数秒: 指の動かし方（ホームの足元に出す）
+    if(G.hand>0){
+      const a=Math.min(1,G.hand/0.4), gy=L.edge-62, gw=124, gx=DOORC-gw/2, sw=Math.sin(performance.now()/180)*3;
+      ctx.save(); ctx.globalAlpha=a;
+      ctx.fillStyle='rgba(34,32,28,.88)'; ctx.fillRect(gx,gy,gw,22);
+      ctx.fillStyle='#F3EFE4'; ctx.textBaseline='middle';
+      ctx.textAlign='left'; fitText('←',gx+6-sw,gy+11.5,14,13,'700'); ctx.textAlign='right'; fitText('→',gx+gw-6+sw,gy+11.5,14,13,'700');
+      ctx.textAlign='center'; fitText('ずらして 離す',gx+gw/2,gy+11.5,gw-40,12,'700');
+      ctx.restore();
+    }
+  } else {
+    const e=1-Math.pow(1-Math.min(1,c.t),3);
+    drawTop(c.k,c.x,c.y0+(c.y1-c.y0)*e,1);
   }
-  // HUD
-  $('station').textContent=(G.screen==='play'||G.screen==='clear'||G.screen==='over')?STAGES[G.stage].station+' ('+(G.stage+1)+'/'+STAGES.length+')':'-';
-  $('timer').textContent=G.screen==='play'?'発車まで '+Math.ceil(G.time)+' 秒':'-';
 }
-function loop(ts){
-  const dt=Math.min(0.05,(ts-(lastTs||ts))/1000); lastTs=ts;
-  if(G.shake>0)G.shake=Math.max(0,G.shake-dt);
-  if(G.screen==='play')update(dt);
-  draw(); requestAnimationFrame(loop);
+
+function drawTrack(){
+  // 発車すると線路が見える
+  ctx.fillStyle='#6F6A60'; ctx.fillRect(0,L.CT,W,H-L.CT);
+  ctx.fillStyle='#5E594F'; for(let y=L.CT+8;y<H;y+=18){ for(let x=(y*7)%13;x<W;x+=26)ctx.fillRect(x,y,8,3); }
+  ctx.fillStyle='#7A5A3E'; for(let x=6;x<W;x+=28)ctx.fillRect(x,L.CT+30,14,L.CB-L.CT-60);
+  ctx.fillStyle='#8C9196'; ctx.fillRect(0,L.CT+60,W,5); ctx.fillRect(0,L.CB-65,W,5);
 }
-function resize(){
-  DPR=window.devicePixelRatio||1; VW=innerWidth; VH=innerHeight;
-  cv.width=VW*DPR; cv.height=VH*DPR;
-  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+
+function drawAnnounce(){
+  let msg=null;
+  if(G.fx&&G.fx.type==='door')msg='ドアが閉まりません。無理なご乗車はおやめください';
+  else if(G.fx&&G.fx.type==='bell')msg='発車ベル　ホームに '+G.fx.left+' 人残っています';
+  else if(G.screen==='play'&&G.guide>0&&!G.fx)msg='奥へお詰めください';
+  if(!msg)return;
+  const y=topY()+(L.edge-topY()>190?114:88);
+  ctx.font='700 13px '+FONT; const w=Math.min(W-24,ctx.measureText(msg).width+54);
+  const x=(W-w)/2;
+  ctx.fillStyle='rgba(34,32,28,.88)'; ctx.fillRect(x,y,w,26);
+  // スピーカー
+  ctx.fillStyle='#F3EFE4'; ctx.fillRect(x+10,y+9,4,8); ctx.beginPath(); ctx.moveTo(x+14,y+9); ctx.lineTo(x+20,y+5); ctx.lineTo(x+20,y+21); ctx.lineTo(x+14,y+17); ctx.fill();
+  ctx.fillStyle=G.fx?'#FFB35C':'#F3EFE4'; ctx.textAlign='left'; ctx.textBaseline='middle'; fitText(msg,x+38,y+13.5,w-44,13,'700');
+  if(G.fx&&G.fx.type==='bell'){ // ベルの音
+    ctx.strokeStyle='#F3EFE4'; ctx.lineWidth=1.5; const r=(G.fx.t*20)%5;
+    for(const k of [0,5]){ ctx.beginPath(); ctx.arc(x+20,y+13,4+r+k,-0.7,0.7); ctx.stroke(); }
+  }
 }
-addEventListener('resize',resize); resize();
-showTitle(); requestAnimationFrame(loop);
+
+function draw(){
+  const sh=G.shake>0?(Math.random()-0.5)*G.shake*30:0;
+  ctx.save(); ctx.translate(sh,0);
+  drawTrack();
+  drawPlatform();
+  drawCar();
+  if(G.screen==='play'||G.screen==='pause')drawCur();
+  drawAnnounce();
+  ctx.restore();
+  if(G.screen==='play'||G.screen==='pause'){
+    const st=STAGES[G.stage], left=G.queue.length+(G.cur&&G.cur.state==='aim'?1:0), t=Math.max(0,Math.ceil(G.time));
+    UI.hud(st.name,(G.stage+1)+'/'+STAGES.length,'ホーム<b>'+left+'</b>人　発車まで'+(t<=10?'<span class="warn"><b style="color:inherit">'+t+'</b>秒</span>':'<b>'+t+'</b>秒'));
+  }
+}
+
+// ---- メインループ ----
+function frame(ts){
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.05):0; lastTs=ts;
+  if(G.screen==='play') update(dt);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle=getComputedStyle(document.body).backgroundColor; ctx.fillRect(0,0,VW,VH);
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR,TY*DPR);
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,H); ctx.clip(); draw(); ctx.restore();
+  requestAnimationFrame(frame);
+}
+window.addEventListener('resize',resize); resize();
+showTitle();
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
