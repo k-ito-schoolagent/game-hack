@@ -64,7 +64,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 .basket{position:absolute;z-index:2;margin:0;padding:15px 4px 4px;border:2px solid #3f2c1a;border-radius:2px;background:#a67a49;color:#2a1d10;text-align:center;line-height:1.2;overflow:hidden;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;align-items:center;touch-action:none}
 .basket::before{content:'';position:absolute;left:0;right:0;top:0;height:11px;background:#2b1f14}
 .basket b{display:block;font-size:15px;font-weight:800;background:#f1ead2;border:1.5px solid #b08d3c;padding:2px 6px;margin-bottom:2px;white-space:nowrap}
-.basket small{display:block;font-size:9.5px;font-weight:600;color:#3a2a18}
+.basket small{display:block;white-space:nowrap;font-size:9px;font-weight:600;color:#3a2a18}
 .basket .plate{position:absolute;left:3px;top:13px;width:16px;height:16px;border-radius:50%;background:#c9a64a;border:1px solid #6b5420;color:#2a1d10;font:800 10px/14px var(--font);font-style:normal;text-align:center}
 .basket.tsujo{background:#77756f;border-color:#2e2d2a}
 .basket.tsujo b{background:#e6e3da;border-color:#8f8d88}
@@ -257,8 +257,8 @@ ORDER.forEach(id=>{
 function onResize(){
   const T=topY(), full=(H-78)-(T+52), ry=Math.min(full/1.8,340), top=T+52+(full-1.8*ry)*0.8, cy=top+ry;
   G.home={x:W/2,y:cy}; G.ry=ry;
-  const slots={north:[210,top,150,76],kanto:[360,cy-ry*0.5,100,76],mid:[305,cy+ry*0.8,120,76],
-               west:[115,cy+ry*0.8,120,76],mourning:[60,cy-ry*0.5,100,76]};
+  const slots={north:[210,top,150,76],kanto:[360,cy-ry*0.5,100,76],mid:[305,cy+ry*0.8,132,76],
+               west:[115,cy+ry*0.8,132,76],mourning:[60,cy-ry*0.5,100,76]};
   for(const id of ORDER){
     const s=slots[id], b=BK[id];
     b.cx=s[0]; b.cy=s[1]; b.w=s[2]; b.h=s[3]; b.x=s[0]-s[2]/2; b.y=s[1]-s[3]/2;
@@ -452,7 +452,7 @@ function drawCard(c){
   const sx=-CWd/2+10, sy=-CHd/2+10;
   ctx.lineWidth=2.2; ctx.strokeStyle='#d2452f'; ctx.strokeRect(sx,sy,32,38);
   ctx.fillStyle='#d2452f'; ctx.font='800 14px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('85',sx+16,sy+19);
-  if(m){ ctx.font='600 8px '+FONT; ctx.fillStyle='#7a6c66'; ctx.fillText('郵便はがき',sx+16,sy+50); }
+  if(m){ ctx.font='600 7.5px '+FONT; ctx.fillStyle='#7a6c66'; ctx.fillText('郵便はがき',sx+19,sy+50); }
   else{ ctx.fillStyle='#d2452f'; ctx.font='800 14px '+FONT; ctx.fillText('年賀',sx+16,sy+52); }
   // 郵便番号 7桁の赤枠（右上）
   const z=c.zip.replace('-','');
@@ -466,7 +466,7 @@ function drawCard(c){
   chunk(kn(c.addr)).forEach((l,i)=>vtext(l,CWd/2-24-i*16,-CHd/2+38,13.5,'#2a2420',600));
   vtext(c.name,30,-CHd/2+34,24,'#1c1814',700);
   if(m){
-    ['喪中につき','年末年始のご挨拶を','失礼させていただきます'].forEach((l,i)=>vtext(l,-CWd/2+22+i*13,-30,9.5,'#6f6c66',500));
+    ['喪中につき','年末年始のご挨拶を','失礼させていただきます'].forEach((l,i)=>vtext(l,-76+i*13,-52,9,'#6f6c66',500));
   }else{
     // 差出人（左下）と小さな郵便番号枠
     vtext('森山健二',-CWd/2+16,8,9.5,'#6b6458',500);
