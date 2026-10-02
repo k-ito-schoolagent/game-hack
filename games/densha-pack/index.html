@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>満員電車パッキング | GAME HACK</title>
+<meta name="description" content="ドア係として乗客を物理で詰め込め。赤いドアラインを越えたら「ドアが閉まりません」。乗客の並びは固定＝覚えれば上手くなる技術介入型パズル。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚃</text></svg>">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d1526;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:#eaf3fc}
+  #wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none}
+  canvas{display:block;width:100%;height:100%}
+  #hud{position:absolute;left:10px;right:10px;top:10px;display:flex;justify-content:space-between;pointer-events:none;font-size:14px}
+  #hud div{background:rgba(6,26,52,.78);border-radius:8px;padding:6px 10px}
+  #station{font-size:16px;font-weight:700}
+  #popup{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:min(84vw,340px);background:rgba(255,255,255,.97);color:#12233f;border-radius:16px;padding:24px 20px;text-align:center;box-shadow:0 10px 34px rgba(0,0,0,.5)}
+  #popup.hidden{display:none}
+  #popup h1{margin:0 0 10px;font-size:20px}
+  #popup p{margin:0 0 16px;font-size:14px;line-height:1.8;white-space:pre-line}
+  #popup button{display:block;width:100%;height:46px;margin-top:8px;font-size:15px;font-weight:700;border:none;border-radius:10px;background:#ffb300;color:#12233f;cursor:pointer}
+  #popup button.ghost{background:#e8eef6;font-weight:500}
+  a{color:inherit}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <div id="station">-</div>
+    <div id="timer">-</div>
+  </div>
+  <div id="popup">
+    <h1 id="ptitle"></h1><p id="ptext"></p>
+    <button id="pbtnMain"></button>
+    <button id="pbtnSub" class="ghost"></button>
+  </div>
+</div>
+<script>
+'use strict';
+/* 満員電車パッキング
+ * 型: 現実(満員電車) × 物理化(乗客=積み上がる箱) × 技術(固定シーケンス暗記+詰め方) × 見せ場(ドアが閉まらない)
+ * 乱数なし。駅ごとの乗客シーケンスは固定。 */
+const W=420,H=700;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0;
+
+// 車両ジオメトリ
+const CAR={x0:44,x1:376,floor:618,door:402}; // door=この高さより上に積むとドアが閉まらない
+// 乗客タイプ（幅・高さ・色・名前）
+const TYPES={
+  slim:{w:34,h:78,c:'#7fb069',n:'細身の人'},
+  std:{w:44,h:78,c:'#5b8dd9',n:'標準の人'},
+  big:{w:56,h:78,c:'#d9855b',n:'大柄な人'},
+  pack:{w:62,h:64,c:'#b05bd9',n:'リュックの人'},
+  kid:{w:34,h:56,c:'#ffd166',n:'子ども'},
+};
+// 駅ごとの固定シーケンス（覚えられる＝技術）
+const STAGES=[
+  {station:'新宿', time:40, seq:['std','slim','std','big','slim','std']},
+  {station:'渋谷', time:42, seq:['pack','std','slim','big','std','kid','std']},
+  {station:'池袋', time:44, seq:['big','std','pack','slim','std','big','kid','std']},
+  {station:'東京', time:46, seq:['std','pack','big','std','slim','pack','std','kid','std']},
+  {station:'品川', time:48, seq:['big','pack','std','big','slim','std','pack','std','kid','std']},
+  {station:'横浜', time:50, seq:['pack','big','pack','std','slim','big','std','kid','std','pack','std']},
+  {station:'大阪', time:52, seq:['big','std','big','pack','std','slim','big','pack','std','kid','std','std']},
+  {station:'博多', time:55, seq:['pack','big','std','pack','big','std','slim','big','pack','std','kid','std','big']},
+];
+
+const G={screen:'title',stage:0,queue:[],cur:null,pile:[],time:0,total:0,miss:0,shake:0,doorAnim:0};
+let lastTs=0;
+
+function startStage(i){
+  const st=STAGES[i];
+  G.stage=i; G.queue=st.seq.map(k=>({...TYPES[k],k})); G.pile=[]; G.time=st.time;
+  G.miss=0; G.screen='play'; nextPassenger();
+  $('popup').classList.add('hidden');
+}
+function nextPassenger(){
+  if(!G.queue.length){ G.cur=null; return; }
+  const p=G.queue.shift();
+  G.cur={...p,x:(CAR.x0+CAR.x1)/2,y:120,vy:0,state:'aim',rot:0};
+}
+function dropCur(){ if(G.cur&&G.cur.state==='aim'){G.cur.state='fall';G.cur.vy=0;} }
+
+// 積み上げ判定: 落下物が床または最も高い接地矩形の上に乗る
+function landingY(p){
+  let top=CAR.floor;
+  for(const b of G.pile){
+    const overlap=Math.min(p.x+p.w/2,b.x+b.w/2)-Math.max(p.x-p.w/2,b.x-b.w/2);
+    if(overlap>4){ top=Math.min(top,b.y-b.h/2); }
+  }
+  return top;
+}
+function update(dt){
+  G.time-=dt;
+  if(G.time<=0){ return fail('発車時刻です','乗せきれませんでした。\n残り '+ (G.queue.length+(G.cur?1:0)) +' 人がホームに取り残されました。'); }
+  const p=G.cur;
+  if(p&&p.state==='fall'){
+    p.vy+=1400*dt; p.y+=p.vy*dt;
+    const land=landingY(p)-p.h/2;
+    if(p.y>=land){
+      p.y=land; p.state='settled'; G.shake=0.15;
+      G.pile.push(p); G.cur=null;
+      if(p.y-p.h/2<CAR.door){ return fail('ドアが閉まりません','積み上がった乗客がドアラインを越えました。\n安全確認のため '+STAGES[G.stage].station+' をやり直します。'); }
+      if(!G.queue.length){ return stageClear(); }
+      nextPassenger();
+    }
+  }
+}
+function stageClear(){
+  G.screen='clear';
+  const last=G.stage>=STAGES.length-1;
+  showPopup(
+    STAGES[G.stage].station+' 発車！',
+    last?'全8駅を乗せ切りました。お疲れさまでした！\n総乗車 '+G.total+' 人':'ドアが閉まりました。次の駅へ進みます。\n乗車 '+G.pile.length+' 人・残り時間 '+Math.ceil(G.time)+' 秒',
+    last?'タイトルへ':'次の駅へ',
+    ()=>{ if(last){G.screen='title';showTitle();} else {G.total+=G.pile.length; startStage(G.stage+1);} },
+    true
+  );
+}
+function fail(title,text){
+  G.screen='over'; G.shake=0.6;
+  showPopup(title,text+'\n（駅: '+STAGES[G.stage].station+' / 総乗車 '+(G.total+G.pile.length)+' 人）','もう一度',()=>startStage(G.stage),true);
+}
+function showTitle(){
+  G.screen='title';
+  showPopup('満員電車パッキング',
+    'ドア係になって乗客を詰め込め。\n\n・ドラッグで位置を決め、離すと落下\n・赤いドアラインを越えたらアウト\n・乗客の並びは毎回同じ。覚えれば強い\n・矢印キー←→で移動、↓かスペースで落下',
+    '乗務開始',()=>{G.total=0;startStage(0);},false);
+}
+function showPopup(t,x,btn,fn,share){
+  $('ptitle').textContent=t; $('ptext').textContent=x;
+  const m=$('pbtnMain'); m.textContent=btn; m.onclick=fn;
+  const s=$('pbtnSub'); s.textContent=share?'𝕏 で共有':'ポータルへ';
+  s.onclick=share?shareX:()=>location.href='../../';
+  $('popup').classList.remove('hidden');
+}
+function shareX(){
+  const st=STAGES[G.stage];
+  const text=G.screen==='clear'
+    ?'【満員電車パッキング】'+st.station+' 発車成功！総乗車 '+(G.total+G.pile.length)+' 人。'
+    :'【満員電車パッキング】'+st.station+' で「ドアが閉まりません」。総乗車 '+(G.total+G.pile.length)+' 人で力尽きる。';
+  window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#満員電車パッキング #GAMEHACK\n'+location.href),'_blank');
+}
+
+// 入力
+let dragging=false;
+function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
+$('wrap').addEventListener('pointerdown',e=>{
+  if(G.screen!=='play'||!G.cur||G.cur.state!=='aim')return;
+  dragging=true; e.preventDefault();
+});
+$('wrap').addEventListener('pointermove',e=>{
+  if(!dragging||!G.cur)return;
+  const g=toGame(e);
+  G.cur.x=Math.max(CAR.x0+G.cur.w/2,Math.min(CAR.x1-G.cur.w/2,g.x));
+});
+$('wrap').addEventListener('pointerup',()=>{ if(dragging){dragging=false; dropCur();} });
+window.addEventListener('keydown',e=>{
+  if(G.screen!=='play'||!G.cur||G.cur.state!=='aim')return;
+  if(e.key==='ArrowLeft')G.cur.x=Math.max(CAR.x0+G.cur.w/2,G.cur.x-14);
+  if(e.key==='ArrowRight')G.cur.x=Math.min(CAR.x1-G.cur.w/2,G.cur.x+14);
+  if(e.key===' '||e.key==='ArrowDown'){dropCur();e.preventDefault();}
+});
+
+// 描画
+function drawPerson(p,ghost){
+  ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot||0);
+  ctx.globalAlpha=ghost?0.5:1;
+  ctx.fillStyle=p.c;
+  ctx.beginPath(); ctx.roundRect(-p.w/2,-p.h/2,p.w,p.h,8); ctx.fill();
+  ctx.fillStyle='rgba(13,21,38,.85)'; // 顔
+  ctx.beginPath(); ctx.arc(0,-p.h/2+14,Math.min(9,p.w*0.22),0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function draw(){
+  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='#0d1526'; ctx.fillRect(0,0,VW,VH);
+  const shx=G.shake>0?(Math.random()-0.5)*G.shake*14:0;
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR+shx*DPR,TY*DPR);
+  // 背景
+  ctx.fillStyle='#101d33'; ctx.fillRect(0,0,W,H);
+  // NEXT キュー
+  ctx.fillStyle='#a9c2de'; ctx.font='600 12px system-ui'; ctx.textAlign='left';
+  ctx.fillText('つぎの乗客',16,26);
+  G.queue.slice(0,3).forEach((p,i)=>{ drawPerson({...p,x:36+i*56,y:66,w:p.w*0.62,h:p.h*0.62}); });
+  // 車両
+  ctx.fillStyle='#1c2f4d'; ctx.fillRect(CAR.x0-14,CAR.door-60,CAR.x1-CAR.x0+28,CAR.floor-CAR.door+74);
+  ctx.fillStyle='#264066'; ctx.fillRect(CAR.x0-14,CAR.floor,CAR.x1-CAR.x0+28,14);
+  // ドアライン
+  ctx.setLineDash([8,6]); ctx.strokeStyle='#e24b4a'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(CAR.x0-14,CAR.door); ctx.lineTo(CAR.x1+14,CAR.door); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#e24b4a'; ctx.font='700 11px system-ui'; ctx.textAlign='left';
+  ctx.fillText('ドアライン',CAR.x0-8,CAR.door-6);
+  // ドア（左右のパネル）
+  ctx.fillStyle='rgba(255,255,255,.14)';
+  ctx.fillRect(CAR.x0-14,CAR.door,20,CAR.floor-CAR.door);
+  ctx.fillRect(CAR.x1-6,CAR.door,20,CAR.floor-CAR.door);
+  // 積み上がった乗客
+  for(const p of G.pile) drawPerson(p);
+  // 操作中の乗客
+  if(G.cur){
+    if(G.cur.state==='aim'){
+      ctx.setLineDash([4,4]); ctx.strokeStyle='rgba(255,255,255,.4)';
+      ctx.beginPath(); ctx.moveTo(G.cur.x,G.cur.y+G.cur.h/2); ctx.lineTo(G.cur.x,landingY(G.cur)); ctx.stroke(); ctx.setLineDash([]);
+      drawPerson(G.cur,true);
+    } else drawPerson(G.cur);
+  }
+  // HUD
+  $('station').textContent=(G.screen==='play'||G.screen==='clear'||G.screen==='over')?STAGES[G.stage].station+' ('+(G.stage+1)+'/'+STAGES.length+')':'-';
+  $('timer').textContent=G.screen==='play'?'発車まで '+Math.ceil(G.time)+' 秒':'-';
+}
+function loop(ts){
+  const dt=Math.min(0.05,(ts-(lastTs||ts))/1000); lastTs=ts;
+  if(G.shake>0)G.shake=Math.max(0,G.shake-dt);
+  if(G.screen==='play')update(dt);
+  draw(); requestAnimationFrame(loop);
+}
+function resize(){
+  DPR=window.devicePixelRatio||1; VW=innerWidth; VH=innerHeight;
+  cv.width=VW*DPR; cv.height=VH*DPR;
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+}
+addEventListener('resize',resize); resize();
+showTitle(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>

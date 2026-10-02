@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>ゲームタイトル | GAME HACK</title>
+<meta name="description" content="一行説明をここに。題材・技術・失敗の見せ場が伝わる文にする。">
+<!-- ファビコン: 絵文字を1つ選んで差し替える -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d1526;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:#eaf3fc}
+  #wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none}
+  canvas{display:block;width:100%;height:100%}
+  /* HUD: safe-area 対応（ノッチのある端末で隠れない） */
+  #hud{position:absolute;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));display:flex;justify-content:space-between;pointer-events:none;font-size:14px}
+  #hud div{background:rgba(6,26,52,.78);border-radius:8px;padding:6px 10px}
+  #popup{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:min(84vw,340px);background:rgba(255,255,255,.97);color:#12233f;border-radius:16px;padding:24px 20px;text-align:center;box-shadow:0 10px 34px rgba(0,0,0,.5)}
+  #popup.hidden{display:none}
+  #popup h1{margin:0 0 10px;font-size:20px}
+  #popup p{margin:0 0 16px;font-size:14px;line-height:1.8;white-space:pre-line}
+  /* ボタンは 44px 以上（指で押せる最小サイズ） */
+  #popup button{display:block;width:100%;height:46px;margin-top:8px;font-size:15px;font-weight:700;border:none;border-radius:10px;background:#ffb300;color:#12233f;cursor:pointer}
+  #popup button.ghost{background:#e8eef6;font-weight:500}
+  a{color:inherit}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <div id="hudL">-</div>
+    <div id="hudR">-</div>
+  </div>
+  <div id="popup">
+    <h1 id="ptitle"></h1><p id="ptext"></p>
+    <button id="pbtnMain"></button>
+    <button id="pbtnSub" class="ghost"></button>
+  </div>
+</div>
+<script>
+'use strict';
+/* ============================================================
+ * GAME HACK 雛形
+ * 型: 現実(○○) × 物理化(○○=○○) × 技術(○○) × 見せ場(○○)
+ * ← この1行を自分のゲームに書き換えることから始める
+ *
+ * 約束:
+ *  - 乱数で勝敗を決めない（固定シーケンスか実データ）
+ *  - 失敗はプレイヤーの操作・判断に帰因できる
+ *  - スマホ縦持ち・親指操作・タップ領域44px以上
+ *  - 単一ファイル・外部依存なし・ビルド不要
+ * ============================================================ */
+
+// 論理キャンバス: 縦持ち基準。実画面にはレターボックスで拡縮される
+const W=420,H=700;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0;
+
+// ---- ゲーム固有のデータ（固定シーケンス例。実データに置き換えてもよい）----
+const STAGES=[
+  {name:'ステージ1', time:30 /*, seq:[...] */},
+];
+
+const G={screen:'title',stage:0,time:0};
+let lastTs=0;
+
+function startStage(i){
+  G.stage=i; G.time=STAGES[i].time; G.screen='play';
+  $('popup').classList.add('hidden');
+}
+
+function update(dt){
+  G.time-=dt;
+  if(G.time<=0){ return fail('時間切れ','次は○○してみよう。'); }
+  // TODO: ゲームロジック
+}
+
+function fail(title,text){
+  G.screen='fail';
+  showPopup(title,text+'\n\n失敗は学び。もう一度。','もう一度',()=>startStage(G.stage),true);
+}
+function stageClear(){
+  G.screen='clear';
+  const last=G.stage>=STAGES.length-1;
+  showPopup(STAGES[G.stage].name+' クリア！',
+    last?'全ステージ制覇！お疲れさまでした！':'次へ進みます。',
+    last?'タイトルへ':'次のステージへ',
+    ()=>{ if(last){G.screen='title';showTitle();} else startStage(G.stage+1); },true);
+}
+
+// ---- 入力: 論理座標に変換してから使う ----
+function toLogical(e){
+  const t=e.touches?e.touches[0]:e;
+  return {x:(t.clientX-TX)/SC, y:(t.clientY-TY)/SC};
+}
+cv.addEventListener('pointerdown',e=>{
+  if(G.screen!=='play')return;
+  const p=toLogical(e);
+  // TODO: タップ/ドラッグ処理（p.x, p.y は 0..W, 0..H）
+});
+
+// ---- 描画 ----
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // TODO: ゲーム画面
+  ctx.fillStyle='#eaf3fc';
+  ctx.font='20px system-ui';
+  ctx.textAlign='center';
+  ctx.fillText('ここにゲーム画面を描く',W/2,H/2);
+  $('hudL').textContent=STAGES[G.stage].name;
+  $('hudR').textContent=Math.max(0,Math.ceil(G.time))+' 秒';
+}
+
+// ---- レターボックス拡縮（どの画面比でも縦持ち基準を維持）----
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=window.innerWidth; VH=window.innerHeight;
+  cv.width=VW*DPR; cv.height=VH*DPR;
+  SC=Math.min(VW/W,VH/H);
+  TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+}
+window.addEventListener('resize',resize);
+resize();
+
+// ---- ポップアップ / 共有 ----
+function showPopup(title,text,btnLabel,onMain,showShare){
+  $('ptitle').textContent=title;
+  $('ptext').textContent=text;
+  const m=$('pbtnMain'); m.textContent=btnLabel; m.onclick=onMain;
+  const s=$('pbtnSub');
+  if(showShare){
+    s.textContent='結果を𝕏で共有';
+    s.onclick=()=>{
+      const url=location.href;
+      const t=encodeURIComponent(title+' | ゲームタイトル #GAMEHACK\n'+url);
+      window.open('https://twitter.com/intent/tweet?text='+t,'_blank');
+    };
+    s.style.display='block';
+  }else{ s.style.display='none'; }
+  $('popup').classList.remove('hidden');
+}
+function showTitle(){
+  showPopup('ゲームタイトル',
+    '一行説明。\n\n遊び方:\n・○○をタップ/ドラッグ\n・○○したら失敗',
+    'スタート',()=>startStage(0),false);
+}
+
+// ---- メインループ ----
+function frame(ts){
+  const dt=Math.min((ts-lastTs)/1000,0.05); lastTs=ts;
+  if(G.screen==='play') update(dt);
+  ctx.save();
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle='#0d1526'; ctx.fillRect(0,0,VW,VH);
+  ctx.translate(TX,TY); ctx.scale(SC,SC);
+  draw();
+  ctx.restore();
+  requestAnimationFrame(frame);
+}
+showTitle();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

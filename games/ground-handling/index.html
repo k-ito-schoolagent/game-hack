@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>グランドハンドリング（仕様書公開中） | GAME HACK</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
+<style>
+  body{margin:0;background:#0d1526;color:#eaf3fc;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.8}
+  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
+  .badge{display:inline-block;font-size:12px;font-weight:700;border:1px solid #ffb300;color:#ffb300;border-radius:6px;padding:2px 10px;margin-bottom:14px}
+  h1{font-size:26px;margin:0 0 14px}
+  p,li{font-size:14.5px;color:#c9dcf2}
+  a{color:#ffb300}
+  .box{background:#16233c;border-radius:12px;padding:14px 16px;margin:14px 0}
+  .box b{color:#ffb300}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="badge">仕様書公開中・制作者募集</span>
+  <h1>グランドハンドリング</h1>
+  <p>実ダイヤで到着する機体を誘導所へ。誘導ルート設計と同時進行を捌く技術。失敗＝滑走路上のニアミスで「運航停止」。</p>
+  <div class="box">
+    <b>発想の型</b>
+    <ul>
+      <li>題材: 空港地上係員の同時進行オペレーション</li>
+      <li>物理化: 機体＝慣性のある車両（曲がりにくい・止まりにくい）。誘導路＝グラフ。到着便＝実ダイヤ固定</li>
+      <li>技術: 実ダイヤは固定＝到着順を暗記し、誘導ルートを先に引く計画技術。同時進行の捌き</li>
+      <li>失敗の見せ場: 滑走路上のニアミスで「運航停止」、誘導ミスで「スポット渋滞」</li>
+      <li>データ: 空港ダイヤ（公開時刻表）の簡略化版</li>
+      <li>操作: 機体をタップ→行先スポットをタップで誘導線を引く</li>
+    </ul>
+  </div>
+  <p>つくってみたい人は <a href="https://github.com/k-ito-schoolagent/game-hack/issues">issue</a> で宣言してください。
+  詳しい設計書は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/games/ground-handling/SPEC.md">SPEC.md</a>。
+  はじめてのプルリクエスト歓迎です（<a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">参加のしかた</a>）。</p>
+  <p><a href="../../">← GAME HACK ポータルへ</a></p>
+</div>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAME HACK — あるあるを物理にするゲーム工房</title>
+<meta name="description" content="現実のシステムを観察し、そのルールを物理として実装し、技術でクリアするゲーム集。参加型リポジトリ — issue・PR の練習歓迎。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+<style>
+  :root { --ink:#eaf3fc; --bg:#0d1526; --panel:#16233c; --accent:#ffb300; --green:#7fb069; --red:#e24b4a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family: system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; line-height:1.7; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 18px 64px; }
+  header { text-align:center; margin-bottom: 28px; }
+  h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: .03em; }
+  .tagline { color:#a9c2de; font-size: 14.5px; margin: 0; }
+  .formula {
+    display:grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin: 22px 0 30px;
+  }
+  .formula div { background:var(--panel); border-radius:10px; padding:10px 12px; font-size:12.5px; color:#c9dcf2; }
+  .formula b { display:block; color:var(--accent); font-size:13px; margin-bottom:2px; }
+  h2 { font-size:19px; margin:30px 0 12px; border-left: 4px solid var(--accent); padding-left:10px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+  .card {
+    display:block; background:var(--panel); border:1px solid rgba(255,255,255,.1); border-radius:14px;
+    padding:16px; color:inherit; text-decoration:none; transition: transform .12s, border-color .12s;
+  }
+  .card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .card.spec { opacity:.75; border-style:dashed; }
+  .card h3 { margin:0 0 6px; font-size:16.5px; }
+  .card p { margin:0 0 10px; font-size:13px; color:#c9dcf2; }
+  .tags { display:flex; flex-wrap:wrap; gap:5px; }
+  .tags span { font-size:11px; background:rgba(255,255,255,.09); border-radius:20px; padding:2px 9px; color:#a9c2de; }
+  .badge { display:inline-block; font-size:11px; font-weight:700; border-radius:6px; padding:2px 8px; margin-bottom:8px; }
+  .badge.play { background:var(--green); color:#0d1526; }
+  .badge.spec { background:transparent; border:1px solid var(--accent); color:var(--accent); }
+  footer { margin-top:40px; font-size:12.5px; color:#7e96b5; text-align:center; }
+  footer a { color:#a9c2de; }
+  .cta { text-align:center; margin-top:26px; }
+  .cta a {
+    display:inline-block; background:var(--accent); color:#12233f; font-weight:700; text-decoration:none;
+    border-radius:10px; padding:12px 26px; font-size:15px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎮 GAME HACK</h1>
+    <p class="tagline">あるあるを物理にするゲーム工房 — 現実のシステムを、そのまま遊べる物理にする。</p>
+  </header>
+
+  <div class="formula">
+    <div><b>① 題材</b>みんなが知っている現実（説明不要）</div>
+    <div><b>② 物理化</b>概念をそのまま物理オブジェクトにする</div>
+    <div><b>③ 技術でクリア</b>運ではなく習熟。実データ＝固定パターン</div>
+    <div><b>④ 失敗が見せ場</b>負けた瞬間が一番共有したくなる</div>
+  </div>
+
+  <h2>遊べるゲーム</h2>
+  <div id="playable" class="grid"><p>読み込み中…</p></div>
+
+  <h2>仕様書公開中（つくってくれる人募集）</h2>
+  <p style="font-size:13.5px;color:#a9c2de;margin:0 0 12px">
+    発想の型に沿った設計書（SPEC.md）まで用意してあります。挑戦したい人は
+    <a href="https://github.com/k-ito-schoolagent/game-hack/issues" style="color:var(--accent)">issue</a> で宣言してから作ってください。はじめての PR 歓迎です。
+  </p>
+  <div id="specs" class="grid"></div>
+
+  <div class="cta">
+    <a href="https://github.com/k-ito-schoolagent/game-hack">GitHub で参加する（issue・PR の練習歓迎）</a>
+  </div>
+
+  <footer>
+    <p>参加のしかた・練習メニューは <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> へ。
+    コードは MIT License。各ゲームのデータ出典はゲーム内に明記。</p>
+  </footer>
+</div>
+<script>
+fetch('games.json').then(r => r.json()).then(games => {
+  const render = g => {
+    const a = document.createElement('a');
+    a.className = 'card' + (g.status === 'spec' ? ' spec' : '');
+    a.href = g.dir + '/';
+    a.innerHTML =
+      `<span class="badge ${g.status === 'playable' ? 'play' : 'spec'}">${g.status === 'playable' ? '遊べる' : '仕様書'}</span>` +
+      `<h3>${g.title}</h3><p>${g.summary}</p>` +
+      `<div class="tags">${g.tags.map(t => `<span>${t}</span>`).join('')}</div>`;
+    return a;
+  };
+  const play = document.getElementById('playable');
+  const spec = document.getElementById('specs');
+  play.innerHTML = '';
+  for (const g of games) (g.status === 'playable' ? play : spec).appendChild(render(g));
+  if (!play.children.length) play.innerHTML = '<p>準備中</p>';
+  if (!spec.children.length) spec.innerHTML = '<p>現在募集中の仕様はありません</p>';
+}).catch(() => {
+  document.getElementById('playable').innerHTML = '<p>games.json を読み込めませんでした</p>';
+});
+</script>
+</body>
+</html>

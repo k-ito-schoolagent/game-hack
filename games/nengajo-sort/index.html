@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>年賀状仕分け | GAME HACK</title>
+<meta name="description" content="郵便局の年末バイト。宛先の都道府県を読んで正しいカゴへフリック。喪中はがきは「配達控除」へ。地理の記憶がそのまま強さになる技術介入型ソーティング。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📮</text></svg>">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d1526;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:#eaf3fc}
+  #wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  canvas{display:block;width:100%;height:100%}
+  #hud{position:absolute;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));display:flex;justify-content:space-between;pointer-events:none;font-size:14px}
+  #hud div{background:rgba(6,26,52,.78);border-radius:8px;padding:6px 10px}
+  #day{font-size:16px;font-weight:700}
+  /* カゴは親指の届く下部に大きく */
+  #baskets{position:absolute;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px;pointer-events:none}
+  .basket{pointer-events:auto;min-height:64px;border:none;border-radius:14px;font-family:inherit;font-size:14.5px;font-weight:700;color:#12233f;background:#7fb069;box-shadow:0 4px 0 rgba(0,0,0,.35);padding:6px}
+  .basket small{display:block;font-size:10px;font-weight:500;color:rgba(18,35,63,.7)}
+  .basket:active{transform:translateY(3px);box-shadow:none}
+  .basket.mourning{background:#b9a7d9;grid-column:1/3}
+  #popup{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:min(86vw,340px);background:rgba(255,255,255,.97);color:#12233f;border-radius:16px;padding:24px 20px;text-align:center;box-shadow:0 10px 34px rgba(0,0,0,.5)}
+  #popup.hidden{display:none}
+  #popup h1{margin:0 0 10px;font-size:20px}
+  #popup p{margin:0 0 16px;font-size:14px;line-height:1.8;white-space:pre-line}
+  #popup button{display:block;width:100%;min-height:52px;margin-top:8px;font-size:16px;font-weight:700;border:none;border-radius:12px;background:#ffb300;color:#12233f;cursor:pointer}
+  #popup button.ghost{background:#e8eef6;font-weight:500}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <div id="day">-</div>
+    <div id="score">-</div>
+  </div>
+  <div id="baskets">
+    <button class="basket" data-b="north">北日本<small>北海道・東北</small></button>
+    <button class="basket" data-b="kanto">関東<small>茨城〜神奈川</small></button>
+    <button class="basket" data-b="mid">中部・近畿<small>新潟〜和歌山・山梨</small></button>
+    <button class="basket" data-b="west">西日本<small>中国・四国・九州・沖縄</small></button>
+    <button class="basket mourning" data-b="mourning">配達控除<small>喪中はがき</small></button>
+  </div>
+  <div id="popup">
+    <h1 id="ptitle"></h1><p id="ptext"></p>
+    <button id="pbtnMain"></button>
+    <button id="pbtnSub" class="ghost"></button>
+  </div>
+</div>
+<script>
+'use strict';
+/* 年賀状仕分け
+ * 型: 現実(年末の郵便局) × 物理化(はがき=フリックする紙) × 技術(地理記憶+反射・固定台本) × 見せ場(クレーム崩壊)
+ * 乱数なし。日ごとの配列は固定。郵便番号の上2桁は実在の代表値。 */
+const W=420,H=700;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0;
+
+// 都道府県→カゴ（実地理）。zip=実在の代表的下2桁
+const PREF={
+  '北海道':['north','06'],'青森県':['north','03'],'岩手県':['north','02'],'宮城県':['north','98'],
+  '秋田県':['north','01'],'山形県':['north','99'],'福島県':['north','96'],
+  '茨城県':['kanto','31'],'栃木県':['kanto','32'],'群馬県':['kanto','37'],'埼玉県':['kanto','33'],
+  '千葉県':['kanto','26'],'東京都':['kanto','10'],'神奈川県':['kanto','22'],
+  '新潟県':['mid','95'],'富山県':['mid','93'],'石川県':['mid','92'],'福井県':['mid','91'],
+  '山梨県':['mid','40'],'長野県':['mid','38'],'岐阜県':['mid','50'],'静岡県':['mid','41'],
+  '愛知県':['mid','45'],'三重県':['mid','51'],'滋賀県':['mid','52'],'京都府':['mid','60'],
+  '大阪府':['mid','53'],'兵庫県':['mid','65'],'奈良県':['mid','63'],'和歌山県':['mid','64'],
+  '鳥取県':['west','68'],'島根県':['west','69'],'岡山県':['west','70'],'広島県':['west','73'],
+  '山口県':['west','74'],'徳島県':['west','77'],'香川県':['west','76'],'愛媛県':['west','79'],
+  '高知県':['west','78'],'福岡県':['west','81'],'佐賀県':['west','84'],'長崎県':['west','85'],
+  '熊本県':['west','86'],'大分県':['west','87'],'宮崎県':['west','88'],'鹿児島県':['west','89'],'沖縄県':['west','90'],
+};
+const CITY={'北海道':'札幌市','青森県':'青森市','岩手県':'盛岡市','宮城県':'仙台市','秋田県':'秋田市','山形県':'山形市','福島県':'福島市','茨城県':'水戸市','栃木県':'宇都宮市','群馬県':'前橋市','埼玉県':'さいたま市','千葉県':'千葉市','東京都':'千代田区','神奈川県':'横浜市','新潟県':'新潟市','富山県':'富山市','石川県':'金沢市','福井県':'福井市','山梨県':'甲府市','長野県':'長野市','岐阜県':'岐阜市','静岡県':'静岡市','愛知県':'名古屋市','三重県':'津市','滋賀県':'大津市','京都府':'京都市','大阪府':'大阪市','兵庫県':'神戸市','奈良県':'奈良市','和歌山県':'和歌山市','鳥取県':'鳥取市','島根県':'松江市','岡山県':'岡山市','広島県':'広島市','山口県':'山口市','徳島県':'徳島市','香川県':'高松市','愛媛県':'松山市','高知県':'高知市','福岡県':'福岡市','佐賀県':'佐賀市','長崎県':'長崎市','熊本県':'熊本市','大分県':'大分市','宮崎県':'宮崎市','鹿児島県':'鹿児島市','沖縄県':'那覇市'};
+// 日ごとの固定台本（12/20〜12/24）。m=喪中
+const DAYS=[
+  {name:'12月20日',limit:7.0,script:['東京都','神奈川県','北海道','大阪府','m:京都府','福岡県','宮城県','愛知県','千葉県','沖縄県']},
+  {name:'12月21日',limit:6.2,script:['埼玉県','広島県','m:東京都','新潟県','鹿児島県','青森県','兵庫県','栃木県','m:福岡県','長野県','熊本県','静岡県']},
+  {name:'12月22日',limit:5.6,script:['石川県','m:大阪府','群馬県','山口県','秋田県','三重県','m:北海道','長崎県','山梨県','福島県','香川県','京都府','大分県']},
+  {name:'12月23日',limit:5.0,script:['m:愛知県','富山県','佐賀県','茨城県','和歌山県','m:宮城県','鳥取県','岐阜県','沖縄県','m:千葉県','高知県','滋賀県','岩手県','愛媛県']},
+  {name:'12月24日',limit:4.4,script:['奈良県','m:神奈川県','宮崎県','福井県','島根県','m:埼玉県','徳島県','山形県','m:広島県','岡山県','新潟県','m:東京都','鹿児島県','福井県','兵庫県']},
+];
+const MAX_MISS=3;
+
+const G={screen:'title',day:0,idx:0,card:null,miss:0,done:0,combo:0,best:0,timer:0,flying:[],shake:0,flash:null};
+let lastTs=0;
+
+function makeCard(key){
+  if(key.startsWith('m:')){ const pref=key.slice(2); return {pref,city:CITY[pref],zip:PREF[pref][1],basket:'mourning',mourning:true}; }
+  return {pref:key,city:CITY[key],zip:PREF[key][1],basket:PREF[key][0],mourning:false};
+}
+function startDay(i){
+  G.day=i; G.idx=0; G.card=null; G.miss=0; G.done=0; G.combo=0; G.flying=[]; G.flash=null;
+  G.screen='play'; $('popup').classList.add('hidden'); nextCard();
+}
+function nextCard(){
+  const D=DAYS[G.day];
+  if(G.idx>=D.script.length){ return dayClear(); }
+  G.card={...makeCard(D.script[G.idx]),x:W/2,y:210,rot:0,state:'idle'};
+  G.idx++; G.timer=D.limit;
+}
+function judge(basket){
+  const c=G.card; if(!c||c.state!=='idle')return;
+  if(basket===c.basket){
+    G.done++; G.combo++; G.best=Math.max(G.best,G.combo);
+    c.state='fly'; c.vy=-900; c.vx=(Math.random()-0.5)*120; c.vr=6; G.flash={ok:true};
+  }else{
+    G.combo=0; G.miss++; G.shake=0.4; G.flash={ok:false};
+    c.state='fly'; c.vy=300; c.vx=0; c.vr=-8;
+    if(G.miss>=MAX_MISS){ G.flying.push(c); G.card=null; return gameOver(); }
+  }
+  G.flying.push(c); G.card=null;
+  setTimeout(()=>{ if(G.screen==='play'&&!G.card) nextCard(); },260);
+}
+function gameOver(){
+  G.screen='over'; G.shake=0.7;
+  setTimeout(()=>showPopup('クレーム崩壊',
+    '誤配が重なり、利用者からの電話が鳴りやみません。\n'+DAYS[G.day].name+'・仕分け '+G.done+' 通（最大コンボ '+G.best+'）',
+    'その日をやり直す',()=>startDay(G.day),true),800);
+}
+function dayClear(){
+  G.screen='clear';
+  const last=G.day>=DAYS.length-1;
+  showPopup(DAYS[G.day].name+' 終了！',
+    last?'年末の激戦を制しました。\n総仕分け '+(G.done)+' 通・最大コンボ '+G.best+'。':'仕分け '+G.done+' 通・最大コンボ '+G.best+'。\n翌日は制限時間が短くなります。',
+    last?'タイトルへ':'翌日へ',()=>{last?(G.screen='title',showTitle()):startDay(G.day+1);},true);
+}
+function showTitle(){
+  G.screen='title';
+  showPopup('年賀状仕分け',
+    '年末の郵便局アルバイト。\n\n・宛先の都道府県を読んで下のカゴへ\n・カゴをタップ、またははがきをフリック\n・喪中はがき（薄紫）は「配達控除」へ\n・制限時間を過ぎると未処理ミス\n・3ミスでクレーム崩壊\n\n宛先は実在の郵便番号つき。地理の記憶が武器になる。',
+    'バイト開始',()=>startDay(0),false);
+}
+function showPopup(t,x,btn,fn,share){
+  $('ptitle').textContent=t;$('ptext').textContent=x;
+  const m=$('pbtnMain');m.textContent=btn;m.onclick=fn;
+  const s=$('pbtnSub');s.textContent=share?'𝕏 で共有':'ポータルへ';
+  s.onclick=share?shareX:()=>location.href='../../';
+  $('popup').classList.remove('hidden');
+}
+function shareX(){
+  const text=G.screen==='clear'
+    ?'【年賀状仕分け】'+DAYS[G.day].name+' ノーミス目前！仕分け '+G.done+' 通・最大コンボ '+G.best+'。'
+    :'【年賀状仕分け】'+DAYS[G.day].name+'、'+G.done+' 通を仕分けてクレーム崩壊。';
+  window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#年賀状仕分け #GAMEHACK\n'+location.href),'_blank');
+}
+
+// カゴのタップ
+document.querySelectorAll('.basket').forEach(b=>{
+  b.addEventListener('pointerdown',e=>{ e.preventDefault(); if(G.screen==='play')judge(b.dataset.b); });
+});
+// はがきのフリック（方向でカゴを選ぶ: 上=中央3つを左右で、下=喪中）
+let dragPid=null,dragStart=null,cardHeld=false;
+function toGame(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left-TX)/SC,y:(e.clientY-r.top-TY)/SC};}
+$('wrap').addEventListener('pointerdown',e=>{
+  if(G.screen!=='play'||!G.card||G.card.state!=='idle')return;
+  const g=toGame(e);
+  if(Math.abs(g.x-G.card.x)<110&&Math.abs(g.y-G.card.y)<80){
+    dragPid=e.pointerId; cardHeld=true; dragStart={x:g.x,y:g.y,t:performance.now()}; e.preventDefault();
+  }
+});
+$('wrap').addEventListener('pointermove',e=>{
+  if(e.pointerId!==dragPid||!cardHeld||!G.card)return;
+  const g=toGame(e);
+  G.card.x=g.x; G.card.y=g.y;
+  G.card.rot=Math.max(-0.4,Math.min(0.4,(g.x-dragStart.x)/300));
+});
+$('wrap').addEventListener('pointerup',e=>{
+  if(e.pointerId!==dragPid||!cardHeld)return;
+  cardHeld=false; dragPid=null;
+  const c=G.card; if(!c)return;
+  const dx=c.x-W/2, dy=c.y-210;
+  if(dy>120){ judge('mourning'); return; } // 下にフリック=喪中
+  if(dy<-40||Math.abs(dx)>60){
+    if(dx<-W*0.22)judge(dy<-40?'north':'north');
+    else if(dx>W*0.22)judge('west');
+    else judge('kanto');
+    return;
+  }
+  c.x=W/2; c.y=210; c.rot=0; // 元に戻す
+});
+
+function update(dt){
+  G.timer-=dt;
+  if(G.timer<=0&&G.card){
+    G.combo=0; G.miss++; G.shake=0.4; G.flash={ok:false};
+    G.card.state='fly'; G.card.vy=500; G.card.vx=0; G.card.vr=3; G.flying.push(G.card); G.card=null;
+    if(G.miss>=MAX_MISS)return gameOver();
+    setTimeout(()=>{ if(G.screen==='play'&&!G.card) nextCard(); },260);
+  }
+  for(const c of G.flying){ c.vy+=2200*dt; c.x+=(c.vx||0)*dt; c.y+=c.vy*dt; c.rot+=c.vr*dt; }
+  G.flying=G.flying.filter(c=>c.y<H+160);
+}
+
+function drawCard(c){
+  ctx.save(); ctx.translate(c.x,c.y); ctx.rotate(c.rot||0);
+  ctx.fillStyle=c.mourning?'#cbb8e8':'#fffdf4';
+  ctx.strokeStyle=c.mourning?'#8f7bb5':'#d8cfb8'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.roundRect(-96,-64,192,128,8); ctx.fill(); ctx.stroke();
+  if(c.mourning){
+    ctx.fillStyle='#4a3a63'; ctx.textAlign='center';
+    ctx.font='700 15px system-ui'; ctx.fillText('喪中につき',0,-18);
+    ctx.fillText('年末年始のご挨拶を',0,4);
+    ctx.fillText('控えさせていただきます',0,26);
+    ctx.font='11px system-ui'; ctx.fillText(c.pref+c.city,0,50);
+  }else{
+    ctx.fillStyle='#c23b3b'; // 年賀印刷風
+    ctx.font='800 13px system-ui'; ctx.textAlign='left'; ctx.fillText('年賀',-86,-44);
+    ctx.fillStyle='#12233f';
+    ctx.font='700 20px system-ui'; ctx.textAlign='center';
+    ctx.fillText(c.pref+' '+c.city,0,-6);
+    ctx.font='600 15px system-ui'; ctx.fillStyle='#3a4a63';
+    ctx.fillText('〒'+c.zip+'0-XXXX',0,24);
+    ctx.font='11px system-ui'; ctx.fillText('あて名 様',0,48);
+  }
+  ctx.restore();
+}
+function draw(){
+  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='#0d1526'; ctx.fillRect(0,0,VW,VH);
+  const shx=G.shake>0?(Math.random()-0.5)*G.shake*16:0;
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR+shx*DPR,TY*DPR);
+  ctx.fillStyle='#101d33'; ctx.fillRect(0,0,W,H);
+  // ベルトのガイド
+  ctx.fillStyle='#22344f'; ctx.fillRect(40,120,W-80,180);
+  ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.strokeRect(40,120,W-80,180);
+  // 残り時間バー
+  if(G.screen==='play'&&G.card){
+    const D=DAYS[G.day], r=Math.max(0,G.timer/D.limit);
+    ctx.fillStyle=r>0.35?'#7fb069':'#e24b4a';
+    ctx.fillRect(40,108,(W-80)*r,7);
+  }
+  for(const c of G.flying)drawCard(c);
+  if(G.card)drawCard(G.card);
+  // フラッシュ
+  if(G.flash){
+    ctx.fillStyle=G.flash.ok?'rgba(127,176,105,.25)':'rgba(226,75,74,.25)';
+    ctx.fillRect(0,0,W,H); G.flash=null;
+  }
+  // コンボ・ミス
+  ctx.textAlign='left'; ctx.font='700 14px system-ui';
+  ctx.fillStyle='#ffb300'; if(G.combo>1)ctx.fillText(G.combo+' コンボ！',16,340);
+  ctx.fillStyle='#e24b4a'; ctx.fillText('ミス '+'●'.repeat(G.miss)+'○'.repeat(Math.max(0,MAX_MISS-G.miss)),16,366);
+  $('day').textContent=(G.screen==='play'||G.screen==='over'||G.screen==='clear')?DAYS[G.day].name:'-';
+  $('score').textContent=G.screen==='play'?('残り '+(DAYS[G.day].script.length-G.idx+(G.card?1:0))+' 通'):'-';
+}
+function loop(ts){
+  const dt=Math.min(0.05,(ts-(lastTs||ts))/1000); lastTs=ts;
+  if(G.shake>0)G.shake=Math.max(0,G.shake-dt);
+  if(G.screen==='play')update(dt);
+  else { for(const c of G.flying){ c.vy+=2200*dt; c.x+=(c.vx||0)*dt; c.y+=c.vy*dt; c.rot+=c.vr*dt; } G.flying=G.flying.filter(c=>c.y<H+160); }
+  draw(); requestAnimationFrame(loop);
+}
+function resize(){
+  DPR=window.devicePixelRatio||1; VW=innerWidth; VH=innerHeight;
+  cv.width=VW*DPR; cv.height=VH*DPR;
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+}
+addEventListener('resize',resize); resize();
+showTitle(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>

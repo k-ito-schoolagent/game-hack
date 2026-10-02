@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>屋根雪おろし（仕様書公開中） | GAME HACK</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
+<style>
+  body{margin:0;background:#0d1526;color:#eaf3fc;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.8}
+  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
+  .badge{display:inline-block;font-size:12px;font-weight:700;border:1px solid #ffb300;color:#ffb300;border-radius:6px;padding:2px 10px;margin-bottom:14px}
+  h1{font-size:26px;margin:0 0 14px}
+  p,li{font-size:14.5px;color:#c9dcf2}
+  a{color:#ffb300}
+  .box{background:#16233c;border-radius:12px;padding:14px 16px;margin:14px 0}
+  .box b{color:#ffb300}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="badge">仕様書公開中・制作者募集</span>
+  <h1>屋根雪おろし</h1>
+  <p>実降雪データで積もる雪。雪庇の崩落物理を読み、落とす向きと順序を決める。失敗＝雪の塊が隣家に崩落「ご近所トラブル発生」。</p>
+  <div class="box">
+    <b>発想の型</b>
+    <ul>
+      <li>題材: 雪国の冬の重労働と「落とす向き」の判断</li>
+      <li>物理化: 屋根の雪＝斜面上の物理ブロック群。落とす＝スワイプ方向に崩落。隣家・車・通行人＝当たり判定つき障害物</li>
+      <li>技術: 実降雪データで積雪量は固定。雪庇の崩れ方（摩擦角・連鎖）を読み、落とす順序と向きを決める技術</li>
+      <li>失敗の見せ場: 雪の塊が隣家に崩落して「ご近所トラブル発生」、自分に落ちて「生き埋め」</li>
+      <li>データ: 気象庁の積雪深データ（地点別・日別）</li>
+      <li>操作: スワイプで雪を落とす方向指定。長押しで雪おろし棒（精密）</li>
+    </ul>
+  </div>
+  <p>つくってみたい人は <a href="https://github.com/k-ito-schoolagent/game-hack/issues">issue</a> で宣言してください。
+  詳しい設計書は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/games/yukiyane/SPEC.md">SPEC.md</a>。
+  はじめてのプルリクエスト歓迎です（<a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">参加のしかた</a>）。</p>
+  <p><a href="../../">← GAME HACK ポータルへ</a></p>
+</div>
+</body>
+</html>

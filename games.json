@@ -1,0 +1,92 @@
+[
+  {
+    "id": "densha-pack",
+    "title": "満員電車パッキング",
+    "dir": "games/densha-pack",
+    "status": "playable",
+    "tags": ["物理", "暗記", "詰め込み"],
+    "summary": "ドア係として乗客（物理ボックス）を車両に詰め込め。赤いドアラインを越えたら「ドアが閉まりません」。乗客の並びは固定＝覚えれば上手くなる。",
+    "authors": ["@itoksk"]
+  },
+  {
+    "id": "hanko-line",
+    "title": "ハンコ決裁ライン",
+    "dir": "games/hanko-line",
+    "status": "playable",
+    "tags": ["判断力", "精密操作", "校務あるある"],
+    "summary": "流れてくる決裁文書の不備（桁違い・存在しない日付・宛先違い）を見抜いて差し戻し、正しい書類にはハンコをまっすぐ押す。斜め押しはにじんでミス。",
+    "authors": ["@itoksk"]
+  },
+  {
+    "id": "nengajo-sort",
+    "title": "年賀状仕分け",
+    "dir": "games/nengajo-sort",
+    "status": "playable",
+    "tags": ["記憶", "反射", "実データ"],
+    "summary": "郵便局の年末バイト。宛先の都道府県（実在の郵便番号つき）を読んで正しいカゴへフリック。喪中はがきは「配達控除」へ。地理の記憶がそのまま強さになる。",
+    "authors": ["@itoksk"]
+  },
+  {
+    "id": "sakura-front",
+    "title": "桜前線お花見キャッチ",
+    "dir": "games/sakura-front",
+    "status": "spec",
+    "tags": ["先読み", "実データ", "気象"],
+    "summary": "お花見幹事としてブルーシートを列島上で事前移動。実開花データで北上する桜前線の「満開」の瞬間・場所に合わせる。失敗＝「葉桜でした」。",
+    "authors": []
+  },
+  {
+    "id": "baiu-defense",
+    "title": "梅雨前線ディフェンス",
+    "dir": "games/baiu-defense",
+    "status": "spec",
+    "tags": ["先読み", "実データ", "気象"],
+    "summary": "プレイヤーは太平洋高気圧。実データの梅雨前線を押し返し、梅雨入りを遅らせる。押しすぎると別の地域に大雨。失敗＝「梅雨入り宣言」テロップ。",
+    "authors": []
+  },
+  {
+    "id": "dam-ops",
+    "title": "ダム放流オペレーション",
+    "dir": "games/dam-ops",
+    "status": "spec",
+    "tags": ["先読み", "バランス", "実データ"],
+    "summary": "実雨量・流量データの洪水を放流量スライダーで捌く。失敗は2方向＝下流氾濫 or 放ちすぎ渇水。貯水率を読む先読みバランス技術。",
+    "authors": []
+  },
+  {
+    "id": "shuden-rta",
+    "title": "終電乗り換えRTA",
+    "dir": "games/shuden-rta",
+    "status": "spec",
+    "tags": ["暗記", "ルート設計", "実データ"],
+    "summary": "実在の時刻表（完全固定）で終電までの乗り換えを繋ぐ。最適ルートの暗記と実行精度がそのまま速さ。失敗＝「タクシー代 ¥18,400」のレシート。",
+    "authors": []
+  },
+  {
+    "id": "yukiyane",
+    "title": "屋根雪おろし",
+    "dir": "games/yukiyane",
+    "status": "spec",
+    "tags": ["物理", "実データ", "読み"],
+    "summary": "実降雪データで積もる雪。雪庇の崩落物理を読み、落とす向きと順序を決める。失敗＝雪の塊が隣家に崩落「ご近所トラブル発生」。",
+    "authors": []
+  },
+  {
+    "id": "hanabi",
+    "title": "花火打上げ職人",
+    "dir": "games/hanabi",
+    "status": "spec",
+    "tags": ["リズム", "実データ", "間合い"],
+    "summary": "実風データ＋固定の演目プログラム。風を読む間合いと打上げリズムの技術。失敗＝風に流されて観客の歓声がざわめきに。",
+    "authors": []
+  },
+  {
+    "id": "ground-handling",
+    "title": "グランドハンドリング",
+    "dir": "games/ground-handling",
+    "status": "spec",
+    "tags": ["同時進行", "ルート設計", "実データ"],
+    "summary": "実ダイヤで到着する機体を誘導所へ。誘導ルート設計と同時進行を捌く技術。失敗＝滑走路上のニアミスで「運航停止」。",
+    "authors": []
+  }
+]
