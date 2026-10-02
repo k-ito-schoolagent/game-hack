@@ -43,7 +43,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 #sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
 @keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 #sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
-#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px;word-break:auto-phrase;text-wrap:balance}
 #sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
 #sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
 #sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
@@ -311,7 +311,7 @@ for(const [i,st] of STAGES.entries()){
 }
 // ---- STAGES END
 
-const G={screen:'title',stage:0,T:0,chunks:[],cap:null,anim:null,fail:null,failT:0,drag:null,me:0,swipes:0,piles:[],landed:null,doneT:-1,total:[],hit:null,shake:0};
+const G={screen:'title',stage:0,T:0,chunks:[],cap:null,anim:null,fail:null,failT:0,drag:null,me:0,swipes:0,piles:[],landed:null,doneT:-1,total:[],hit:null,shake:0,pan:0,nfx:null,lfs:13};
 let lastTs=0;
 // 画面: 隣家の壁〜道路（右の軒から4.75m）までが横幅いっぱい。屋根の雪が横幅の約75%を占める
 // 縦は描画だけ KY 倍（物理は等倍）。横幅で縮尺が決まるぶん、H に応じて縦を 1.3〜1.6 倍に伸ばし、屋根の雪を大きく見せる。
@@ -322,7 +322,8 @@ function snowTop(st){ const gm=geom(st); return Math.max(...makeChunks(st).map(c
 // 屋根の雪の上下の中心が画面の 66% の高さに来るよう、面ごとに地面の位置を決める（地面の下は 100px 以上残す）
 function layoutY(){ const st=STAGES[G.stage]||STAGES[0]; KY=1.3+0.3*Math.max(0,Math.min(1,(H-700)/220)); SY=S*KY;
   const mid=(SIM.eaveH+snowTop(st))/2; GY=Math.min(H-100,Math.round(H*0.66+mid*SY)); }
-function onResize(){ if(typeof G!=='undefined') layoutY(); }
+function onResize(){ if(typeof G!=='undefined'){ layoutY(); if(G.chunks.length) fitLabelFs(); } }
+function fitLabelFs(){ if(G.anim) return; G.lfs=13; G.lfs=labelRects(cur()).placed.reduce((a,p)=>Math.min(a,p.fs),13); }
 const wx=x=>X0+x*S, wy=y=>GY-y*SY;
 const fmt=n=>Math.round(n).toLocaleString('ja-JP');
 const cur=()=>STAGES[G.stage];
@@ -330,10 +331,10 @@ const cur=()=>STAGES[G.stage];
 function startStage(i){
   G.stage=i; const st=cur();
   G.chunks=makeChunks(st); G.cap={gap:st.gapCap,yard:st.yardCap};
-  G.T=0; G.anim=null; G.fail=null; G.failT=0; G.drag=null; G.swipes=0; G.piles=[]; G.doneT=-1; G.hit=null; G.shake=0;
+  G.T=0; G.anim=null; G.fail=null; G.failT=0; G.drag=null; G.swipes=0; G.piles=[]; G.doneT=-1; G.hit=null; G.shake=0; G.pan=0; G.nfx=null;
   G.landed={gap:0,yard:0,ditch:0,road:0};
   G.me=-0.01; G.meFace=1;
-  G.screen='play'; UI.close(); lastTs=0; layoutY();
+  G.screen='play'; UI.close(); lastTs=0; layoutY(); fitLabelFs();
 }
 function restart(){ startStage(G.stage); }
 
@@ -387,14 +388,19 @@ $('wrap').addEventListener('pointerup',e=>{
 $('wrap').addEventListener('pointercancel',()=>{ G.drag=null; });
 
 // ---- 進行 ----
+// 隣家への失敗のときだけ、雪が軒を飛び出した瞬間からカメラを隣家の勝手口へ寄せる（G.pan: 0=ふだん 1=寄りきった）
+// XL: 寄ったときに見える左端まで、空・地面・断面を描いておく
+const PANX=1, XL=-200, isNbFail=f=>!!f&&(f.type==='nb'||f.type==='gapfull');
+function panTarget(){ if(isNbFail(G.fail)) return PANX; const a=G.anim; return a&&isNbFail(a.j.fail)&&a.t>=a.j.fail.f.t0-0.05?PANX:0; }
 function update(dt){
   G.T+=dt; if(G.shake>0)G.shake=Math.max(0,G.shake-dt);
+  G.pan+=(panTarget()-G.pan)*Math.min(1,dt*7);
   if(G.fail){
     G.failT+=dt;
     // 失敗のあとも雪と人は落ち続ける（判定はしない）
     const a=G.anim;
     if(a&&a.t<a.end){ a.t+=dt*PLAY; while(a.evI<a.j.ev.length&&a.j.ev[a.evI].t<=a.t){ const e=a.j.ev[a.evI++]; if(e===G.fail||!e.f)continue; G.piles.push({zone:e.f.zone,side:e.f.side,d:e.f.d,m:e.f.m,t:G.T,y:e.f.y||0}); } }
-    if(G.failT>1.2&&G.screen==='play') failSheet();
+    if(G.failT>(G.nfx?2.1:1.2)&&G.screen==='play') failSheet();
     return;
   }
   const a=G.anim;
@@ -415,6 +421,13 @@ function update(dt){
 function startFail(e){
   G.fail=e; G.failT=0; G.shake=0.45; buzz([30,40,60]);
   if(e.f&&e.type!=='self') G.piles.push({zone:e.type,side:e.f.side,d:e.f.d,m:e.f.m,t:G.T,y:e.f.y||0});
+  if(isNbFail(e)){
+    // 隣家: 当たった所と勝手口の前に雪煙。演出の揺れだけ乱数
+    const N=nbGeo(cur()), hy=e.type==='nb'?wy(e.f.y):GY-8, puffs=[];
+    if(e.type==='nb') for(let i=0;i<20;i++) puffs.push({x:N.ex-2,y:hy+(Math.random()-.5)*16,vx:-8-Math.random()*55,vy:(Math.random()-.5)*60,r:3+Math.random()*5,d:Math.random()*.08});
+    for(let i=0;i<16;i++) puffs.push({x:N.mx+(Math.random()-.5)*50,y:GY-4,vx:(Math.random()-.5)*70,vy:-12-Math.random()*36,r:4+Math.random()*6,d:(e.type==='nb'?.26:.05)+Math.random()*.15});
+    G.nfx={kind:e.type,hy,r:Math.sqrt(e.f.m/SIM.rho)*S*.5,puffs};
+  }
 }
 function actText(){
   const a=G.anim, c=a.act.c, st=cur();
@@ -423,11 +436,13 @@ function actText(){
   return side+'の'+pos+'の雪 '+fmt(c.m)+'kg を「'+LV[a.act.lv]+'」で'+(a.act.dir>0?'軒へ押した':'棟へ押し上げた');
 }
 const WHO={kid:'通学の子ども',kid2:'通学の子ども',oba:'隣のおばあちゃん'};
+const GUIDE_SAY=['軒のほうへ、そうっと押すんだよ。','強く押すと遠くまで飛ぶからね'];
+const NB_SAY={nb:['ちょっと！ 雨どいが曲がったよ！','勝手口も開かないじゃないの'],gapfull:['うちの勝手口が開かないよ！','どこから出ればいいのさ']};
 function failSheet(){
   const e=G.fail, st=cur(), a=G.anim, act=actText(); let title, lead;
   const f=e.f;
-  if(e.type==='nb'){ title='ご近所トラブル'; lead='隣のおばあちゃん「ちょっと！ うちの屋根に落ちたよ！」\n'+act+'。'+fmt(f.m)+'kg の雪が秒速'+f.v.toFixed(1)+'mで軒を飛び出し、'+st.gap.toFixed(1)+'m 先の隣家に当たりました。'; }
-  else if(e.type==='gapfull'){ title='ご近所トラブル'; lead='隣のおばあちゃん「勝手口が開かないよ！」\n'+act+'。隣家との間の置き場は残り '+fmt(Math.max(0,G.cap.gap))+'kg でしたが、'+fmt(f.m)+'kg を落として隣家の壁まで埋めました。'; }
+  if(e.type==='nb'){ title='ご近所トラブル'; lead='隣のおばあちゃん「'+NB_SAY.nb.join(' ')+'」\n'+act+'。'+fmt(f.m)+'kg の雪が秒速'+f.v.toFixed(1)+'mで軒を飛び出し、'+st.gap.toFixed(1)+'m 先の隣家の壁（高さ'+f.y.toFixed(1)+'m）に当たりました。隣の軒の雪まで崩れて雨どいが曲がり、勝手口が雪に埋まりました。'; }
+  else if(e.type==='gapfull'){ title='ご近所トラブル'; lead='隣のおばあちゃん「'+NB_SAY.gapfull.join(' ')+'」\n'+act+'。隣家との間の置き場は残り '+fmt(Math.max(0,G.cap.gap))+'kg でしたが、'+fmt(f.m)+'kg を落とし、あふれた雪が隣家の勝手口をふさぎました。'; }
   else if(e.type==='car'){ title='カーポート崩落'; lead='「バキッ」\n'+act+'。'+fmt(f.m)+'kg の雪が秒速'+f.v.toFixed(1)+'mで軒を飛び出し、'+f.d.toFixed(1)+'m 先のカーポートの屋根を直撃。屋根が折れて車が埋まりました。'; }
   else if(e.type==='yardfull'){ title='カーポート崩落'; lead='「車が埋まった……」\n'+act+'。庭の雪置き場は残り '+fmt(Math.max(0,G.cap.yard))+'kg でしたが、'+fmt(f.m)+'kg を落とし、あふれた雪山がカーポートへ崩れました。'; }
   else if(e.type==='ped'){ title='通学路に落雪'; lead=WHO[e.who]+'「わっ！」\n'+act+'。'+fmt(f.m)+'kg の雪が流雪溝を越えて道路へ。歩いていた'+WHO[e.who]+'の目の前に落ちました。'; }
@@ -454,7 +469,7 @@ function clear(){
     subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.place+' 積雪'+st.depth+'cm の屋根から '+fmt(sumLanded())+'kg を'+G.swipes+'回で下ろした',TAG)],['一覧へ',toPortal]]});
 }
 function showTitle(){
-  G.screen='title'; UI.hideHud(); G.stage=0; G.chunks=makeChunks(STAGES[0]); G.cap={gap:1e9,yard:1e9}; G.landed={gap:0,yard:0,ditch:0,road:0}; layoutY();
+  G.screen='title'; UI.hideHud(); G.stage=0; G.pan=0; G.nfx=null; G.fail=null; G.anim=null; G.chunks=makeChunks(STAGES[0]); G.cap={gap:1e9,yard:1e9}; G.landed={gap:0,yard:0,ditch:0,road:0}; layoutY();
   UI.sheet({no:'回覧 '+GAME_NO,title:'屋根雪おろし',
     lead:'大雪の朝。屋根の雪をかたまりごと下ろす。\n左は隣家、右はカーポートと通学路。落とす向きと順番で、雪の行き先が決まる。',
     rows:[['あなたの権限','屋根の雪のかたまりの重さ（kg）が見える'],['操作','かたまりを、落としたい向きへはらう（長くはらうほど強く押す）'],
@@ -472,15 +487,15 @@ function rr(x,y,w,h,c){ ctx.fillStyle=c; ctx.fillRect(x,y,w,h); }
 
 function drawSky(){
   const g=ctx.createLinearGradient(0,0,0,GY); g.addColorStop(0,'#AEB9C4'); g.addColorStop(1,'#DCE2E7');
-  ctx.fillStyle=g; ctx.fillRect(0,0,W,GY+2);
+  ctx.fillStyle=g; ctx.fillRect(XL,0,W-XL+20,GY+2);
   // 遠くの山と杉林
   const mt=GY-80, top=Math.max(topY()+150,GY-470);
-  fillPoly([[0,mt-120],[70,top+120],[150,top+40],[230,top+90],[300,top],[380,top+70],[420,top+60],[420,mt],[0,mt]],'#BFC8D0');
-  fillPoly([[0,mt-40],[90,mt-130],[180,mt-70],[270,mt-115],[360,mt-60],[420,mt-90],[420,mt],[0,mt]],'#ADB8C1');
+  fillPoly([[XL,mt-40],[0,mt-120],[70,top+120],[150,top+40],[230,top+90],[300,top],[380,top+70],[420,top+60],[420,mt],[XL,mt]],'#BFC8D0');
+  fillPoly([[XL,mt-90],[0,mt-40],[90,mt-130],[180,mt-70],[270,mt-115],[360,mt-60],[420,mt-90],[420,mt],[XL,mt]],'#ADB8C1');
 
   ctx.fillStyle='#8E9AA3';
-  for(let i=0;i<30;i++){ const x=i*15-4, h=26+((i*37)%17); ctx.beginPath(); ctx.moveTo(x,GY-70); ctx.lineTo(x+7,GY-70-h); ctx.lineTo(x+14,GY-70); ctx.fill(); }
-  rr(0,GY-72,W,14,'#E6EAEE');
+  for(let i=-13;i<30;i++){ const x=i*15-4, h=26+((i*37)%17); ctx.beginPath(); ctx.moveTo(x,GY-70); ctx.lineTo(x+7,GY-70-h); ctx.lineTo(x+14,GY-70); ctx.fill(); }
+  rr(XL,GY-72,W-XL,14,'#E6EAEE');
   // 裏の通りの家並み（雪をかぶった屋根）
   for(const [x,w,h,rf] of [[-10,70,46,22],[52,64,38,18],[300,72,44,20],[362,70,50,24]]){
     const b=GY-58; rr(x,b-h,w,h,'#9FA8AE'); fillPoly([[x-4,b-h],[x+w/2,b-h-rf],[x+w+4,b-h]],'#7E8A92');
@@ -497,7 +512,7 @@ function drawFlakes(dt){
 }
 function drawGround(st){
   // 地面の雪（手前ほど少し青い）
-  rr(0,GY,W,H-GY,'#E9EDF1'); rr(0,GY,W,3,'#F7F9FA');
+  rr(XL,GY,W-XL,H-GY,'#E9EDF1'); rr(XL,GY,W-XL,3,'#F7F9FA');
   ctx.fillStyle='#DFE5EA'; for(let i=0;i<4;i++) rr(0,GY+30+i*26,W,1.5,'#E1E7EC');
   const E=SIM.half;
   // 流雪溝（コンクリートの溝と流れ）
@@ -542,8 +557,8 @@ function drawPit(b,f,lim){
 function drawBand(st){
   const B=bandLayout(st);
   // 断面の地層（踏み固めた根雪）
-  rr(0,GY+3,wx(SIM.half+st.ditch[1]),H-GY-3,'#E3E8EC');
-  ctx.fillStyle='rgba(150,165,178,.18)'; for(let y=GY+14;y<H;y+=11) ctx.fillRect(0,y,wx(SIM.half+st.ditch[1]),1);
+  rr(XL,GY+3,wx(SIM.half+st.ditch[1])-XL,H-GY-3,'#E3E8EC');
+  ctx.fillStyle='rgba(150,165,178,.18)'; for(let y=GY+14;y<H;y+=11) ctx.fillRect(XL,y,wx(SIM.half+st.ditch[1])-XL,1);
   B.L.top=B.top; B.L.bot=B.bot; B.R.top=B.top; B.R.bot=B.bot;
   drawPit(B.L,B.fl,B.lim); drawPit(B.R,B.fr,B.lim);
   // 流雪溝の断面: コンクリートのU字溝と流れる水
@@ -573,25 +588,85 @@ function drawSnowPole(st){
   ctx.font='800 11px '+FONT; ctx.strokeStyle='rgba(243,245,247,.95)'; ctx.lineWidth=3.5; ctx.strokeText(st.depth+'cm',x+11,dy+4); ctx.fillStyle='#1F2F3F'; ctx.fillText(st.depth+'cm',x+11,dy+4);
 }
 function poleRect(st){ ctx.font='800 11px '+FONT; return {x:6,y:GY-6*SY-4,w:20+ctx.measureText(st.depth+'cm').width,h:6*SY+4}; }
+// 隣家: 軒先・下見板の壁・勝手口・台所の窓・雨どい。ふだんは画面の左端に少し見えるだけで、隣への失敗のときにカメラが寄る
+function nbGeo(st){ const ex=wx(-SIM.half-st.gap), ey=wy(4.2), dt=GY-1.9*SY;
+  return {ex,ey,dx0:ex-30,dx1:ex-12,dt,dh:GY-dt,wx0:ex-86,wx1:ex-50,wt:wy(2.25),wb:wy(1.25),mx:ex-20}; }
+const ease=u=>{ u=Math.max(0,Math.min(1,u)); return 1-(1-u)*(1-u); };
 function drawNeighbor(st){
-  const ex=wx(-SIM.half-st.gap), ey=wy(4.2);
+  const N=nbGeo(st), {ex,ey}=N, fx=G.nfx, ft=fx?G.failT:0, L=ex-200;
   // 壁
-  rr(-10,ey+6,ex-6+10,GY-ey-6,'#9C8F7C');
-  for(let y=ey+14;y<GY;y+=7){ rr(-10,y,ex-6+10,1,'rgba(60,50,40,.18)'); }
-  // 屋根（右の軒先だけ見える）
-  const k=0.6, rx=-10, ry=ey-(ex-rx)*k;
-  fillPoly([[ex+3,ey],[rx,ry],[rx,ry+7],[ex+3,ey+6]],'#35585B');
-  fillPoly([[ex+3,ey],[rx,ry],[rx,ry-30],[ex-4,ey-24],[ex+8,ey-14],[ex+9,ey-4]],'#F3F5F7');
-  ctx.strokeStyle='#D3DBE2'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(rx,ry-30); ctx.lineTo(ex-4,ey-24); ctx.lineTo(ex+8,ey-14); ctx.stroke();
-  // 勝手口の灯り
-  rr(ex-14,GY-44,8,44,'#5E4A38'); rr(ex-13,GY-40,6,14,'#E8D9A8');
+  rr(L,ey+6,ex-6-L,GY-ey-6,'#9C8F7C');
+  for(let y=ey+14;y<GY;y+=7) rr(L,y,ex-6-L,1,'rgba(60,50,40,.18)');
+  // 屋根（右の軒先から左へ上がる）と屋根の雪。隣家に当てると軒先の雪庇も崩れ落ちる
+  const k=0.6, ry=ey-(ex-L)*k;
+  fillPoly([[ex+3,ey],[L,ry],[L,ry+7],[ex+3,ey+6]],'#35585B');
+  const corn=!(fx&&fx.kind==='nb'&&ft>0.12);
+  if(corn){ fillPoly([[ex+3,ey],[L,ry],[L,ry-30],[ex-4,ey-24],[ex+8,ey-14],[ex+9,ey-4]],'#F3F5F7');
+    ctx.strokeStyle='#D3DBE2'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(L,ry-30); ctx.lineTo(ex-4,ey-24); ctx.lineTo(ex+8,ey-14); ctx.stroke(); }
+  else { fillPoly([[ex-17,ey-12],[L,ry],[L,ry-30],[ex-14,ey-32],[ex-11,ey-24],[ex-16,ey-19]],'#F3F5F7'); }
+  // 台所の窓（おばあちゃんが開けて顔を出す）
+  const open=fx&&ft>0.55;
+  rr(N.wx0,N.wt,N.wx1-N.wx0,N.wb-N.wt,'#4A4038');
+  const gw=(N.wx1-N.wx0-4)/2;
+  if(open){ rr(N.wx0+2,N.wt+2,gw,N.wb-N.wt-4,'#2F2A26'); rr(N.wx0+2+gw,N.wt+2,gw,N.wb-N.wt-4,'#AFC0C8'); rr(N.wx0+2+gw+3,N.wt+2,2,N.wb-N.wt-4,'#4A4038'); }
+  else { rr(N.wx0+2,N.wt+2,gw*2,N.wb-N.wt-4,'#E8D9A8'); rr(N.wx0+1+gw,N.wt+2,2,N.wb-N.wt-4,'#4A4038'); }
+  rr(N.wx0-3,N.wb,N.wx1-N.wx0+6,3,'#7B6A55'); rr(N.wx0-3,N.wt-4,N.wx1-N.wx0+6,4,'#F3F5F7');
+  // 勝手口（霧除けの小屋根つき）。灯りがついている
+  rr(N.dx0,N.dt,N.dx1-N.dx0,N.dh,'#5E4A38'); rr(N.dx0+3,N.dt+5,N.dx1-N.dx0-6,N.dh*0.32,'#E8D9A8'); rr(N.dx1-6,N.dt+N.dh*0.55,2,4,'#C9B37A');
+  fillPoly([[N.dx0-5,N.dt-2],[N.dx1+5,N.dt-2],[N.dx1+5,N.dt-6],[N.dx0-5,N.dt-10]],'#35585B'); fillPoly([[N.dx0-6,N.dt-9],[N.dx1+6,N.dt-5],[N.dx1+4,N.dt-10],[N.dx0-4,N.dt-15]],'#F3F5F7');
+  // 雨どい: 軒樋（切り口）と、壁の角を下りる竪樋。隣家に当てると落ちた雪庇に引っかけられて曲がる
+  const bent=fx&&fx.kind==='nb'&&ft>0.2, gx=N.dx0-9, gc='#7C776A', my=ey+(GY-ey)*0.45;
+  ctx.strokeStyle=gc; ctx.lineWidth=3; ctx.lineJoin='round'; ctx.beginPath();
+  if(!bent){ rr(ex+1,ey+2,8,5,gc); ctx.moveTo(ex+3,ey+7); ctx.lineTo(ex-4,ey+12); ctx.lineTo(gx+1,ey+12); ctx.lineTo(gx+1,GY-3); }
+  else { const sw=Math.sin(ft*10)*Math.max(0,1.2-ft)*0.25;
+    ctx.save(); ctx.translate(ex+4,ey+4); ctx.rotate(1.2+sw); rr(-2,-2.5,46,5,gc); rr(40,-3.5,6,7,'#5E5A50'); ctx.restore();   // 軒樋が外れてぶら下がる
+    ctx.moveTo(gx+1,ey+12); ctx.lineTo(gx+7,ey+30); ctx.lineTo(gx+14,my); ctx.lineTo(gx+3,my+20); ctx.lineTo(gx+1,GY-3); }   // 竪樋が押されて折れ曲がる
+  ctx.stroke();
+  for(let y=ey+30;y<GY-10;y+=34) if(!bent||y>my+20) rr(gx-2,y,6,2,'#5E5A50');
+  // 勝手口の前に崩れた雪の山（扉を埋める）
+  if(fx){ const g=ease((ft-(fx.kind==='nb'?0.2:0.02))/0.45), rx=fx.kind==='gapfull'?46:38, ryy=N.dh*(fx.kind==='gapfull'?1.1:0.9)*g;
+    if(g>0){ ctx.beginPath(); ctx.moveTo(N.mx-rx,GY+1);
+      for(let i=0;i<=16;i++){ const u=-1+i/8, y=GY-ryy*Math.sqrt(Math.max(0,1-u*u))*(1+0.07*Math.sin(i*2.7)); ctx.lineTo(N.mx+u*rx,y); }
+      ctx.closePath(); ctx.fillStyle='#F2F5F7'; ctx.fill(); ctx.strokeStyle='#C9D2DA'; ctx.lineWidth=1; ctx.stroke();
+      if(g>0.6) for(const [ox,oy,r,rot] of [[-14,.72,7,.3],[8,.82,9,-.4],[22,.45,6,.9],[-30,.3,6,.2]]) blob(N.mx+ox,GY-ryy*oy,r,rot,false); }
+  }
+}
+// 吹き出し（複数行）: 尾の先 (tx,ty)、箱の左端 bx。画面の外に出ないよう寄せ、幅が足りなければ縮める（下限10px）
+function say(tx,ty,lines,bx,alpha){
+  ctx.save(); ctx.globalAlpha=alpha==null?1:alpha;
+  let fs=13; ctx.font='700 '+fs+'px '+FONT; let tw=Math.max(...lines.map(t=>ctx.measureText(t).width));
+  while(tw+16>W-8&&fs>10){ fs--; ctx.font='700 '+fs+'px '+FONT; tw=Math.max(...lines.map(t=>ctx.measureText(t).width)); }
+  const w=tw+16, lh=fs+6, h=lines.length*lh+8, x=Math.max(4,Math.min(W-4-w,bx)), y=ty-8-h;
+  rr(x,y,w,h,'#FFFFFF'); ctx.strokeStyle='#22201C'; ctx.lineWidth=1.2; ctx.strokeRect(x,y,w,h);
+  const cx=Math.max(x+8,Math.min(x+w-8,tx));
+  fillPoly([[cx-5,y+h-0.6],[cx+5,y+h-0.6],[tx,ty]],'#FFFFFF'); ctx.beginPath(); ctx.moveTo(cx-5,y+h); ctx.lineTo(tx,ty); ctx.lineTo(cx+5,y+h); ctx.stroke();
+  ctx.fillStyle='#22201C'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  lines.forEach((t,i)=>ctx.fillText(t,x+8,y+4+lh*(i+1)-5));
+  ctx.restore(); return {x,y,w,h};
+}
+// おばあちゃんの台詞（画面の座標で描く。寄ったカメラで文字が拡大されないように）
+function drawNbSay(st,C){
+  if(!G.nfx||G.failT<=0.8) return; const N=nbGeo(st), t=camPt(C,(N.wx0+N.wx1)/2+2,N.wt-6), b=camPt(C,N.wx0-12,0);
+  say(t.x,t.y,NB_SAY[G.nfx.kind],b.x,1);
 }
 // 失敗の瞬間に出てくる人・ハザード（落ちた雪より手前に描く）
 function drawFailOverlay(st){
   const e=G.fail; if(!e)return;
-  if((e.type==='nb'||e.type==='gapfull')&&G.failT>0.35){
-    const ex=wx(-SIM.half-st.gap), ox=ex+14, oy=GY-2; person('oba',ox,oy,1,0,true);
-    bubble(ox+30,oy-50,'ちょっと！',1);
+  const fx=G.nfx;
+  if(fx){ const N=nbGeo(st), ft=G.failT;
+    // 当たった雪が壁を滑り落ち、軒の雪庇も崩れて落ちる
+    if(fx.kind==='nb'&&ft<0.32){ const u=ease(ft/0.32); blob(N.ex-4-u*10,fx.hy+(GY-14-fx.hy)*u,fx.r*(1-u*0.3),u*2,false); }
+    if(fx.kind==='nb'&&ft>0.12&&ft<0.5){ const u=(ft-0.12)/0.38; blob(N.ex+2-u*14,N.ey-14+(GY-20-N.ey+14)*u*u,13,u*3,false); }
+    // 雪煙
+    ctx.fillStyle='#FFFFFF';
+    for(const p of fx.puffs){ const age=ft-p.d; if(age<0||age>1.2)continue; ctx.globalAlpha=0.8*(1-age/1.2);
+      ctx.beginPath(); ctx.arc(p.x+p.vx*age*(1-age*0.35),p.y+p.vy*age*(1-age*0.35),p.r*(1+age*2.2),0,Math.PI*2); ctx.fill(); }
+    ctx.globalAlpha=1;
+    // おばあちゃんが台所の窓を開けて顔を出す
+    if(ft>0.55){ const u=ease((ft-0.55)/0.22), cx=(N.wx0+N.wx1)/2-4;
+      ctx.save(); ctx.beginPath(); ctx.rect(N.wx0+2,N.wt+2,N.wx1-N.wx0-4,N.wb-N.wt-2); ctx.clip();
+      ctx.translate(cx,N.wb+12+(1-u)*34); ctx.scale(1.15,1.15); person('oba',0,0,1,0,true); ctx.restore();
+    }
   }
   if((e.type==='car'||e.type==='yardfull')&&st.cp&&Math.floor(G.failT*4)%2===0){
     const cx=wx(SIM.half+(st.cp[0]+st.cp[1])/2); ell(cx-8,GY-14,3,3,'#F2A93B'); ell(cx+8,GY-14,3,3,'#F2A93B');
@@ -675,7 +750,9 @@ function drawChunk(st,c,s,hl){
 // 隣どうしは段を互い違いにする。measureText で実測し、ほかの kg 表示・引き出し線・自分（人物）・上の帯に重なれば
 // 2段ずつ上げ、それでも収まらなければ縮める（下限10px）
 const rectHit=(a,b)=>a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h;
-const guideAlpha=()=>G.screen==='play'&&G.swipes===0?Math.max(0,Math.min(1,(5-G.T)/0.8)):0;
+// 引き出し線は、ほかの kg 表示の文字（縁取りを含む）から左右 LPAD 以上離す
+const LPAD=5, padX=(r,p)=>({x:r.x-p,y:r.y,w:r.w+p*2,h:r.h});
+const guideAlpha=()=>G.screen==='play'&&G.stage===0&&G.swipes===0?Math.max(0,Math.min(1,(5-G.T)/0.8)):0;
 // 上の帯（気象庁テロップ・ゆるみの注意）の下端
 function telopBottom(st){ return topY()+12+52+(st.slip[0]||st.slip[1]?28:0)+4; }
 function labelBase(st){ const gm=geom(st); return Math.min(...makeChunks(st).map(c=>wy(roofPt(gm,c.s).y+c.d)))-6; }
@@ -691,42 +768,49 @@ function labelRects(st){
   obst.push(poleRect(st));
   const top=telopBottom(st), base=labelBase(st);
   items.sort((p,q)=>p.row-q.row||p.x0-q.x0);
-  const placed=[];
-  for(const it of items){
-    let best=null;
-    for(const fs of [13,12,11,10]){
-      ctx.font='800 '+fs+'px '+FONT; const w1=ctx.measureText(it.t).width; ctx.font='700 '+(fs*0.73)+'px '+FONT; const w2=ctx.measureText('kg').width;
-      const w=w1+w2+1, h=fs+2;
+  // 文字の大きさは全部の表示でそろえる: 13px から順に、全部が置ける大きさを探す
+  const placeAll=fs=>{
+    ctx.font='800 '+fs+'px '+FONT; const wk=(ctx.font='700 '+(fs*0.73)+'px '+FONT,ctx.measureText('kg').width); ctx.font='800 '+fs+'px '+FONT;
+    const placed=[];
+    for(const it of items){
+      const w1=ctx.measureText(it.t).width, w=w1+wk+1, h=fs+2; let best=null;
       for(let row=it.row;row<=it.row+8&&!best;row+=2){
         const y=Math.min(base,it.y0-4)-row*(h+4), x=Math.max(4,Math.min(W-4-w,it.x0-w/2)), rc={x:x-1,y:y-h+1,w:w+2,h:h+1};
         if(rc.y<top) break;
         const ld={x:it.x0-1,y:y+2,w:2,h:Math.max(0,it.y0-y-3)};
-        if(placed.some(q=>rectHit(q.rc,rc)||(q.ld.h>0&&rectHit(q.ld,rc)))||obst.some(o=>rectHit(o,rc))) continue;
-        if(ld.h>0&&placed.some(q=>rectHit(q.rc,ld))) continue;
+        if(placed.some(q=>rectHit(q.rc,rc)||(q.ld.h>0&&rectHit(q.ld,padX(rc,LPAD))))||obst.some(o=>rectHit(o,rc))) continue;
+        if(ld.h>0&&placed.some(q=>rectHit(padX(q.rc,LPAD),ld))) continue;
         best={...it,fs,w1,w,h,x,y,rc,ld,up:row};
       }
-      if(best)break;
+      if(!best){ const x=Math.max(4,Math.min(W-4-w,it.x0-w/2)), y=it.y0-4;
+        best={...it,fs,w1,w,h,x,y,up:0,rc:{x:x-1,y:y-h+1,w:w+2,h:h+1},ld:{x:0,y:0,w:0,h:0},bad:true}; }
+      placed.push(best);
     }
-    if(!best){ ctx.font='800 10px '+FONT; const w1=ctx.measureText(it.t).width, w=w1+9, x=Math.max(4,Math.min(W-4-w,it.x0-w/2)), y=it.y0-4;
-      best={...it,fs:10,w1,w,h:12,x,y,up:0,rc:{x:x-1,y:y-11,w:w+2,h:13},ld:{x:0,y:0,w:0,h:0},bad:true}; }
-    placed.push(best);
-  }
+    return placed;
+  };
+  let placed=null;
+  // 面の始め（いちばん混んだ状態）で決めた大きさを、その面のあいだ使う（再生中に大きさが変わってちらつかない）
+  for(const fs of [13,12,11,10].filter(f=>f<=(G.lfs||13))){ placed=placeAll(fs); if(!placed.some(p=>p.bad)) break; }
   return {placed,obst,top};
 }
 // 引き出し線は人物より奥に描く（人物の後ろを通る）
 function drawLeaders(st){
-  const {placed}=labelRects(st);
+  if(G.pan>0.98) return;   // 隣家へ寄っている間は kg 表示を消す（画面の外で切れないように）
+  const {placed}=labelRects(st); ctx.save(); ctx.globalAlpha=1-G.pan;
   ctx.strokeStyle='rgba(31,47,63,.5)'; ctx.lineWidth=1;
   for(const L of placed) if(L.ld.h>0){ ctx.beginPath(); ctx.moveTo(L.x0,L.y+2); ctx.lineTo(L.x0,L.y0-1); ctx.stroke(); }
+  ctx.restore();
 }
 function drawLabels(st){
-  const {placed}=labelRects(st);
+  if(G.pan>0.98) return;
+  const {placed}=labelRects(st); ctx.save(); ctx.globalAlpha=1-G.pan;
   ctx.lineJoin='round'; ctx.textAlign='left';
   for(const L of placed){
     ctx.strokeStyle='rgba(251,250,244,.92)'; ctx.lineWidth=3.5; ctx.fillStyle='#1F2F3F';
     ctx.font='800 '+L.fs+'px '+FONT; ctx.strokeText(L.t,L.x,L.y); ctx.fillText(L.t,L.x,L.y);
     ctx.font='700 '+(L.fs*0.73)+'px '+FONT; ctx.strokeText('kg',L.x+L.w1+1,L.y); ctx.fillText('kg',L.x+L.w1+1,L.y);
   }
+  ctx.restore();
 }
 // 検証用: 気象庁の帯の文字が帯の中に収まるか（全面）
 function __telopCheck(){ const bad=[];
@@ -747,7 +831,9 @@ function __labelCheck(){
   const st=cur(), {placed,obst,top}=labelRects(st), bad=[];
   placed.forEach((p,i)=>{ if(p.bad)bad.push('unplaced '+p.t);
     if(p.rc.x<0||p.rc.x+p.rc.w>W||p.rc.y<top) bad.push('out '+p.t);
-    placed.forEach((q,j)=>{ if(j>i&&rectHit(p.rc,q.rc)) bad.push('overlap '+p.t+'/'+q.t); if(j!==i&&q.ld.h>0&&rectHit(p.rc,q.ld)) bad.push('leader '+q.t+' x '+p.t); });
+    placed.forEach((q,j)=>{ if(j>i&&rectHit(p.rc,q.rc)) bad.push('overlap '+p.t+'/'+q.t); if(j!==i&&q.ld.h>0&&rectHit(p.rc,q.ld)) bad.push('leader '+q.t+' x '+p.t);
+      // 線と文字の交差: 線（太さ1px）が文字の縁取り（3.5px）の外側を 3px 以上あけて通るか
+      if(j!==i&&q.ld.h>0&&rectHit(padX(p.rc,3),{x:q.x0-0.5,y:q.ld.y,w:1,h:q.ld.h})) bad.push('line x text '+q.t+' x '+p.t); });
     obst.forEach(o=>{ if(rectHit(o,p.rc)) bad.push('me '+p.t); }); });
   return {n:placed.length,minFs:Math.min(...placed.map(p=>p.fs)),maxUp:Math.max(0,...placed.map(p=>p.up)),bad};
 }
@@ -806,7 +892,8 @@ function drawPiles(st){
   for(const p of G.piles){
     const age=G.T-p.t, x=zx(p), r=Math.sqrt(p.m/SIM.rho*2/(Math.PI*1.6))*S;   // 断面積 m/ρ（奥行き1m）の半楕円
     if(p.zone==='ditch'){ if(age<1.2){ ctx.globalAlpha=1-age/1.2; ell(x,GY+3,r*.8,4,'#F5F7F9'); ctx.globalAlpha=1; } continue; }
-    if(p.zone==='nb'||p.zone==='car'){ blob(x,wy(p.y||0)-r*.4,r*.9,0.4,false); continue; }
+    if(p.zone==='nb'||p.zone==='gapfull') continue;   // 隣家の崩れは drawNeighbor / drawFailOverlay で描く
+    if(p.zone==='car'){ blob(x,wy(p.y||0)-r*.4,r*.9,0.4,false); continue; }
     ctx.beginPath(); ctx.ellipse(x,GY+1,r*1.1,r*.7,0,Math.PI,0); ctx.fillStyle='#F2F5F7'; ctx.fill(); ctx.strokeStyle='#CED7DE'; ctx.lineWidth=1; ctx.stroke();
   }
 }
@@ -855,6 +942,7 @@ function drawPeds(behind){
   const T=G.fail?G.T-G.failT:G.T, st=cur();
   for(const p of peds(T)){
     if(!!p.behind!==behind)continue;
+    if(p.kind==='oba'&&G.nfx)continue;   // おばあちゃんは家の窓から顔を出している
     const x=Math.min(wx(SIM.half+p.d),W-14), fade=behind?Math.min(1,(p.d-PED_FROM)/0.3):1;
     let y=GY+(behind?-4:6), hop=0;
     const hit=G.fail&&G.fail.type==='ped'&&G.fail.who===p.kind;
@@ -878,12 +966,10 @@ function drawTelop(st){
     ctx.fillStyle='#22201C'; ctx.textAlign='left'; ctx.font='600 12px '+FONT;
     ctx.fillText('日中 気温+2℃　'+(st.slip[0]?'左（南向き）':'右')+'の屋根の雪がゆるんでいます', 20, ny+16); ny+=28;
   }
-  // はじめの数秒だけの手引き（地面の下の帯。置き場はまだ空で、道路にはかからない）
+  // 第1面のはじめの数秒だけ: 隣のおばあちゃんが家の間から声をかける
   const g=guideAlpha();
-  if(g>0){ const gw=Math.min(W-60,wx(SIM.half+st.ditch[0])-16), gy=Math.round(GY+26+(H-GY-26-48)/2); ctx.globalAlpha=g; ctx.fillStyle='rgba(243,239,228,.96)'; ctx.fillRect(8,gy,gw,48);
-    ctx.strokeStyle='#22201C'; ctx.lineWidth=1; ctx.strokeRect(8.5,gy+.5,gw-1,47);
-    ctx.fillStyle='#22201C'; ctx.textAlign='center'; ctx.font='700 14px '+FONT; ctx.fillText('雪のかたまりを、落としたい向きへはらう',8+gw/2,gy+20);
-    ctx.font='500 12px '+FONT; ctx.fillText('長くはらうほど強く押す（弱・中・強）',8+gw/2,gy+38); ctx.globalAlpha=1; }
+  if(g>0){ const N=nbGeo(st), ox=N.ex+20; ctx.save(); ctx.globalAlpha=g; person('oba',ox,GY-1,1,0,true); ctx.restore();
+    say(ox+6,GY-40,GUIDE_SAY,ox+30,g); }
 }
 function drawDrag(st){
   if(!G.drag)return; const inf=dragInfo(G.drag); if(!inf)return;
@@ -903,15 +989,24 @@ function drawDrag(st){
   ctx.fillStyle='#22201C'; ctx.textAlign='left'; ctx.fillText(lab,lx+6,ly+16);
 }
 let FONT='sans-serif', prevTs=0;
+// カメラ: 隣家の窓と勝手口のあいだ P を、画面の Q へ z 倍で寄せる
+function cam(st){ const k=G.pan, N=nbGeo(st), px=N.ex-24, py=GY-62;
+  return {k,z:1+0.6*k,px,py,qx:px+k*(165-px),qy:py-k*40}; }
+function camApply(C){ if(C.k>0.001){ ctx.translate(C.qx,C.qy); ctx.scale(C.z,C.z); ctx.translate(-C.px,-C.py); } }
+const camPt=(C,x,y)=>C.k>0.001?{x:C.qx+(x-C.px)*C.z,y:C.qy+(y-C.py)*C.z}:{x,y};
 function draw(){
   const st=cur(), dt=Math.min(0.05,(performance.now()-prevTs)/1000||0); prevTs=performance.now();
   ctx.save();
   if(G.shake>0){ const k=G.shake*10; ctx.translate(Math.sin(G.T*90)*k,Math.cos(G.T*70)*k*.5); }
+  const C=cam(st); ctx.save(); camApply(C);
   drawSky(); drawGround(st); drawBand(st); drawPeds(true); drawSnowWall(st); drawNeighbor(st); drawCarport(st); drawHouse(st); drawPiles(st);
   drawRoofSnow(st); drawSnowPole(st); drawFailOverlay(st); drawLeaders(st);
   if(G.screen!=='title') drawMe(st);
   drawPeds(false); drawLabels(st);
-  drawFlakes(dt); drawBandText(st);
+  ctx.restore();
+  drawFlakes(dt);
+  ctx.save(); camApply(C); drawBandText(st); ctx.restore();
+  drawNbSay(st,C);
   ctx.restore();
   drawTelop(st); drawDrag(st);
   if(G.screen==='play'||G.screen==='pause'){
