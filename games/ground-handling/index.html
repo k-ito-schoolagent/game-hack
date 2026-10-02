@@ -65,6 +65,7 @@ body{--scene:#5f6b4a}
 #hudL{color:var(--ink)}
 #hudL small{color:var(--ink2)}
 #hudC{color:var(--flap)}
+@media(max-width:380px){#hudL{padding-left:10px}#hudC{padding:0 8px}}
 #pauseBtn{border-left:1px solid #2c2f33}
 #sheetBg{background:rgba(8,9,10,.55)}
 #sheet{background:var(--paper);border-top:3px solid #000;color:var(--ink)}
@@ -380,7 +381,7 @@ function telop(text,x,y,dur,guide){ G.telops.push({text,x,y,t0:G.t,dur,guide}); 
 function update(dt){
   simAcc+=dt;
   while(simAcc>=STEP && G.screen==='play'){ step(STEP); simAcc-=STEP; }
-  UI.hud('伊丹 '+STAGES[G.stage].name,(G.stage+1)+'/'+STAGES.length,hudC());
+  UI.hud(STAGES[G.stage].name,(G.stage+1)+'/'+STAGES.length,hudC());
 }
 function hudC(){ const h=G.air.length; return clockStr(G.t)+'　着 '+G.done+'/'+G.flights.length+'　上空 '+(h>=2?'<span class="warn">'+h+'</span>':h); }
 
@@ -703,6 +704,9 @@ function onResize(){ if(G.screen==='title')layout(); }
 
 // ---- 描画 ----
 const C={grass:'#7a8b55',grass2:'#71824e',asph:'#56585a',rwy:'#3f4143',apron:'#bdb9ae',apronJ:'#aeaa9f',yellow:'#f2c230',white:'#f1f0ea',bld:'#cfcac0',roof2:'#bdb7ab',glass:'#5d7480',land:'#a9a59b',road:'#4b4d4f'};
+// 文字は実測して枠に収める（入らなければ 10px まで縮める）
+function fitFont(t,maxW,px,wt){ let f=px; ctx.font=wt+' '+f+'px '+FONT; while(f>10&&ctx.measureText(t).width>maxW){ f-=.5; ctx.font=wt+' '+f+'px '+FONT; } return f; }
+function fitText(t,x,y,maxW,px,wt){ fitFont(t,maxW,px,wt); ctx.fillText(t,x,y); }
 function draw(){
   if(!L.yR)layout();
   ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,H); ctx.clip();
@@ -715,7 +719,7 @@ function draw(){
   drawTelops();
   if(G.fx)drawFx();
   ctx.restore();
-  if(G.screen==='play'||G.screen==='pause'||G.screen==='fx') UI.hud('伊丹 '+STAGES[G.stage].name,(G.stage+1)+'/'+STAGES.length,hudC());
+  if(G.screen==='play'||G.screen==='pause'||G.screen==='fx') UI.hud(STAGES[G.stage].name,(G.stage+1)+'/'+STAGES.length,hudC());
 }
 function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 function drawGround(){
@@ -740,7 +744,7 @@ function drawGround(){
     ctx.fillStyle='#e8e6df'; rr(mx,my-5,96,10,4); ctx.fill();
     ctx.fillStyle='#2f6f9e'; ctx.fillRect(mx+4,my-1,88,2);
     ctx.fillStyle='#3a3f44'; for(let k=0;k<4;k++)ctx.fillRect(mx+4+k*24,my-5,1,10);
-    ctx.fillStyle='rgba(34,32,28,.75)'; ctx.font='600 10px '+FONT; ctx.textAlign='left'; ctx.fillText('大阪空港駅',196,my+4);
+    if(!G.fx){ ctx.fillStyle='rgba(34,32,28,.75)'; ctx.font='600 10px '+FONT; ctx.textAlign='left'; ctx.fillText('大阪空港駅',196,my+4); }
   }
   // 管制塔
   const tx=W-40, ty=ly0+Math.max(24,(lh-30)*0.42);
@@ -762,7 +766,7 @@ function drawGround(){
     ctx.fillStyle='#b8a07a'; ctx.fillRect(0,dy,W,22);
     ctx.fillStyle='#a88f69'; for(let x=0;x<W;x+=6)ctx.fillRect(x,dy,1,22);
     ctx.fillStyle='#8a8478'; ctx.fillRect(0,dy+21,W,1.5);
-    ctx.fillStyle='rgba(34,32,28,.65)'; ctx.font='600 8px '+FONT; ctx.fillText('展望デッキ',W-58,dy-3);
+    ctx.fillStyle='rgba(34,32,28,.65)'; ctx.font='600 10px '+FONT; ctx.fillText('展望デッキ',W-58,dy-3);
     // デッキの見物客（真上から: 頭・肩・持ち物）
     const ppl=[[30,0,'#4a5d7a',1],[38,1,'#c96b4b',.7],[92,0,'#3d3d3d',1],[150,0,'#6c7f4f',1.1],[157,1,'#e0b13a',.65],[214,0,'#8a5a8f',1],[262,0,'#3f6f8f',1],[268,1,'#d8d0c0',.95],[330,0,'#5a4a3a',1.1],[388,0,'#7a3b3b',1]];
     ppl.forEach(([x,row,col,k])=>{ const y=dy+7+row*8; ctx.save(); ctx.translate(x,y); ctx.scale(k,k);
@@ -825,19 +829,20 @@ function drawGround(){
     ctx.fillStyle='#262626'; ctx.fillRect(s.x-9,L.yL-17,18,12);
     ctx.fillStyle=C.yellow; ctx.font='800 10px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(s.no,s.x,L.yL-10.5); ctx.textBaseline='alphabetic';
     // 大きさ表示
-    ctx.fillStyle='rgba(60,52,20,.75)'; ctx.font='700 7.5px '+FONT; ctx.fillText(s.cat==='L'?'777':s.cat==='M'?'A321':'ATR',s.x,L.yL-21);
+    ctx.fillStyle='rgba(60,52,20,.75)'; ctx.font='700 10px '+FONT; ctx.fillText(s.cat==='L'?'777':s.cat==='M'?'A321':'ATR',s.x,L.yL-21);
     // 駐機誘導表示（VDGS）
-    const vy=L.yF-17; ctx.fillStyle='#1e2224'; ctx.fillRect(s.x-12,vy,24,10);
-    ctx.fillStyle='#f2a93a'; ctx.font='700 7px '+FONT;
+    const vy=L.yF-18; ctx.fillStyle='#1e2224'; ctx.fillRect(s.x-16,vy,32,12);
+    ctx.fillStyle='#f2a93a';
     const pl=s.plane, rs=s.res;
     let vt='----';
     if(rs)vt=rs.T.id; else if(s.pushing)vt='PUSH'; else if(pl){ const r=Math.ceil(pl.depAt-G.t); vt=pl.tow?'PUSH':r>0?'D'+String(r).padStart(2,'0'):'PUSH'; }
-    ctx.fillText(vt,s.x,vy+8);
+    fitText(vt,s.x,vy+10,29,10,700);
     // 搭乗橋（大型・中型）
     if(s.cat!=='S'){ s.rot={x:s.x-(s.cat==='L'?22:15),y:L.yF+8}; ctx.fillStyle='#9a958a'; ctx.beginPath(); ctx.arc(s.rot.x,s.rot.y,4.5,0,7); ctx.fill(); }
   });
   // 誘導路標識（黒地に黄の位置標識）
-  const sign=(x,y,txt)=>{ ctx.font='800 9px '+FONT; const w=ctx.measureText(txt).width+8; ctx.fillStyle='#202020'; ctx.fillRect(x-w/2,y-6,w,12); ctx.strokeStyle=C.yellow; ctx.lineWidth=1; ctx.strokeRect(x-w/2+1.5,y-4.5,w-3,9); ctx.fillStyle=C.yellow; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(txt,x,y+0.5); ctx.textBaseline='alphabetic'; };
+  const tile=G.fx&&G.fx.t>0.6?fxTile(G.fx):null;   // 状態タイルの下に半分だけ隠れる標識は描かない
+  const sign=(x,y,txt)=>{ if(tile&&Math.abs(x-tile.cx)<tile.tw/2+16&&Math.abs(y-tile.cy)<tile.th/2+8)return; ctx.font='800 10px '+FONT; const w=ctx.measureText(txt).width+8; ctx.fillStyle='#202020'; ctx.fillRect(x-w/2,y-6,w,12); ctx.strokeStyle=C.yellow; ctx.lineWidth=1; ctx.strokeRect(x-w/2+1.5,y-4.5,w-3,9); ctx.fillStyle=C.yellow; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(txt,x,y+0.5); ctx.textBaseline='alphabetic'; };
   CONN.forEach(c=>sign(c.x+(c.x<40?18:-18),L.yP-24,c.n));
   EXITS.forEach(e=>sign(e.X+28,L.yP+20,e.n));
   sign(W-24,L.yP-24,'A');
@@ -917,18 +922,18 @@ function drawPlanes(){
     const off=p.state==='roll'?2.5+p.alt*14:2.5;
     drawPlane(p.T,p.al,p.x+off,p.y+off*1.3,p.hd,{shadow:true});
   }
+  const tags=[];
   for(const p of list){
     drawPlane(p.T,p.al,p.x,p.y,p.hd);
     // 待機中の機体: 押せることを示す輪
     if(p.state==='bay'&&(!drag||drag.p!==p)){
       const k=(performance.now()/900)%1;
       ctx.strokeStyle='rgba(255,255,255,'+(0.85-k*0.8)+')'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(p.x,p.y,p.T.r+4+k*10,0,7); ctx.stroke();
-      ctx.fillStyle='#262626'; ctx.font='700 9px '+FONT; const w=ctx.measureText(p.cs).width+6; ctx.fillRect(p.x-w/2,p.y+p.T.r+4,w,12); ctx.fillStyle='#f1f0ea'; ctx.textAlign='center'; ctx.fillText(p.cs,p.x,p.y+p.T.r+13);
+      tags.push({p,down:true});
     }
-    if((p.state==='taxi'||p.state==='dep')&&p.y>L.yL-12){
-      ctx.fillStyle='rgba(38,38,38,.82)'; ctx.font='700 8px '+FONT; const w=ctx.measureText(p.cs).width+6; ctx.fillRect(p.x-w/2,p.y-p.T.r-12,w,10); ctx.fillStyle='#f1f0ea'; ctx.textAlign='center'; ctx.fillText(p.cs,p.x,p.y-p.T.r-4);
-    }
+    else if((p.state==='taxi'||p.state==='dep')&&p.y>L.yL-12) tags.push({p,down:false});
   }
+  drawTags(tags);
   // 搭乗橋（機体の左前ドアへ）
   for(const s of SPOTS){
     if(!s.rot)continue;
@@ -940,6 +945,36 @@ function drawPlanes(){
     ctx.strokeStyle='#b9b4a8'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(s.rot.x,s.rot.y); ctx.lineTo(tx,ty); ctx.stroke(); ctx.lineCap='butt';
     ctx.fillStyle='#6f6a60'; ctx.fillRect(tx-2.5,ty-2.5,5,5);
   }
+}
+// 便名札: 画面内に収め、ほかの札・誘導路標識・スポット番号と重ならない位置へずらす
+function staticTagRects(){
+  const r=[];
+  SPOTS.forEach(s=>{ r.push([s.x-16,L.yL-31,s.x+16,L.yL-4]); });
+  CONN.forEach(c=>{ const x=c.x+(c.x<40?18:-18); r.push([x-14,L.yP-31,x+14,L.yP-17]); });
+  EXITS.forEach(e=>{ r.push([e.X+28-14,L.yP+13,e.X+28+14,L.yP+27]); });
+  r.push([W-24-14,L.yP-31,W-24+14,L.yP-17]);
+  return r;
+}
+function drawTags(tags){
+  if(!tags.length)return;
+  const placed=[], fixed=staticTagRects();
+  const hit=(a,b)=>a[0]<b[2]+1&&a[2]>b[0]-1&&a[1]<b[3]+1&&a[3]>b[1]-1;
+  const out=[];
+  for(const t of tags){
+    const p=t.p; if(p.x<-6||p.x>W+6)continue;
+    ctx.font='700 10px '+FONT; const w=ctx.measureText(p.cs).width+8, h=14;
+    const x0=Math.max(4,Math.min(W-4-w,p.x-w/2));
+    const base=t.down?p.y+p.T.r+4:p.y-p.T.r-4-h;
+    const steps=t.down?[0,15,-15,30,-30,45,-45,60,-60]:[0,-15,15,-30,30,-45,45,-60,60];
+    let best=null;
+    for(const dy of steps){ const y=Math.max(L.tY+2,Math.min(H-h-2,base+dy)), r=[x0,y,x0+w,y+h];
+      if(!placed.some(o=>hit(o,r))&&!fixed.some(o=>hit(o,r))){ best=r; break; } }
+    if(!best){ const y=Math.max(L.tY+2,Math.min(H-h-2,base)); best=[x0,y,x0+w,y+h]; }
+    placed.push(best); out.push([p,best]);
+  }
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(const [p,r] of out){ ctx.fillStyle='#262626'; ctx.fillRect(r[0],r[1],r[2]-r[0],r[3]-r[1]); ctx.fillStyle='#f1f0ea'; ctx.font='700 10px '+FONT; ctx.fillText(p.cs,(r[0]+r[2])/2,(r[1]+r[3])/2+.5); }
+  ctx.textBaseline='alphabetic';
 }
 function drawCrew(){
   const t=performance.now()/1000;
@@ -1021,39 +1056,51 @@ function drawBoard(){
   // 到着のフライトストリップ盤
   const x0=6,y0=L.boardY,w=W-12,h=L.boardH;
   ctx.fillStyle='#39433c'; ctx.fillRect(x0,y0,w,h);
-  ctx.fillStyle='#d7d2c2'; ctx.font='700 9px '+FONT; ctx.textAlign='left'; ctx.fillText('ARR RJOO 32L',x0+6,y0+11);
+  ctx.fillStyle='#d7d2c2'; ctx.font='700 10px '+FONT; ctx.textAlign='left'; ctx.fillText('ARR RJOO 32L',x0+6,y0+11);
   const sw=w-112;
   const list=G.flights.filter(f=>f.state!=='in').slice(0,4);
   list.forEach((f,k)=>{
     const y=y0+16+k*21;
     ctx.fillStyle=f.state==='air'?'#f4e3b4':'#efe9d6'; ctx.fillRect(x0+4,y,sw,19);
-    ctx.fillStyle='#8b8574'; [70,128,186,226].forEach(dx=>ctx.fillRect(x0+4+dx,y,1,19));
-    ctx.fillStyle='#22201c'; ctx.font='800 11px '+FONT; ctx.fillText(f.cs,x0+8,y+13.5);
-    ctx.font='600 9px '+FONT; ctx.fillText(f.T.id+'/'+f.T.wake,x0+78,y+13); ctx.fillText(f.org+' '+ORIGIN[f.org],x0+134,y+13);
-    ctx.font='700 10px '+FONT; ctx.fillText(clockHHMM(f.eta),x0+192,y+13.5);
+    ctx.fillStyle='#8b8574'; [70,128,193,233].forEach(dx=>ctx.fillRect(x0+4+dx,y,1,19));
+    ctx.fillStyle='#22201c';
+    fitText(f.cs,x0+8,y+13.5,58,11,800);
+    fitText(f.T.id+'/'+f.T.wake,x0+75,y+13.5,50,10,600); fitText(f.org+' '+ORIGIN[f.org],x0+131,y+13.5,60,10,600);
+    ctx.font='700 10px '+FONT; ctx.fillText(clockHHMM(f.eta),x0+197,y+13.5);
     const st=f.state==='air'?'HOLD':f.state==='land'?(f.plane&&f.plane.state==='bay'?f.plane.exit.n:'LDG'):f.state==='taxi'?'TAXI':'';
-    if(st){ ctx.fillStyle=f.state==='air'?'#22201c':'#5e584d'; ctx.font='800 9px '+FONT; ctx.fillText(st,x0+234,y+13); }
+    if(st){ ctx.fillStyle=f.state==='air'?'#22201c':'#5e584d'; ctx.font='800 10px '+FONT; ctx.fillText(st,x0+237,y+13.5); }
   });
   // 上空待機の枠
   const hx=x0+sw+10;
-  ctx.fillStyle='#d7d2c2'; ctx.font='700 9px '+FONT; ctx.fillText('HOLDING '+G.air.length+'/'+HOLD_MAX,hx,y0+11);
+  ctx.fillStyle='#d7d2c2'; ctx.font='700 10px '+FONT; ctx.fillText('HOLDING '+G.air.length+'/'+HOLD_MAX,hx,y0+11);
   for(let k=0;k<HOLD_MAX;k++){
     const y=y0+16+k*21, f=G.air[k];
     ctx.strokeStyle='#8f9a90'; ctx.lineWidth=1; ctx.strokeRect(hx+0.5,y+0.5,92,18);
-    if(f){ ctx.fillStyle='#f4e3b4'; ctx.fillRect(hx+1,y+1,91,17); ctx.fillStyle='#22201c'; ctx.font='800 10px '+FONT; ctx.fillText(f.cs,hx+5,y+13); ctx.font='600 8px '+FONT; ctx.fillText(f.T.id,hx+62,y+13); }
+    if(f){ ctx.fillStyle='#f4e3b4'; ctx.fillRect(hx+1,y+1,91,17); ctx.fillStyle='#22201c'; ctx.font='800 10px '+FONT; fitText(f.cs,hx+5,y+13,54,10,800); fitText(f.T.id,hx+62,y+13,28,10,600); }
   }
   if(G.air.length>HOLD_MAX){ ctx.fillStyle='#ff5a4c'; ctx.font='800 10px '+FONT; ctx.fillText(G.air[HOLD_MAX].cs+' 待機不可',hx,y0+16+3*21+12); }
 }
 function drawTelops(){
   G.telops=G.telops.filter(o=>G.t-o.t0<o.dur);
+  const placed=[];
   for(const o of G.telops){
     const a=Math.min(1,(o.dur-(G.t-o.t0))*3);
-    ctx.globalAlpha=a; ctx.font='700 11px '+FONT; const w=Math.min(W-16,ctx.measureText(o.text).width+16);
+    ctx.font='700 11px '+FONT; const w=Math.min(W-16,ctx.measureText(o.text).width+16);
+    const fs=fitFont(o.text,w-16,11,700);
     const x=Math.max(8+w/2,Math.min(W-8-w/2,o.x));
-    ctx.fillStyle='rgba(28,30,30,.88)'; ctx.fillRect(x-w/2,o.y-11,w,22);
-    ctx.fillStyle='#f1f0ea'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(o.text,x,o.y+0.5); ctx.textBaseline='alphabetic';
+    // ほかの交信と重ならないよう、あとから出たものを下へ（収まらなければ上へ）ずらす
+    let y=o.y; const hit=yy=>placed.some(r=>x-w/2<r[2]&&x+w/2>r[0]&&yy-11<r[3]&&yy+11>r[1]);
+    for(let k=0;k<6&&hit(y);k++) y=o.y+(k%2===0?1:-1)*(Math.floor(k/2)+1)*24;
+    y=Math.max(L.tY+14,Math.min(H-14,y)); placed.push([x-w/2,y-11,x+w/2,y+11]);
+    ctx.globalAlpha=a;
+    ctx.fillStyle='rgba(28,30,30,.88)'; ctx.fillRect(x-w/2,y-11,w,22);
+    ctx.fillStyle='#f1f0ea'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(o.text,x,y+0.5); ctx.textBaseline='alphabetic';
     ctx.globalAlpha=1;
   }
+}
+function fxTile(f){
+  const n=[...f.stamp].length;
+  return {cx:W/2,cy:f.kind==='hold'||f.kind==='clear'?(L.yL+L.yP)/2:Math.min(H-90,f.y+90),tw:n===4?150:118,th:n===4?112:84};
 }
 function drawFx(){
   const f=G.fx;
@@ -1066,16 +1113,16 @@ function drawFx(){
   // 管制の交信テロップ
   const ty=L.landTop+30;
   ctx.fillStyle='rgba(18,20,20,.92)'; ctx.fillRect(0,ty-18,W,18*f.lines.length+18);
-  ctx.fillStyle='#f1f0ea'; ctx.font='800 13px '+FONT; ctx.textAlign='left';
+  ctx.fillStyle='#f1f0ea'; ctx.textAlign='left';
   const shown=Math.floor(f.t*40);
-  let used=0; f.lines.forEach((ln,i)=>{ const n=Math.max(0,Math.min(ln.length,shown-used)); used+=ln.length; ctx.fillText(ln.slice(0,n),12,ty+i*18+2); });
+  let used=0; f.lines.forEach((ln,i)=>{ const n=Math.max(0,Math.min(ln.length,shown-used)); used+=ln.length; fitFont(ln,W-24,13,800); ctx.fillText(ln.slice(0,n),12,ty+i*18+2); });
   // 状態タイル（運航状況表示のフラップ）がめくれて出る
   if(f.t>0.6){
     const k=Math.min(1,(f.t-0.6)/0.25), fl=Math.cos((1-k)*Math.PI);
     const col=f.round?'#5fd18b':'#ff5a4c';
     const cy=f.kind==='hold'||f.kind==='clear'?(L.yL+L.yP)/2:Math.min(H-90,f.y+90);
     ctx.save(); ctx.translate(W/2,cy); ctx.scale(1,Math.max(0.02,Math.abs(fl)));
-    const ch=[...f.stamp], tw=ch.length===4?150:118, th=ch.length===4?112:84;
+    const ch=[...f.stamp], {tw,th}=fxTile(f);
     ctx.fillStyle='#0e0f11'; ctx.fillRect(-tw/2,-th/2,tw,th);
     ctx.strokeStyle=col; ctx.lineWidth=4; ctx.strokeRect(-tw/2+2,-th/2+2,tw-4,th-4);
     ctx.fillStyle=col; ctx.textAlign='center'; ctx.textBaseline='middle';

@@ -302,7 +302,7 @@ const hhmm=m=>{ m=Math.round(m); return Math.floor(m/60)+':'+String(m%60).padSta
 
 function startStage(i){
   G.stage=i; const st=STAGES[i];
-  Object.assign(G,{embers:[],endWait:0,gt:0,acc:0,i:0,miss:0,hits:0,shells:[],bursts:[],puffs:[],traces:[],texts:[],pend:null,fx:null,flash:0,cheer:0,duck:0,guide:3.8,maxDev:0,lastShot:null});
+  Object.assign(G,{jmark:null,embers:[],endWait:0,gt:0,acc:0,i:0,miss:0,hits:0,shells:[],bursts:[],puffs:[],traces:[],texts:[],pend:null,fx:null,flash:0,cheer:0,duck:0,guide:3.8,maxDev:0,lastShot:null});
   initWind(); G.screen='play'; UI.close(); lastTs=0;
 }
 function restart(){ startStage(G.stage); }
@@ -355,12 +355,18 @@ function judge(st,P){
   G.lastShot=Object.assign(P,{bx,d,y,no:P.i+1});
   G.maxDev=Math.max(G.maxDev,Math.abs(d));
   G.pend=null; G.i++;
+  G.jmark={x:bx,y,hit:Math.abs(d)<=K.tol*st.tolK&&!P.hid,life:1.4};
   if(bx<st.crowdL||bx>st.crowdR){ return failFx('crowd'); }
   if(P.hid){ G.miss++; say(bx,y-K.r*rScale()-8,'見えない…'); if(G.miss>=3)return failFx('smoke'); return; }
   if(Math.abs(d)<=K.tol*st.tolK){ G.hits++; G.cheer=1; say(bx,y-K.r*rScale()-8,P.i%2?'鍵屋ー！':'玉屋ー！'); }
   else { G.miss++; say(bx,y-K.r*rScale()-8,'あぁ…'); if(G.miss>=3)return failFx('zure'); }
 }
-function say(x,y,t){ G.texts.push({x:clamp(x,40,W-40),y:Math.max(LY.top+18,y),t,life:1.4}); }
+function say(x,y,t){ // 掛け声は土手の観客から。ほかの掛け声と重ならない位置に置く
+  ctx.font='700 14px '+FONT; const w=ctx.measureText(t).width+8;
+  x=clamp(x,w/2+4,W-w/2-4); let yy=LY.bankY-14;
+  const hit=(x,yy)=>G.texts.some(o=>Math.abs(o.x-x)<(o.w+w)/2&&Math.abs(o.y-yy)<20);
+  for(let k=0;k<8&&hit(x,yy);k++){ if(k%2===0)yy-=22; else x=clamp(x+(x<W/2?w:-w),w/2+4,W-w/2-4); }
+  G.texts.push({x,y:yy,t,w,life:1.4}); }
 
 function update(dt){
   const st=STAGES[G.stage];
@@ -377,7 +383,7 @@ function failFx(type){
   G.screen='fx'; G.fx={type,t:0,dur:type==='crowd'?1.2:1.1}; buzz([30,40,80]);
   if(type==='crowd'){ G.duck=1; G.duckX=G.lastShot.bx; const y=G.lastShot.y;
     G.embers=[]; for(let i=0;i<70;i++){ const a=Math.random()*Math.PI*2, v=30+Math.random()*90; G.embers.push({x:G.lastShot.bx+Math.cos(a)*30,y:y+Math.sin(a)*30,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.5,px:0,py:0}); }
-    for(let i=0;i<5;i++)G.texts.push({x:clamp(G.lastShot.bx+(i-2)*58,40,W-40),y:LY.bankY-6-(i%2)*16,t:['うわっ','ざわ…','きゃー','危ない','ざわ…'][i],life:1.6}); }
+    ['うわっ','ざわ…','きゃー','危ない','ざわ…'].forEach((t,i)=>say(G.lastShot.bx+(i-2)*60,0,t)); }
   if(type==='smoke'){ for(let i=0;i<6;i++)G.puffs.push({x:60+i*60,y:LY.top+80+(i%3)*60,r:90,al:.0,a:.6,grow:true}); }
 }
 function finaleFx(){
@@ -446,6 +452,9 @@ function showTitle(){
 // 描画
 // ================================================================
 const FONT=getComputedStyle(document.body).fontFamily;
+// 文字は実測して枠に収める（入らなければ 10px まで縮める）
+function fitFont(t,maxW,px,wt){ let f=px; ctx.font=wt+' '+f+'px '+FONT; while(f>10&&ctx.measureText(t).width>maxW){ f-=.5; ctx.font=wt+' '+f+'px '+FONT; } return f; }
+function fitText(t,x,y,maxW,px,wt){ fitFont(t,maxW,px,wt); ctx.fillText(t,x,y); }
 function rng(seed){ let s=seed>>>0; return ()=>(s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296; }
 function mix(a,b,t){ const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);
   const r=(pa>>16)+(((pb>>16)-(pa>>16))*t), g=((pa>>8)&255)+((((pb>>8)&255)-((pa>>8)&255))*t), bl=(pa&255)+(((pb&255)-(pa&255))*t);
@@ -589,6 +598,11 @@ function drawBarge(){
   // 職人（法被姿）
   person(x0+14,y-1,.55,'hapi',0);
 }
+function drawJudgeMark(dt){ // 判定に使った開花の芯（スターマインは7発の中心）
+  const m=G.jmark; if(!m||(m.life-=dt)<=0)return;
+  ctx.save(); ctx.globalAlpha=Math.min(1,m.life); ctx.strokeStyle=m.hit?'#F3EFE4':'rgba(243,239,228,.55)'; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.moveTo(m.x-4,m.y-4); ctx.lineTo(m.x+4,m.y+4); ctx.moveTo(m.x+4,m.y-4); ctx.lineTo(m.x-4,m.y+4); ctx.stroke(); ctx.restore();
+}
 function drawMarker(){
   const st=STAGES[G.stage], p=st.prog[G.i]; if(!p||G.screen==='result'||G.screen==='title')return;
   const K=KINDS[p.k], y=burstY(p.k), r=K.r*rScale()*.55, x=p.tx;
@@ -596,8 +610,8 @@ function drawMarker(){
   ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.stroke(); ctx.setLineDash([]);
   ctx.strokeStyle='rgba(243,239,228,.8)'; ctx.beginPath(); ctx.arc(x,y,K.tol*st.tolK,0,7); ctx.stroke();   // 芯がここに入れば決まり
   ctx.beginPath(); ctx.moveTo(x-5,y); ctx.lineTo(x+5,y); ctx.moveTo(x,y-5); ctx.lineTo(x,y+5); ctx.stroke();
-  ctx.fillStyle='rgba(243,239,228,.75)'; ctx.font='600 11px '+FONT; ctx.textAlign='center';
-  ctx.fillText('第'+(G.i+1)+'番',x,y-r-6);
+  if(G.screen==='play'||G.screen==='pause'){ ctx.fillStyle='rgba(243,239,228,.75)'; ctx.textAlign='center';
+    const ly=y-r-6>LY.top+14?y-r-6:y+r+14; fitText('第'+(G.i+1)+'番',clamp(x,24,W-24),ly,44,11,600); }
   ctx.restore();
 }
 // ---- 花火 ----
@@ -759,13 +773,14 @@ function drawStrip(){
   const st=STAGES[G.stage], S=LY.stripY, p=st.prog[Math.min(G.i,st.prog.length-1)];
   ctx.fillStyle='#121a33'; ctx.fillRect(0,S,W,H-S); ctx.fillStyle='#B89B5E'; ctx.fillRect(0,S,W,1); ctx.fillRect(0,S+3,W,1);
   ctx.textAlign='left'; ctx.fillStyle='#B3AA92'; ctx.font='500 11px '+FONT;
-  ctx.fillText(st.name+' 番組',14,S+18);
-  ctx.fillStyle='#EFE6CC'; ctx.font='700 15px '+FONT;
+  const LW=W*.54-20, RW=W*.46-20;
+  fitText(st.name+' 番組',14,S+18,LW,11,500);
+  ctx.fillStyle='#EFE6CC';
   const K=KINDS[p.k];
-  ctx.fillText(G.i<st.prog.length?('第'+(G.i+1)+'番　'+K.gou+'　'+K.name):'打止め',14,S+38);
-  ctx.textAlign='right'; ctx.fillStyle='#B3AA92'; ctx.font='500 11px '+FONT; ctx.fillText(st.station+' 10分値',W-14,S+18);
-  const b=base(st,G.gt); ctx.fillStyle='#EFE6CC'; ctx.font='700 14px '+FONT;
-  ctx.fillText(b.row[1]+' '+b.spd.toFixed(1)+'m/s　瞬間'+b.gust.toFixed(1),W-14,S+38);
+  fitText(G.i<st.prog.length?('第'+(G.i+1)+'番　'+K.gou+'　'+K.name):'打止め',14,S+38,LW,15,700);
+  ctx.textAlign='right'; ctx.fillStyle='#B3AA92'; fitText(st.station+' 10分値',W-14,S+18,RW,11,500);
+  const b=base(st,G.gt); ctx.fillStyle='#EFE6CC';
+  fitText(b.row[1]+' '+b.spd.toFixed(1)+'m/s　瞬間'+b.gust.toFixed(1),W-14,S+38,RW,14,700);
 }
 function drawTelop(){
   const f=G.fx; let t=null;
@@ -775,10 +790,10 @@ function drawTelop(){
   if(f&&f.type==='zure'&&f.t>.2)t='親方「……代われ」';
   if(G.screen==='play'&&G.guide>0)t='親方「風の筋を見ろ。流される分を見越して、印で開かせろ」';
   if(!t)return;
-  ctx.font='600 12.5px '+FONT; const w=Math.min(W-24,ctx.measureText(t).width+24), y=LY.top+10;
+  fitFont(t,W-48,12.5,600); const w=Math.min(W-24,ctx.measureText(t).width+24), y=LY.top+10;
   ctx.globalAlpha=G.screen==='play'?Math.min(1,G.guide):1;
   ctx.fillStyle='rgba(16,18,26,.86)'; ctx.fillRect((W-w)/2,y,w,26); ctx.strokeStyle='rgba(243,239,228,.4)'; ctx.lineWidth=1; ctx.strokeRect((W-w)/2+.5,y+.5,w-1,25);
-  ctx.fillStyle='#F3EFE4'; ctx.textAlign='center'; ctx.fillText(t,W/2,y+17.5,W-36); ctx.globalAlpha=1;
+  ctx.fillStyle='#F3EFE4'; ctx.textAlign='center'; ctx.fillText(t,W/2,y+17.5); ctx.globalAlpha=1;
 }
 function drawEmbers(dt){ // 観覧席へ降る燃えかす
   if(!G.embers||!G.embers.length)return;
@@ -790,7 +805,7 @@ function drawEmbers(dt){ // 観覧席へ降る燃えかす
 function drawTexts(dt){
   ctx.textAlign='center'; ctx.font='700 14px '+FONT;
   G.texts=G.texts.filter(t=>(t.life-=dt)>0);
-  for(const t of G.texts){ ctx.globalAlpha=Math.min(1,t.life*1.5); ctx.fillStyle='#F3EFE4'; ctx.fillText(t.t,t.x,t.y-(1.4-t.life)*10); }
+  for(const t of G.texts){ ctx.globalAlpha=Math.min(1,t.life*1.5); ctx.fillStyle='#F3EFE4'; ctx.fillText(t.t,t.x,t.y-(1.4-Math.min(1.4,t.life))*6); }
   ctx.globalAlpha=1;
 }
 
@@ -802,7 +817,7 @@ function draw(){
   if(G.screen==='pause'&&$('sheet').className!=='prog')sheetKind('prog');
   G.flash=Math.max(0,G.flash-dt*2.2); G.cheer=Math.max(0,G.cheer-dt*.7); if(G.screen==='play')G.duck=0;
   for(const tr of G.traces)tr.life-=dt; G.traces=G.traces.filter(t=>t.life>0);
-  drawSky(); drawWind(dt); drawFar(); drawSmoke(); drawMarker(); drawShells(); drawBursts(); drawWater(); drawSide(); drawBuoys(); drawBarge(); drawBank(); drawEmbers(dt); drawStrip(); drawTexts(dt); drawTelop();
+  drawSky(); drawWind(dt); drawFar(); drawSmoke(); drawMarker(); drawShells(); drawBursts(); drawJudgeMark(dt); drawWater(); drawSide(); drawBuoys(); drawBarge(); drawBank(); drawEmbers(dt); drawStrip(); drawTexts(dt); drawTelop();
   const st=STAGES[G.stage];
   if(G.screen==='play'||G.screen==='pause'||G.screen==='fx'){
     const rem=st.prog.length-G.i, late=realMin(st,G.gt)>st.m1-15;

@@ -65,6 +65,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 #hudL{font-size:15px;letter-spacing:.08em}
 #hudL small{color:#D3E2F0;font-size:12.5px}
 #hudC{color:#FFFFFF;font-size:15px}
+@media(max-width:380px){#hudL{padding-left:10px}#hudC{padding:0 8px}}
 #pauseBtn{border-left-color:rgba(255,255,255,.3)}
 #pauseBtn i{border-left-color:#FFFFFF;border-right-color:#FFFFFF}
 #pauseBtn:focus-visible{outline-color:#FFFFFF}
@@ -307,7 +308,7 @@ function layout(){
   landPath=new Path2D();
   for(const r of MAINLAND){ r.forEach((p,i)=>{ const [x,y]=px(p[0],p[1]); i?landPath.lineTo(x,y):landPath.moveTo(x,y); }); landPath.closePath(); }
   // 沖縄本島の挿入図（太平洋側の右下）
-  const bw=88, bh=78; OKI_BOX={x:W-12-bw,y:M.y0+M.h-bh-4,w:bw,h:bh};
+  const bw=96, bh=78; OKI_BOX={x:W-12-bw,y:M.y0+M.h-bh-4,w:bw,h:bh};
   okiPath=new Path2D();
   for(const r of OKI){ r.forEach((p,i)=>{ const [x,y]=okiPx(p[0],p[1]); i?okiPath.lineTo(x,y):okiPath.moveTo(x,y); }); okiPath.closePath(); }
   bandCtx=null;
@@ -495,8 +496,29 @@ function drawBand(){
   }
   ctx.restore();
   ctx.font='600 10px '+FONT; ctx.fillStyle=C.ink2; ctx.textAlign='left'; ctx.textBaseline='middle';
-  const put=[];
-  for(const L of ISO){ if((!fc&&L.v>today)||!L.lab)continue; const [x,y]=px(L.lab[0],L.lab[1]); if(put.some(q=>Math.abs(q[0]-x)<34&&Math.abs(q[1]-y)<13))continue; put.push([x,y]); ctx.fillText(dShort(L.v),Math.min(x+3,W-4-ctx.measureText(dShort(L.v)).width),y); }
+  const put=[], av=tipRects();   // 吹き出しの下になる日付は描かない
+  for(const L of ISO){ if((!fc&&L.v>today)||!L.lab)continue; const [x,y]=px(L.lab[0],L.lab[1]); if(put.some(q=>Math.abs(q[0]-x)<34&&Math.abs(q[1]-y)<13))continue;
+    const tw=ctx.measureText(dShort(L.v)).width, tx=Math.min(x+3,W-4-tw);
+    if(av.some(r=>tx<r[2]+2&&tx+tw>r[0]-2&&y-7<r[3]+2&&y+7>r[1]-2))continue;
+    put.push([x,y]); ctx.fillText(dShort(L.v),tx,y); }
+}
+// 地図上の吹き出し（敷いたシートの札・ドラッグ中の札）の位置。重なる日付や札同士を避けるのに使う
+function tipRects(){
+  const out=[];
+  if(G.sheet){ const [x,y]=px(G.sheet.s.lon,G.sheet.s.lat), left=G.sheet.party-Math.floor(G.day);
+    out.push(labelBox(x,y-16,G.sheet.s.name+' 宴会'+dShort(G.sheet.party)+(left>0?'（あと'+left+'日）':''),false)); }
+  const hov=G.drag?venueAt(G.drag.x,G.drag.y):null;
+  if(hov){ const [x,y]=px(hov.lon,hov.lat); out.push(hoverBox(x,y,hov,out[0])); }
+  return out;
+}
+function hoverTxt(hov){ return hov.name+'に敷く → 宴会'+dShort(Math.floor(G.day)+STAGES[G.stage].wait); }
+function hoverBox(x,y,hov,other){
+  const txt=hoverTxt(hov);
+  for(const yy of [y-20,y+26,y-42,y+48]){
+    const b=labelBox(x,yy,txt,true); b.y=yy;
+    if(!other||!(b[0]<other[2]+2&&b[2]>other[0]-2&&b[1]<other[3]+2&&b[3]>other[1]-2))return b;
+  }
+  const b=labelBox(x,y-20,txt,true); b.y=y-20; return b;
 }
 function drawMap(){
   ctx.fillStyle=C.sea; ctx.fillRect(0,M.y0-2,W,H-M.y0+2);
@@ -512,7 +534,7 @@ function drawMap(){
   const B=OKI_BOX; ctx.fillStyle=C.sea; ctx.fillRect(B.x,B.y,B.w,B.h); ctx.strokeStyle=C.coast; ctx.lineWidth=0.8; ctx.strokeRect(B.x+.5,B.y+.5,B.w-1,B.h-1);
   const nv=NAHA.v[SD.col];
   ctx.fillStyle=nv!=null&&Math.floor(G.day)>nv+4?C.leaf:C.land; ctx.fill(okiPath); ctx.stroke(okiPath);
-  ctx.fillStyle=C.ink2; ctx.font='600 9.5px '+FONT; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillStyle=C.ink2; ctx.font='600 10px '+FONT; ctx.textAlign='left'; ctx.textBaseline='top';
   ctx.fillText('那覇 ひかんざくら',B.x+5,B.y+4);
   ctx.fillText(nv!=null?'満開 '+dShort(nv):'満開 観測なし',B.x+5,B.y+16);
   // 凡例（日本海側の左上）
@@ -538,7 +560,7 @@ function drawMap(){
   if(G.drag){
     const d=G.drag;
     if(hov){ const [x,y]=px(hov.lon,hov.lat); ctx.beginPath(); ctx.arc(x,y,11,0,7); ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.stroke();
-      label(x,y-20,hov.name+'に敷く → 宴会'+dShort(Math.floor(G.day)+STAGES[G.stage].wait),true); }
+      const tb=tipRects().pop(); label(x,tb.y,hoverTxt(hov),true); }
     drawMiniSheet(d.x,d.y,1.4,true);
   }
   // 冒頭のガイド（数秒で消える）
@@ -550,6 +572,10 @@ function drawMap(){
     ctx.fillStyle='#F3EFE4'; ctx.fillText('ブルーシートを地点までドラッグ',x,y+51);
     ctx.globalAlpha=1;
   }
+}
+function labelBox(x,y,txt,strong){
+  ctx.save(); ctx.font=(strong?'700 12px ':'600 11px ')+FONT; const w=ctx.measureText(txt).width+12; ctx.restore();
+  const lx=Math.max(4,Math.min(W-4-w,x-w/2)); return [lx,y-10,lx+w,y+9];
 }
 function label(x,y,txt,strong){
   ctx.font=(strong?'700 12px ':'600 11px ')+FONT; const w=ctx.measureText(txt).width+12;
@@ -870,7 +896,7 @@ function draw(){
   if(G.screen==='play'||G.screen==='pause'||G.screen==='result'){
     const st=STAGES[G.stage];
     const day='<span>'+dLabel(G.day)+'</span>';
-    UI.hud('さくら情報',st.name+' '+(G.stage+1)+'/'+STAGES.length,day+'　宴会 '+G.done.length+'/'+st.need);
+    UI.hud('桜前線',st.name+' '+(G.stage+1)+'/'+STAGES.length,day+'　宴会 '+G.done.length+'/'+st.need);
   }
 }
 
