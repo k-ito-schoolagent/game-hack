@@ -2,162 +2,229 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>ゲームタイトル | GAME HACK</title>
-<meta name="description" content="一行説明をここに。題材・技術・失敗の見せ場が伝わる文にする。">
-<!-- ファビコン: 絵文字を1つ選んで差し替える -->
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+<meta name="description" content="一行説明をここに。題材・権限・失敗の見せ場が伝わる文にする。">
+<meta name="theme-color" content="#F3EFE4">
+<!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>遊</text></svg>">
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#0d1526;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:#eaf3fc}
-  #wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none}
-  canvas{display:block;width:100%;height:100%}
-  /* HUD: safe-area 対応（ノッチのある端末で隠れない） */
-  #hud{position:absolute;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));display:flex;justify-content:space-between;pointer-events:none;font-size:14px}
-  #hud div{background:rgba(6,26,52,.78);border-radius:8px;padding:6px 10px}
-  #popup{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:min(84vw,340px);background:rgba(255,255,255,.97);color:#12233f;border-radius:16px;padding:24px 20px;text-align:center;box-shadow:0 10px 34px rgba(0,0,0,.5)}
-  #popup.hidden{display:none}
-  #popup h1{margin:0 0 10px;font-size:20px}
-  #popup p{margin:0 0 16px;font-size:14px;line-height:1.8;white-space:pre-line}
-  /* ボタンは 44px 以上（指で押せる最小サイズ） */
-  #popup button{display:block;width:100%;height:46px;margin-top:8px;font-size:15px;font-weight:700;border:none;border-radius:10px;background:#ffb300;color:#12233f;cursor:pointer}
-  #popup button.ghost{background:#e8eef6;font-weight:500}
-  a{color:inherit}
+/* ================================================================
+ * GAME HACK 共通UI（ここから）— 全ゲームで同じものをコピーして使う
+ * 世界観: 業務帳票。紙 × 墨 × 朱（ハンコの赤）。
+ * - 朱は「判子」と「失敗」にだけ使う。ボタンや装飾には使わない
+ * - 角丸は 2px まで。影・グラデーション・絵文字は使わない
+ * ================================================================ */
+:root{
+  --paper:#F3EFE4; --paper2:#E8E1CF; --ink:#22201C; --ink2:#5E584D; --rule:#CDC3AC; --shu:#C8372D;
+  --font:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--scene,#2b2a27);font-family:var(--font);color:var(--ink);-webkit-text-size-adjust:100%}
+#wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+canvas{display:block;width:100%;height:100%}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+/* HUD: 帳票の見出し帯。左=どこ / 中=いまの数値 / 右=一時停止 */
+#hud{position:absolute;left:0;right:0;top:0;padding-top:var(--safe-t);background:var(--paper);border-bottom:1px solid var(--ink);display:none;grid-template-columns:1fr auto 52px;align-items:center;height:calc(48px + var(--safe-t));box-sizing:border-box;font-feature-settings:"tnum";z-index:5}
+#hud.on{display:grid}
+#hudL{padding-left:14px;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hudL small{font-weight:500;color:var(--ink2);font-size:12px;margin-left:6px}
+#hudC{padding:0 12px;font-size:15px;font-weight:700;text-align:right;white-space:nowrap}
+#hudC .warn{color:var(--shu)}
+#pauseBtn{width:52px;height:48px;border:0;border-left:1px solid var(--rule);background:transparent;display:grid;place-items:center}
+#pauseBtn i{display:block;width:12px;height:14px;border-left:4px solid var(--ink);border-right:4px solid var(--ink);box-sizing:border-box}
+/* シート: 下から出る帳票。親指で押せる位置にボタンを置く */
+#sheetBg{position:absolute;inset:0;background:rgba(34,32,28,.5);display:none;z-index:10}
+#sheetBg.on{display:block}
+#sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
+#sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
+#sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
+#sheet dt{color:var(--ink2)}
+#sheet dd{margin:0;font-weight:600;font-feature-settings:"tnum"}
+#sheet .acts{display:grid;gap:8px}
+.btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
+.btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn:active{transform:translateY(1px);opacity:.9}
+.sub{display:flex;justify-content:center;gap:4px}
+.sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
+/* 判子: 結果シートの右上に押される。中身は最大4字 */
+.stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
+.stamp.round{border-radius:50%}
+.stamp span{display:block}
+@keyframes stampIn{from{transform:rotate(-8deg) scale(1.9);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:.92}}
+@media (prefers-reduced-motion:reduce){#sheet,.stamp{animation:none}}
+/* ===== GAME HACK 共通UI（ここまで）===== */
 </style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="cv"></canvas>
-  <div id="hud">
-    <div id="hudL">-</div>
-    <div id="hudR">-</div>
-  </div>
-  <div id="popup">
-    <h1 id="ptitle"></h1><p id="ptext"></p>
-    <button id="pbtnMain"></button>
-    <button id="pbtnSub" class="ghost"></button>
-  </div>
+  <!-- 共通UI: ここから -->
+  <div id="hud"><div id="hudL"></div><div id="hudC"></div><button id="pauseBtn" aria-label="一時停止"><i></i></button></div>
+  <div id="sheetBg"><div id="sheet" role="dialog" aria-modal="true"></div></div>
+  <!-- 共通UI: ここまで -->
 </div>
 <script>
 'use strict';
 /* ============================================================
  * GAME HACK 雛形
- * 型: 現実(○○) × 物理化(○○=○○) × 技術(○○) × 見せ場(○○)
+ * 型: 題材(○○) × 物理化(○○=○○) × 権限(○○できる) × 技術(○○) × 見せ場(○○)
  * ← この1行を自分のゲームに書き換えることから始める
  *
  * 約束:
  *  - 乱数で勝敗を決めない（固定シーケンスか実データ）
  *  - 失敗はプレイヤーの操作・判断に帰因できる
- *  - スマホ縦持ち・親指操作・タップ領域44px以上
+ *  - 操作は1つに絞る。スマホ縦持ち・親指操作・タップ領域44px以上
  *  - 単一ファイル・外部依存なし・ビルド不要
  * ============================================================ */
 
-// 論理キャンバス: 縦持ち基準。実画面にはレターボックスで拡縮される
-const W=420,H=700;
+// ================================================================
+// GAME HACK 共通UI（ここから）— 書き換えずにコピーする
+// ================================================================
+// 論理座標: 横幅 W=420 固定。高さ H は端末の縦横比に合わせて 700〜920 で伸びる（上下の黒帯を出さない）
+// 描画は H を見てレイアウトする（上端=HUD 下、下端=親指ゾーン）
+const W=420; let H=760;
+const HUD_H=48;
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
-let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0;
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0,SAFE_T=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=window.innerWidth; VH=window.innerHeight;
+  cv.width=Math.round(VW*DPR); cv.height=Math.round(VH*DPR);
+  H=Math.max(700,Math.min(920,Math.round(W*VH/VW)));
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+  SAFE_T=(parseFloat(getComputedStyle($('hud')).paddingTop)||0)/SC;
+  if(typeof onResize==='function')onResize();
+}
+// 画面座標 → 論理座標
+function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
+// DOM 要素の中心 → 論理座標（下部ボタンとの距離判定などに使う）
+function elCenter(el){ const r=el.getBoundingClientRect(); return toGame({clientX:r.left+r.width/2,clientY:r.top+r.height/2}); }
+// HUD の下端（論理座標）。ゲームの描画はここから下に置く
+function topY(){ return HUD_H+SAFE_T; }
+// 振動（対応端末のみ）
+function buzz(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(_){} }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-// ---- ゲーム固有のデータ（固定シーケンス例。実データに置き換えてもよい）----
+const UI={
+  hud(l,lSmall,c){ $('hud').classList.add('on'); $('hudL').innerHTML=esc(l)+(lSmall?'<small>'+esc(lSmall)+'</small>':''); $('hudC').innerHTML=c||''; },
+  hideHud(){ $('hud').classList.remove('on'); },
+  /* シートを開く
+   * o = { no:'No.01 · 乗務報告', title, lead, rows:[[ラベル,値],...], stamp:'不可'|'発車'(最大4字), round:true(丸印),
+   *       main:[ラベル,fn], subs:[[ラベル,fn],...] } */
+  sheet(o){
+    const s=$('sheet');
+    let h='';
+    if(o.stamp){ const t=[...o.stamp]; const lines=t.length===4?[t.slice(0,2).join(''),t.slice(2).join('')]:t.length===3?[t.join('')]:[t.join('')];
+      const fs=t.length<=2?27:t.length===3?20:22;
+      h+='<div class="stamp'+(o.round?' round':'')+'" style="font-size:'+fs+'px">'+lines.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'; }
+    if(o.no)h+='<p class="no">'+esc(o.no)+'</p>';
+    h+='<h1>'+esc(o.title)+'</h1>';
+    if(o.lead)h+='<p class="lead">'+esc(o.lead)+'</p>';
+    if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
+    h+='<div class="acts">';
+    if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
+    h+='</div>';
+    s.innerHTML=h; s.scrollTop=0;
+    s.querySelectorAll('button').forEach(b=>{
+      const k=b.dataset.k, fn=k==='main'?o.main[1]:o.subs[+k.slice(1)][1];
+      b.addEventListener('click',e=>{ e.stopPropagation(); fn(); });
+    });
+    $('sheetBg').classList.add('on');
+    const m=s.querySelector('.btn'); if(m)setTimeout(()=>m.focus({preventScroll:true}),50);
+  },
+  close(){ $('sheetBg').classList.remove('on'); },
+  open(){ return $('sheetBg').classList.contains('on'); },
+};
+// 共有（𝕏）とポータルへ
+function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function toPortal(){ location.href='../../'; }
+// 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
+let pausedFrom=null;
+function pause(){
+  if(G.screen!=='play')return;
+  pausedFrom='play'; G.screen='pause';
+  UI.sheet({no:GAME_NO+' · 一時停止中',title:'一時停止',main:['再開する',resume],subs:[['この面をやり直す',()=>{UI.close();restart();}],['一覧へ戻る',toPortal]]});
+}
+function resume(){ if(G.screen!=='pause')return; UI.close(); G.screen='play'; lastTs=0; }
+$('pauseBtn').addEventListener('click',e=>{ e.stopPropagation(); G.screen==='pause'?resume():pause(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden)pause(); });
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ G.screen==='pause'?resume():pause(); } });
+// ===== GAME HACK 共通UI（ここまで）=====
+
+
+// ---- ゲーム固有 ----------------------------------------------
+const GAME_NO='No.00';            // 一覧の通し番号（games.json の順）
+const TAG='ゲームタイトル';        // 共有ハッシュタグ
 const STAGES=[
-  {name:'ステージ1', time:30 /*, seq:[...] */},
+  {name:'第1面', time:30},
 ];
-
 const G={screen:'title',stage:0,time:0};
 let lastTs=0;
 
-function startStage(i){
-  G.stage=i; G.time=STAGES[i].time; G.screen='play';
-  $('popup').classList.add('hidden');
-}
+function startStage(i){ G.stage=i; G.time=STAGES[i].time; G.screen='play'; UI.close(); }
+function restart(){ startStage(G.stage); }
 
 function update(dt){
   G.time-=dt;
-  if(G.time<=0){ return fail('時間切れ','次は○○してみよう。'); }
-  // TODO: ゲームロジック
+  if(G.time<=0) return fail('時間切れ','発車ベルが鳴り終わりました。ホームに3人残っています。');
 }
-
-function fail(title,text){
-  G.screen='fail';
-  showPopup(title,text+'\n\n失敗は学び。もう一度。','もう一度',()=>startStage(G.stage),true);
+// 失敗は見せ場: 判子は朱で大きく。lead は場面の中の言葉（駅のアナウンス・上司の一言など）で、何が起きたかを具体的に
+function fail(title,lead){
+  G.screen='result'; buzz([30,40,60]);
+  UI.sheet({no:GAME_NO+' · 業務報告',title,lead,stamp:'不可',
+    rows:[['面',STAGES[G.stage].name]],
+    main:['この面をやり直す',restart],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+STAGES[G.stage].name+'で「'+title+'」',TAG)],['一覧へ',toPortal]]});
 }
-function stageClear(){
-  G.screen='clear';
+function clear(){
+  G.screen='result';
   const last=G.stage>=STAGES.length-1;
-  showPopup(STAGES[G.stage].name+' クリア！',
-    last?'全ステージ制覇！お疲れさまでした！':'次へ進みます。',
-    last?'タイトルへ':'次のステージへ',
-    ()=>{ if(last){G.screen='title';showTitle();} else startStage(G.stage+1); },true);
+  UI.sheet({no:GAME_NO+' · 業務報告',title:STAGES[G.stage].name+' 完了',stamp:'完了',round:true,
+    rows:[['残り時間',Math.ceil(G.time)+' 秒']],
+    main:[last?'はじめから':'次の面へ',()=>startStage(last?0:G.stage+1)],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+STAGES[G.stage].name+' 完了',TAG)],['一覧へ',toPortal]]});
+}
+function showTitle(){
+  G.screen='title'; UI.hideHud();
+  UI.sheet({no:GAME_NO+' · 業務内容',title:'ゲームタイトル',
+    lead:'あなたは○○。一行で状況を書く。',
+    rows:[['あなたの権限','現実ではありえない権限を1つだけ'],['操作','操作は1つ（例: ドラッグして離す）'],['失敗','○○したら失敗']],
+    main:['はじめる',()=>startStage(0)],subs:[['一覧へ',toPortal]]});
 }
 
 // ---- 入力: 論理座標に変換してから使う ----
-function toLogical(e){
-  const t=e.touches?e.touches[0]:e;
-  return {x:(t.clientX-TX)/SC, y:(t.clientY-TY)/SC};
-}
-cv.addEventListener('pointerdown',e=>{
+$('wrap').addEventListener('pointerdown',e=>{
   if(G.screen!=='play')return;
-  const p=toLogical(e);
-  // TODO: タップ/ドラッグ処理（p.x, p.y は 0..W, 0..H）
+  const p=toGame(e);
+  // TODO: p.x(0..W), p.y(0..H)
 });
 
 // ---- 描画 ----
 function draw(){
-  ctx.clearRect(0,0,W,H);
-  // TODO: ゲーム画面
-  ctx.fillStyle='#eaf3fc';
-  ctx.font='20px system-ui';
-  ctx.textAlign='center';
+  ctx.fillStyle='#3a3833'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#F3EFE4'; ctx.font='600 18px '+getComputedStyle(document.body).fontFamily; ctx.textAlign='center';
   ctx.fillText('ここにゲーム画面を描く',W/2,H/2);
-  $('hudL').textContent=STAGES[G.stage].name;
-  $('hudR').textContent=Math.max(0,Math.ceil(G.time))+' 秒';
-}
-
-// ---- レターボックス拡縮（どの画面比でも縦持ち基準を維持）----
-function resize(){
-  DPR=Math.min(window.devicePixelRatio||1,2);
-  VW=window.innerWidth; VH=window.innerHeight;
-  cv.width=VW*DPR; cv.height=VH*DPR;
-  SC=Math.min(VW/W,VH/H);
-  TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
-}
-window.addEventListener('resize',resize);
-resize();
-
-// ---- ポップアップ / 共有 ----
-function showPopup(title,text,btnLabel,onMain,showShare){
-  $('ptitle').textContent=title;
-  $('ptext').textContent=text;
-  const m=$('pbtnMain'); m.textContent=btnLabel; m.onclick=onMain;
-  const s=$('pbtnSub');
-  if(showShare){
-    s.textContent='結果を𝕏で共有';
-    s.onclick=()=>{
-      const url=location.href;
-      const t=encodeURIComponent(title+' | ゲームタイトル #GAMEHACK\n'+url);
-      window.open('https://twitter.com/intent/tweet?text='+t,'_blank');
-    };
-    s.style.display='block';
-  }else{ s.style.display='none'; }
-  $('popup').classList.remove('hidden');
-}
-function showTitle(){
-  showPopup('ゲームタイトル',
-    '一行説明。\n\n遊び方:\n・○○をタップ/ドラッグ\n・○○したら失敗',
-    'スタート',()=>startStage(0),false);
+  if(G.screen==='play'||G.screen==='pause') UI.hud(STAGES[G.stage].name,'1/'+STAGES.length,'残り '+Math.max(0,Math.ceil(G.time))+' 秒');
 }
 
 // ---- メインループ ----
 function frame(ts){
-  const dt=Math.min((ts-lastTs)/1000,0.05); lastTs=ts;
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.05):0; lastTs=ts;
   if(G.screen==='play') update(dt);
-  ctx.save();
   ctx.setTransform(DPR,0,0,DPR,0,0);
-  ctx.fillStyle='#0d1526'; ctx.fillRect(0,0,VW,VH);
-  ctx.translate(TX,TY); ctx.scale(SC,SC);
+  ctx.fillStyle=getComputedStyle(document.body).backgroundColor; ctx.fillRect(0,0,VW,VH);
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR,TY*DPR);
   draw();
-  ctx.restore();
   requestAnimationFrame(frame);
 }
+window.addEventListener('resize',resize); resize();
 showTitle();
 requestAnimationFrame(frame);
 </script>

@@ -2,40 +2,891 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>桜前線お花見キャッチ（仕様書公開中） | GAME HACK</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>桜前線お花見キャッチ | GAME HACK</title>
+<meta name="description" content="お花見の幹事として、気象庁の満開日データで北上する桜前線に先回りし、満開の日に満開の場所でブルーシートを広げる。遅れれば葉桜、早ければつぼみ。">
+<meta name="theme-color" content="#D6E0E2">
+<!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>桜</text></svg>">
 <style>
-  body{margin:0;background:#0d1526;color:#eaf3fc;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.8}
-  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
-  .badge{display:inline-block;font-size:12px;font-weight:700;border:1px solid #ffb300;color:#ffb300;border-radius:6px;padding:2px 10px;margin-bottom:14px}
-  h1{font-size:26px;margin:0 0 14px}
-  p,li{font-size:14.5px;color:#c9dcf2}
-  a{color:#ffb300}
-  .box{background:#16233c;border-radius:12px;padding:14px 16px;margin:14px 0}
-  .box b{color:#ffb300}
+/* ================================================================
+ * GAME HACK 共通UI（ここから）— 全ゲームで同じものをコピーして使う
+ * 世界観: 業務帳票。紙 × 墨 × 朱（ハンコの赤）。
+ * - 朱は「判子」と「失敗」にだけ使う。ボタンや装飾には使わない
+ * - 角丸は 2px まで。影・グラデーション・絵文字は使わない
+ * ================================================================ */
+:root{
+  --paper:#F3EFE4; --paper2:#E8E1CF; --ink:#22201C; --ink2:#5E584D; --rule:#CDC3AC; --shu:#C8372D;
+  --font:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--scene,#2b2a27);font-family:var(--font);color:var(--ink);-webkit-text-size-adjust:100%}
+#wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+canvas{display:block;width:100%;height:100%}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+/* HUD: 帳票の見出し帯。左=どこ / 中=いまの数値 / 右=一時停止 */
+#hud{position:absolute;left:0;right:0;top:0;padding-top:var(--safe-t);background:var(--paper);border-bottom:1px solid var(--ink);display:none;grid-template-columns:1fr auto 52px;align-items:center;height:calc(48px + var(--safe-t));box-sizing:border-box;font-feature-settings:"tnum";z-index:5}
+#hud.on{display:grid}
+#hudL{padding-left:14px;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hudL small{font-weight:500;color:var(--ink2);font-size:12px;margin-left:6px}
+#hudC{padding:0 12px;font-size:15px;font-weight:700;text-align:right;white-space:nowrap}
+#hudC .warn{color:var(--shu)}
+#pauseBtn{width:52px;height:48px;border:0;border-left:1px solid var(--rule);background:transparent;display:grid;place-items:center}
+#pauseBtn i{display:block;width:12px;height:14px;border-left:4px solid var(--ink);border-right:4px solid var(--ink);box-sizing:border-box}
+/* シート: 下から出る帳票。親指で押せる位置にボタンを置く */
+#sheetBg{position:absolute;inset:0;background:rgba(34,32,28,.5);display:none;z-index:10}
+#sheetBg.on{display:block}
+#sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
+#sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
+#sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
+#sheet dt{color:var(--ink2)}
+#sheet dd{margin:0;font-weight:600;font-feature-settings:"tnum"}
+#sheet .acts{display:grid;gap:8px}
+.btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
+.btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn:active{transform:translateY(1px);opacity:.9}
+.sub{display:flex;justify-content:center;gap:4px}
+.sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
+/* 判子: 結果シートの右上に押される。中身は最大4字 */
+.stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
+.stamp.round{border-radius:50%}
+.stamp span{display:block}
+@keyframes stampIn{from{transform:rotate(-8deg) scale(1.9);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:.92}}
+@media (prefers-reduced-motion:reduce){#sheet,.stamp{animation:none}}
+/* ===== GAME HACK 共通UI（ここまで）===== */
+/* ---- ゲーム固有の見た目: 花見の案内状（和紙・墨・桜色の罫・明朝）と開花情報の帯 ---- */
+:root{--scene:#D6E0E2;--paper:#FBF6F0;--paper2:#F4E6E2;--ink:#3A2A28;--ink2:#7A615E;--rule:#E2C6C4;--mincho:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",serif}
+/* HUD: 気象庁の「さくら情報」見出し帯風（紺地に白、下に桜色の細線） */
+#hud{background:#22476F;color:#FFFFFF;border-bottom:0;box-shadow:inset 0 -3px 0 #E7A3B5}
+#hudL{font-size:15px;letter-spacing:.08em}
+#hudL small{color:#D3E2F0;font-size:12.5px}
+#hudC{color:#FFFFFF;font-size:15px}
+#pauseBtn{border-left-color:rgba(255,255,255,.3)}
+#pauseBtn i{border-left-color:#FFFFFF;border-right-color:#FFFFFF}
+#pauseBtn:focus-visible{outline-color:#FFFFFF}
+#sheet{border-top:0;padding:30px 28px calc(22px + var(--safe-b));box-shadow:inset 0 0 0 9px var(--paper),inset 0 0 0 10px #B88C8A,inset 0 0 0 13px var(--paper),inset 0 0 0 14px #B88C8A}
+#sheet .no{font-family:var(--mincho);letter-spacing:.2em;padding-right:92px}
+#sheet h1{font-family:var(--mincho);font-weight:700;letter-spacing:.06em}
+#sheet > .no:first-child + h1{padding-right:0}
+#sheet .lead{font-family:var(--mincho);font-size:15.5px}
+#sheet dl{border-top:0}
+#sheet dl::before{content:"記";display:block;text-align:center;font-family:var(--mincho);font-size:15px;letter-spacing:.2em;padding:2px 0 8px;border-bottom:1px solid var(--ink)}
+#sheet dl div{border-bottom:1px dotted #C9A7A5}
+#sheet dt{font-family:var(--mincho)}
+#sheet dd{overflow-wrap:anywhere}
+.btn{background:#4A302D;font-family:var(--mincho);letter-spacing:.14em}
+.sub button{font-family:var(--mincho)}
+.stamp{font-family:var(--mincho);border-width:3px;box-shadow:inset 0 0 0 3px var(--paper),inset 0 0 0 4px var(--shu)}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <span class="badge">仕様書公開中・制作者募集</span>
-  <h1>桜前線お花見キャッチ</h1>
-  <p>お花見幹事としてブルーシートを列島上で事前移動。実開花データで北上する桜前線の「満開」の瞬間・場所に合わせる。失敗＝「葉桜でした」。</p>
-  <div class="box">
-    <b>発想の型</b>
-    <ul>
-      <li>題材: お花見幹事の「満開の日に場所取りしたい」という全員が知る苦労</li>
-      <li>物理化: 桜前線＝地図上を北上する帯。ブルーシート＝ドラッグで動かす矩形。満開判定＝帯との重なり</li>
-      <li>技術: 実開花データは年ごとに固定。前線の北上速度を読み、何日先のどの地点に置くかを先読みする技術。張りっぱなしで時間経過、満開当日に帯と重なれば成功</li>
-      <li>失敗の見せ場: 「葉桜でした」「満開は昨日でした」「場所取りだけ完璧（桜なし）」の3パターンを画面いっぱいに表示</li>
-      <li>データ: 気象庁の桜開花・満開日データ（地点別・年別。観測事実データ）。年選択は typhoon-dodge と同じ型</li>
-      <li>操作: ドラッグでブルーシート移動。日付は自動経過（1日=約1秒）。予報帯は3日先まで表示</li>
-    </ul>
-  </div>
-  <p>つくってみたい人は <a href="https://github.com/k-ito-schoolagent/game-hack/issues">issue</a> で宣言してください。
-  詳しい設計書は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/games/sakura-front/SPEC.md">SPEC.md</a>。
-  はじめてのプルリクエスト歓迎です（<a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">参加のしかた</a>）。</p>
-  <p><a href="../../">← GAME HACK ポータルへ</a></p>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <!-- 共通UI: ここから -->
+  <div id="hud"><div id="hudL"></div><div id="hudC"></div><button id="pauseBtn" aria-label="一時停止"><i></i></button></div>
+  <div id="sheetBg"><div id="sheet" role="dialog" aria-modal="true"></div></div>
+  <!-- 共通UI: ここまで -->
 </div>
+<script>
+'use strict';
+/* ============================================================
+ * GAME HACK 雛形
+ * 型: 題材(○○) × 物理化(○○=○○) × 権限(○○できる) × 技術(○○) × 見せ場(○○)
+ * ← この1行を自分のゲームに書き換えることから始める
+ *
+ * 約束:
+ *  - 乱数で勝敗を決めない（固定シーケンスか実データ）
+ *  - 失敗はプレイヤーの操作・判断に帰因できる
+ *  - 操作は1つに絞る。スマホ縦持ち・親指操作・タップ領域44px以上
+ *  - 単一ファイル・外部依存なし・ビルド不要
+ * ============================================================ */
+
+// ================================================================
+// GAME HACK 共通UI（ここから）— 書き換えずにコピーする
+// ================================================================
+// 論理座標: 横幅 W=420 固定。高さ H は端末の縦横比に合わせて 700〜920 で伸びる（上下の黒帯を出さない）
+// 描画は H を見てレイアウトする（上端=HUD 下、下端=親指ゾーン）
+const W=420; let H=760;
+const HUD_H=48;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0,SAFE_T=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=window.innerWidth; VH=window.innerHeight;
+  cv.width=Math.round(VW*DPR); cv.height=Math.round(VH*DPR);
+  H=Math.max(700,Math.min(920,Math.round(W*VH/VW)));
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+  SAFE_T=(parseFloat(getComputedStyle($('hud')).paddingTop)||0)/SC;
+  if(typeof onResize==='function')onResize();
+}
+// 画面座標 → 論理座標
+function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
+// DOM 要素の中心 → 論理座標（下部ボタンとの距離判定などに使う）
+function elCenter(el){ const r=el.getBoundingClientRect(); return toGame({clientX:r.left+r.width/2,clientY:r.top+r.height/2}); }
+// HUD の下端（論理座標）。ゲームの描画はここから下に置く
+function topY(){ return HUD_H+SAFE_T; }
+// 振動（対応端末のみ）
+function buzz(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(_){} }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const UI={
+  hud(l,lSmall,c){ $('hud').classList.add('on'); $('hudL').innerHTML=esc(l)+(lSmall?'<small>'+esc(lSmall)+'</small>':''); $('hudC').innerHTML=c||''; },
+  hideHud(){ $('hud').classList.remove('on'); },
+  /* シートを開く
+   * o = { no:'No.01 · 乗務報告', title, lead, rows:[[ラベル,値],...], stamp:'不可'|'発車'(最大4字), round:true(丸印),
+   *       main:[ラベル,fn], subs:[[ラベル,fn],...] } */
+  sheet(o){
+    const s=$('sheet');
+    let h='';
+    if(o.stamp){ const t=[...o.stamp]; const lines=t.length===4?[t.slice(0,2).join(''),t.slice(2).join('')]:t.length===3?[t.join('')]:[t.join('')];
+      const fs=t.length<=2?27:t.length===3?20:22;
+      h+='<div class="stamp'+(o.round?' round':'')+'" style="font-size:'+fs+'px">'+lines.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'; }
+    if(o.no)h+='<p class="no">'+esc(o.no)+'</p>';
+    h+='<h1>'+esc(o.title)+'</h1>';
+    if(o.lead)h+='<p class="lead">'+esc(o.lead)+'</p>';
+    if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
+    h+='<div class="acts">';
+    if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
+    h+='</div>';
+    s.innerHTML=h; s.scrollTop=0;
+    s.querySelectorAll('button').forEach(b=>{
+      const k=b.dataset.k, fn=k==='main'?o.main[1]:o.subs[+k.slice(1)][1];
+      b.addEventListener('click',e=>{ e.stopPropagation(); fn(); });
+    });
+    $('sheetBg').classList.add('on');
+    const m=s.querySelector('.btn'); if(m)setTimeout(()=>m.focus({preventScroll:true}),50);
+  },
+  close(){ $('sheetBg').classList.remove('on'); },
+  open(){ return $('sheetBg').classList.contains('on'); },
+};
+// 共有（𝕏）とポータルへ
+function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function toPortal(){ location.href='../../'; }
+// 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
+let pausedFrom=null;
+function pause(){
+  if(G.screen!=='play')return;
+  pausedFrom='play'; G.screen='pause';
+  UI.sheet({no:GAME_NO+' · 一時停止中',title:'一時停止',main:['再開する',resume],subs:[['この面をやり直す',()=>{UI.close();restart();}],['一覧へ戻る',toPortal]]});
+}
+function resume(){ if(G.screen!=='pause')return; UI.close(); G.screen='play'; lastTs=0; }
+$('pauseBtn').addEventListener('click',e=>{ e.stopPropagation(); G.screen==='pause'?resume():pause(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden)pause(); });
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ G.screen==='pause'?resume():pause(); } });
+// ===== GAME HACK 共通UI（ここまで）=====
+
+
+// ---- ゲーム固有 ----------------------------------------------
+/* 型: 題材(お花見の幹事) × 物理化(桜前線=地図を北上する満開の帯、場所取り=敷いてから宴会までの日数)
+ *     × 権限(ブルーシートを日本中どこへでも一瞬で敷き直せる) × 技術(前線の北上速度を読み、場所取り日数ぶん先回りする)
+ *     × 見せ場(宴会の日に葉桜／まだつぼみ／満開は昨日、で一同がっかり) */
+const GAME_NO='No.04';
+const TAG='桜前線お花見キャッチ';
+
+// 気象庁「さくらの満開日」観測値（2021〜2026年）と平年値（1991〜2020年の平均）
+// 地点名|緯度|経度|2021,2022,2023,2024,2025,2026,平年|種目(e=えぞやまざくら h=ひかんざくら 空=そめいよしの)|会場にできる地点=1
+// 緯度経度は各地の気象台付近の概略値（地図上の位置にだけ使う）
+const STN_SRC=`稚内|45.42|141.68|5/11,5/9,5/5,5/4,5/10,5/6,5/16|e|1
+旭川|43.76|142.37|5/3,4/28,4/28,4/26,5/2,4/26,5/7|e|1
+網走|44.02|144.28|5/7,4/30,5/1,4/30,5/10,5/7,5/13|e|1
+札幌|43.06|141.33|4/27,4/25,4/21,4/24,4/27,4/24,5/6||1
+帯広|42.92|143.21|4/27,4/25,4/22,4/26,5/3,4/22,5/5|e|1
+釧路|42.98|144.38|5/11,5/10,5/4,5/5,5/9,5/6,5/19|e|1
+室蘭|42.32|140.97|5/4,4/30,4/27,4/28,5/3,4/28,5/9||1
+函館|41.77|140.73|4/23,4/25,4/20,4/23,4/28,4/20,5/2||1
+青森|40.82|140.77|4/17,4/20,4/11,4/18,4/22,4/16,4/26||1
+秋田|39.72|140.1|4/7,4/16,4/7,4/14,4/18,4/9,4/22||1
+盛岡|39.7|141.17|4/13,4/18,4/6,4/14,4/19,4/12,4/24||1
+山形|38.26|140.35|4/5,4/13,4/5,4/10,4/14,4/6,4/18||0
+仙台|38.26|140.9|3/31,4/11,3/31,4/9,4/10,4/4,4/13||1
+福島|37.76|140.47|3/29,4/8,3/28,4/7,4/8,4/3,4/11||1
+新潟|37.9|139.05|3/31,4/11,3/31,4/11,4/9,4/3,4/13||1
+金沢|36.59|136.63|3/29,4/5,3/30,4/8,4/6,4/3,4/8||1
+富山|36.71|137.2|3/28,4/6,3/27,4/10,4/6,4/2,4/8||0
+長野|36.66|138.19|4/1,4/11,4/3,4/13,4/13,4/6,4/16||1
+宇都宮|36.55|139.87|3/31,4/2,3/30,4/11,4/9,4/3,4/6||0
+福井|36.06|136.22|3/27,4/6,3/27,4/6,4/9,3/31,4/7||0
+前橋|36.4|139.06|3/28,4/1,3/24,4/8,4/7,4/1,4/5||1
+熊谷|36.15|139.38|3/29,3/30,3/26,4/8,4/7,4/3,4/3||0
+水戸|36.38|140.47|3/30,4/6,3/27,4/8,4/8,4/3,4/6||1
+岐阜|35.4|136.76|3/27,3/28,3/23,4/4,3/31,3/26,4/2||0
+名古屋|35.17|136.97|3/28,3/30,3/27,4/7,4/4,3/30,4/2||1
+甲府|35.67|138.55|3/29,3/28,3/24,4/5,4/4,3/24,4/2||1
+銚子|35.74|140.86|3/28,4/6,3/30,4/7,4/7,4/3,4/6||0
+津|34.73|136.52|3/25,3/30,3/27,4/2,4/2,3/29,4/3||0
+静岡|34.98|138.4|3/28,3/30,3/29,4/8,4/3,4/2,4/2||1
+東京|35.69|139.75|3/22,3/27,3/22,4/4,3/30,3/28,3/31||1
+横浜|35.44|139.65|3/27,3/28,3/25,4/7,4/4,4/1,4/1||0
+松江|35.46|133.07|3/27,3/31,3/27,4/3,4/2,3/31,4/5||1
+鳥取|35.49|134.24|3/29,4/1,3/24,4/6,4/4,3/31,4/5||1
+京都|35.01|135.73|3/26,3/30,3/24,4/5,4/5,3/30,4/4||1
+彦根|35.28|136.24|3/30,4/6,3/30,4/9,4/9,4/2,4/8||0
+広島|34.4|132.46|3/25,3/29,3/28,4/5,4/2,3/30,4/3||1
+岡山|34.66|133.92|3/29,3/30,3/27,4/5,4/5,3/31,4/4||0
+神戸|34.7|135.21|3/30,4/1,3/31,4/7,4/6,4/5,4/5||0
+大阪|34.68|135.52|3/28,3/30,3/27,4/6,4/4,4/3,4/4||0
+和歌山|34.23|135.16|3/27,3/29,3/25,4/3,3/30,4/2,4/3||0
+奈良|34.69|135.83|3/30,3/31,3/27,4/8,4/4,3/31,4/4||0
+松山|33.84|132.78|3/27,3/28,3/28,4/5,3/30,4/4,4/3||1
+高松|34.32|134.05|3/27,3/30,3/29,4/5,4/3,4/1,4/4||1
+高知|33.57|133.55|3/23,3/27,3/24,3/31,3/28,3/31,3/30||1
+徳島|34.07|134.57|4/1,3/30,3/31,4/6,4/6,4/6,4/4||0
+下関|33.95|130.93|3/26,4/1,3/31,4/5,4/4,4/6,4/4||0
+福岡|33.58|130.38|3/22,3/27,3/26,4/2,3/28,4/3,3/31||1
+佐賀|33.27|130.3|3/24,3/28,3/31,4/2,4/2,4/3,4/2||0
+大分|33.24|131.62|3/30,4/1,4/3,4/5,4/4,4/5,4/4||1
+長崎|32.73|129.87|3/23,3/29,3/30,4/2,3/31,4/3,4/2||1
+熊本|32.81|130.71|3/27,3/28,3/29,4/2,3/28,4/2,4/1||1
+鹿児島|31.56|130.56|3/30,4/1,4/5,4/12,4/7,4/5,4/5||1
+宮崎|31.94|131.41|3/29,3/28,3/30,4/3,4/2,4/3,4/2||1
+那覇|26.21|127.68|2/1,2/1,1/30,2/5,,2/3,2/4|h|0`;
+// 海岸線: Natural Earth 1:50m（パブリックドメイン）を間引いた [経度,緯度] 列
+const COAST_SRC=`138.34,37.82 138.23,37.83 138.28,37.85 138.32,37.97 138.25,37.99 138.25,38.08 138.5,38.32 138.45,38.08 138.58,38.07 138.5,37.9
+134.93,34.29 134.82,34.2 134.73,34.21 134.67,34.29 134.83,34.47 135,34.54 134.91,34.4
+130.62,30.26 130.45,30.26 130.39,30.39 130.5,30.47 130.64,30.39 130.67,30.37
+130.96,30.4 130.87,30.39 130.87,30.44 130.95,30.67 131.06,30.83 131.06,30.64
+130.08,32.23 130,32.19 129.96,32.24 130.02,32.29 129.98,32.35 130.01,32.52 130.17,32.54 130.2,32.34
+129.39,34.35 129.37,34.31 129.27,34.37 129.33,34.61 129.45,34.69 129.48,34.54 129.38,34.42
+129.08,32.84 129,32.95 129.11,33.13 129.18,32.99
+143.82,44.12 144.72,43.93 145.37,44.33 145.13,43.87 145.14,43.66 145.34,43.3 145.83,43.39 145.51,43.17 144.92,43 144.2,42.97 143.97,42.88 143.43,42.42 143.24,42 141.85,42.58 141.41,42.55 140.99,42.34 140.71,42.56 140.48,42.56 140.35,42.44 140.33,42.29 140.53,42.13 140.73,42.12 141.15,41.81 141,41.74 140.66,41.82 140.27,41.46 140.04,41.47 140,41.58 140.11,41.91 140.06,42.07 139.84,42.28 139.86,42.58 140.43,42.95 140.49,43.05 140.39,43.3 141.14,43.18 141.37,43.28 141.4,43.64 141.64,44.02 141.76,44.48 141.78,44.72 141.58,45.16 141.67,45.4 141.94,45.51 142.88,44.67
+131.17,33.6 131.7,33.6 131.71,33.5 131.54,33.27 131.9,33.25 131.85,33.12 132,32.88 131.66,32.47 131.34,31.4 131.07,31.44 131.1,31.26 130.69,31.02 130.79,31.27 130.7,31.58 130.8,31.62 130.78,31.71 130.66,31.72 130.56,31.56 130.54,31.4 130.64,31.27 130.59,31.18 130.2,31.29 130.15,31.41 130.29,31.45 130.32,31.6 130.19,31.77 130.19,32.09 130.39,32.22 130.64,32.62 130.5,32.66 130.55,32.83 130.38,33.09 130.24,33.18 130.13,33.1 130.18,32.85 130.33,32.85 130.34,32.7 130.05,32.77 129.77,32.57 129.83,32.73 129.69,32.88 129.68,33.06 129.83,32.89 129.99,32.85 129.9,33.02 129.58,33.24 129.61,33.34 129.84,33.32 129.83,33.44 130.37,33.63 130.48,33.83 130.72,33.93 130.95,33.87
+134.36,34.26 134.64,34.23 134.67,33.85 134.74,33.82 134.38,33.61 134.18,33.25 133.96,33.45 133.63,33.51 133.29,33.36 132.98,32.84 132.8,32.75 132.64,32.76 132.71,32.9 132.5,32.92 132.43,33.06 132.51,33.29 132.41,33.33 132.41,33.43 132.03,33.34 132.64,33.69 132.78,33.99 132.94,34.1 133.19,33.93 133.58,34.02 133.64,34.13 133.6,34.24 133.95,34.35
+141.23,41.37 141.46,41.4 141.43,40.72 141.8,40.29 141.99,39.79 141.98,39.43 141.9,39.11 141.66,38.97 141.55,38.76 141.47,38.4 141.11,38.34 140.96,38.15 141,37.11 140.73,36.73 140.57,36.23 140.87,35.72 140.64,35.66 140.46,35.51 140.35,35.18 139.84,34.91 139.83,35.3 140.1,35.59 139.99,35.67 139.83,35.66 139.65,35.41 139.74,35.25 139.68,35.15 139.47,35.3 139.25,35.28 139.13,35.15 139.09,34.84 138.84,34.62 138.76,34.7 138.8,34.97 138.9,35.03 138.72,35.12 138.58,35.09 138.19,34.6 137.54,34.66 137.06,34.58 137.29,34.7 137.28,34.77 137.03,34.77 136.96,34.83 136.94,34.72 136.87,34.73 136.9,35.04 136.8,35.05 136.69,34.98 136.53,34.68 136.88,34.43 136.85,34.32 136.33,34.18 135.92,33.56 135.7,33.49 135.45,33.55 135.13,34.01 135.1,34.29 135.31,34.42 135.42,34.62 135.04,34.63 134.74,34.77 134.25,34.71 133.97,34.53 133.14,34.3 132.66,34.25 132.42,34.35 132.31,34.32 132.15,33.84 131.74,34.05 131.23,33.95 131.07,34.02 130.92,33.98 130.89,34.26 131,34.39 131.35,34.41 132.26,35.02 132.7,35.42 132.92,35.51 133.27,35.56 133.38,35.46 133.98,35.51 135.17,35.75 135.27,35.72 135.23,35.59 135.33,35.53 135.68,35.5 135.9,35.61 136.1,35.77 136.01,35.99 136.07,36.12 136.7,36.74 136.72,37.2 136.84,37.38 137.32,37.52 137.34,37.44 136.9,37.12 136.99,37.03 137.02,36.84 137.25,36.75 137.51,36.95 138.32,37.22 138.63,37.47 138.89,37.84 139.36,38.1 139.52,38.5 139.8,38.88 140.06,39.62 139.99,39.86 139.74,39.92 139.91,40.02 140.01,40.26 139.92,40.53 139.97,40.67 140.28,40.85 140.32,41.16 140.39,41.23 140.63,41.2 140.75,40.83 140.94,40.94 141.12,40.88 141.23,40.99 141.24,41.21 140.8,41.14 140.8,41.25 140.94,41.51
+128.26,26.65 127.87,26.44 127.9,26.33 127.79,26.26 127.8,26.15 127.65,26.09 127.73,26.43 127.95,26.59 127.89,26.63 127.91,26.69 128.05,26.64 128.1,26.67 128.25,26.88 128.33,26.81`;
+
+const YEAR_COL={2021:0,2022:1,2023:2,2024:3,2025:4,2026:5,'平年':6};
+const CUM=[0,31,59,90,120,151,181,212,243,273,304,334];
+const md2d=s=>{ const [m,d]=s.split('/').map(Number); return CUM[m-1]+d; };
+const dLabel=n=>{ n=Math.floor(n); let m=0; while(m<11&&CUM[m+1]<n)m++; return (m+1)+'月'+(n-CUM[m])+'日'; };
+const dShort=n=>{ n=Math.floor(n); let m=0; while(m<11&&CUM[m+1]<n)m++; return (m+1)+'/'+(n-CUM[m]); };
+
+const STN=STN_SRC.trim().split('\n').map(l=>{ const [n,la,lo,v,sp,pl]=l.split('|');
+  return {name:n,lat:+la,lon:+lo,v:v.split(',').map(x=>x?md2d(x):null),sp,play:pl==='1'}; });
+const COAST=COAST_SRC.trim().split('\n').map(l=>l.split(' ').map(p=>p.split(',').map(Number)));
+const OKI=COAST.filter(r=>r.some(p=>p[1]<27)), MAINLAND=COAST.filter(r=>!r.some(p=>p[1]<27));
+const NAHA=STN.find(s=>s.name==='那覇');
+
+// 面 = 年。wait=シートを敷いてから宴会までの日数（回覧で全員の予定を押さえる）、need=宴会の回数、spd=1日の秒数、fc=予想の等期日線を出すか
+const STAGES=[
+  {name:'平年', year:'平年', wait:2, need:3, spd:1.25, fc:true,
+   lead:'総務部長「今年は3か所で花見をやる。満開の日にな。場所は任せる」\n回覧が回りきるのに2日。シートを敷いた2日後が宴会。'},
+  {name:'2023年', year:2023, wait:3, need:3, spd:1.1, fc:true,
+   lead:'総務部長「今年は早いらしいぞ。東京はもう3月中だそうだ」\n回覧に3日かかる。シートを敷いた3日後が宴会。'},
+  {name:'2024年', year:2024, wait:3, need:4, spd:1.0, fc:true,
+   lead:'総務部長「今年は遅い。そのぶん一気に咲くから気をつけろ」\n宴会は4か所。シートを敷いた3日後が宴会。'},
+  {name:'2021年', year:2021, wait:3, need:4, spd:0.95, fc:false,
+   lead:'総務部長「今年は予想図が回ってこない。前線を見て読め」\n地図に出るのは、もう満開になった所の線だけ。'},
+  {name:'2026年', year:2026, wait:4, need:5, spd:0.9, fc:false,
+   lead:'総務部長「今年は5か所。回覧も4日かかる」\n予想図なし。シートを敷いた4日後が宴会。'},
+];
+// 宴会の日 d = 宴会日 − 満開日。0〜2日を満開として扱う
+function bloomState(d){ return d<=-4?'bud':d<0?'half':d<=2?'full':d<=4?'fall':'leaf'; }
+const STATE_JA={bud:'つぼみ',half:'咲き始め',full:'満開',fall:'散り始め',leaf:'葉桜'};
+
+const G={screen:'title',stage:0,time:0,day:0,start:0,end:0,done:[],sheet:null,drag:null,anim:null,guide:0,briefed:-1,log:[]};
+let lastTs=0;
+
+// ---- 地図 ----
+const LON0=129.4, LAT1=45.7, GSTEP=0.05, GW=332, GH=298;   // 129.4〜146.0E / 30.8〜45.7N
+const KX=Math.cos(38*Math.PI/180);
+const M={s:30,x0:0,y0:0,w:0,h:0};
+let PANEL={y:48,h:300}, landPath=null, okiPath=null, OKI_BOX=null;
+function px(lon,lat){ return [M.x0+(lon-LON0)*KX*M.s, M.y0+(LAT1-lat)*M.s]; }
+function layout(){
+  const ww=(GW*GSTEP)*KX, hh=GH*GSTEP;
+  // 陸地（129.55〜145.85E）が左右 12px の余白に収まる縮尺。中心は 137.7E
+  M.s=Math.min((W-24)/((145.85-129.55)*KX),(H-topY()-8-190)/hh);
+  M.w=ww*M.s; M.h=hh*M.s; M.x0=W/2-(137.7-LON0)*KX*M.s; M.y0=H-6-M.h;
+  PANEL={y:topY(),h:M.y0-topY()-4};
+  landPath=new Path2D();
+  for(const r of MAINLAND){ r.forEach((p,i)=>{ const [x,y]=px(p[0],p[1]); i?landPath.lineTo(x,y):landPath.moveTo(x,y); }); landPath.closePath(); }
+  // 沖縄本島の挿入図（太平洋側の右下）
+  const bw=88, bh=78; OKI_BOX={x:W-12-bw,y:M.y0+M.h-bh-4,w:bw,h:bh};
+  okiPath=new Path2D();
+  for(const r of OKI){ r.forEach((p,i)=>{ const [x,y]=okiPx(p[0],p[1]); i?okiPath.lineTo(x,y):okiPath.moveTo(x,y); }); okiPath.closePath(); }
+  bandCtx=null;
+}
+function okiPx(lon,lat){ const s=M.s*1.15; return [OKI_BOX.x+18+(lon-127.6)*KX*s, OKI_BOX.y+OKI_BOX.h-10-(lat-26.05)*s]; }
+function onResize(){ layout(); }
+
+// 満開日の面（観測地点から逆距離加重で内挿した概略）と等期日線
+let GRID=null, ISO=[], bandCv=null, bandCtx=null, bandImg=null;
+function inLand(lon,lat){
+  let c=false;
+  for(const r of MAINLAND){ for(let i=0,j=r.length-1;i<r.length;j=i++){ const a=r[i],b=r[j];
+    if((a[1]>lat)!==(b[1]>lat)&&lon<(b[0]-a[0])*(lat-a[1])/(b[1]-a[1])+a[0])c=!c; } }
+  return c;
+}
+function buildGrid(stage){
+  const col=YEAR_COL[stage.year];
+  const pts=STN.filter(s=>s.sp!=='h'&&s.v[col]!=null).map(s=>[s.lon*KX,s.lat,s.v[col]]);
+  GRID=new Float32Array(GW*GH);
+  for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){
+    const lon=LON0+(i+.5)*GSTEP, lat=LAT1-(j+.5)*GSTEP, x=lon*KX;
+    let sw=0,sv=0,hit=null;
+    for(const p of pts){ const d2=(x-p[0])**2+(lat-p[1])**2; if(d2<1e-6){hit=p[2];break;} const w=1/(d2*Math.sqrt(d2)); sw+=w; sv+=w*p[2]; }
+    GRID[j*GW+i]=hit!=null?hit:sv/sw;
+  }
+  // 等期日線: 3/25, 3/31, 4/5 … 5/20（5日ごと）
+  const levels=['3/25','3/31','4/5','4/10','4/15','4/20','4/25','4/30','5/5','5/10','5/15','5/20'].map(md2d);
+  ISO=levels.map(v=>{
+    const segs=[]; let lab=null;
+    const P=(i,j)=>[LON0+(i+.5)*GSTEP, LAT1-(j+.5)*GSTEP];
+    const lerp=(a,b,va,vb)=>{ const t=(v-va)/(vb-va); return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]; };
+    for(let j=0;j<GH-1;j++)for(let i=0;i<GW-1;i++){
+      const a=GRID[j*GW+i],b=GRID[j*GW+i+1],c=GRID[(j+1)*GW+i+1],d=GRID[(j+1)*GW+i];
+      const pa=P(i,j),pb=P(i+1,j),pc=P(i+1,j+1),pd=P(i,j+1);
+      const e=[]; // 辺との交点
+      if((a<v)!==(b<v))e.push(lerp(pa,pb,a,b));
+      if((b<v)!==(c<v))e.push(lerp(pb,pc,b,c));
+      if((c<v)!==(d<v))e.push(lerp(pc,pd,c,d));
+      if((d<v)!==(a<v))e.push(lerp(pd,pa,d,a));
+      if(e.length>=2)segs.push([e[0],e[1]]);
+      if(e.length===4)segs.push([e[2],e[3]]);
+    }
+    for(const s of segs){ const p=s[0]; if(inLand(p[0],p[1])&&(!lab||p[0]>lab[0]))lab=p; }
+    return {v,segs,lab};
+  });
+}
+
+// ---- 進行 ----
+function stageData(i){
+  const st=STAGES[i], col=YEAR_COL[st.year];
+  const venues=STN.filter(s=>s.play&&s.v[col]!=null);
+  const b=venues.map(s=>s.v[col]);
+  return {st,col,venues,start:Math.min(...b)-st.wait-3,end:Math.max(...b)+2};
+}
+let SD=null;
+function startStage(i,skipBrief){
+  G.stage=i;
+  if(!skipBrief&&G.briefed!==i){ G.briefed=i; return brief(i); }
+  SD=stageData(i); buildGrid(SD.st); bandCtx=null;
+  G.day=SD.start; G.done=[]; G.sheet=null; G.drag=null; G.anim=null; G.guide=3.2; G.log=[];
+  petals.length=0; G.screen='play'; UI.close(); lastTs=0;
+}
+function restart(){ startStage(G.stage,true); }
+function brief(i){
+  const st=STAGES[i];
+  G.screen='title'; UI.hideHud();
+  UI.sheet({no:GAME_NO+' · 総務部回覧 '+(i+1)+'/'+STAGES.length,title:(st.name==='平年'?'平年':st.name)+'のお花見のご案内',lead:st.lead,
+    rows:[['日時','満開の日（'+(st.year==='平年'?'平年値: 1991〜2020年の平均':st.year+'年の気象庁観測値')+'）'],['回数',st.need+'回（同じ会場は使えない）'],['回覧','シートを敷いてから'+st.wait+'日で全員に回る（その日が宴会）'],['添付','満開日の地図'+(st.fc?'（予想の等期日線あり）':'（満開になった所の線だけ）')],['幹事','総務部 新人（あなた）']],
+    main:['シートを持って出る',()=>startStage(i,true)],subs:[['一覧へ',toPortal]]});
+}
+const venueAt=(x,y)=>{
+  let best=null,bd=30;
+  for(const s of SD.venues){ if(G.done.some(d=>d.s===s))continue; const [sx,sy]=px(s.lon,s.lat); const d=Math.hypot(sx-x,sy-y); if(d<bd){bd=d;best=s;} }
+  return best;
+};
+function place(s){
+  if(G.sheet&&G.sheet.s===s)return;
+  G.sheet={s,placed:Math.floor(G.day),party:Math.floor(G.day)+STAGES[G.stage].wait,re:!!G.sheet};
+  buzz(15);
+}
+function update(dt){
+  if(G.guide>0)G.guide-=dt;
+  if(G.anim){ G.anim.t+=dt; animStep(); return; }
+  G.day+=dt/STAGES[G.stage].spd;
+  const st=STAGES[G.stage];
+  if(G.sheet&&G.day>=G.sheet.party){ G.day=G.sheet.party; return beginParty(); }
+  if(!G.sheet&&G.day>SD.end+1){
+    return finish('fail',{kind:'end'});
+  }
+}
+function beginParty(){
+  const sh=G.sheet, b=sh.s.v[SD.col], d=sh.party-b;
+  G.anim={t:0,sh,d,state:bloomState(d),ok:d>=0&&d<=2};
+  buzz(G.anim.ok?[20,40,20]:[40,60,80]);
+}
+function animStep(){
+  const a=G.anim;
+  if(a.ok&&a.t>2.0&&!a.next){
+    a.next=1; G.done.push({s:a.sh.s,day:a.sh.party,d:a.d}); G.log.push(a.sh.s.name+' '+dShort(a.sh.party));
+    G.sheet=null;
+    if(G.done.length>=STAGES[G.stage].need) return finish('clear'); // 宴会の場面を残したまま報告を出す
+    G.anim=null; return;
+  }
+  if(!a.ok&&a.t>1.6&&!a.next){ a.next=1; finish('fail',{kind:a.state,a}); }
+}
+function finish(kind,o){
+  const st=STAGES[G.stage], last=G.stage>=STAGES.length-1;
+  G.screen='result'; G.drag=null;
+  const venuesTxt=G.done.length?G.done.map(x=>x.s.name+'（'+dShort(x.day)+'）').join('・'):'なし';
+  if(kind==='clear'){
+    const lead='各位\n下記のとおり、すべて満開の日に実施いたしました。\n'+(last?'総務部長「5年分、ぜんぶ満開でやれたな。来年も頼む」':'総務部長「どこも満開だった。来年も頼むぞ」');
+    UI.sheet({no:GAME_NO+' · 総務部 · お花見 実施報告',title:st.name+'のお花見 実施報告',lead,stamp:'満開',round:true,
+      rows:[['実施',venuesTxt],['満開日との差',G.done.map(x=>x.d===0?'当日':x.d+'日後').join('・')],['参加','総務部 5名'],['幹事','総務部 新人（あなた）'],['年',st.name+'（'+(G.stage+1)+'/'+STAGES.length+'）']],
+      main:[last?'はじめから':'次の年へ',()=>startStage(last?0:G.stage+1)],
+      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+'、'+G.done.map(x=>x.s.name+dShort(x.day)).join('・')+'で満開の宴会',TAG)],['一覧へ',toPortal]]});
+    return;
+  }
+  let title,lead,stamp,rows;
+  if(o.kind==='end'){
+    title='今年のお花見は中止です'; stamp='中止';
+    lead='各位\n北海道まで葉桜となりましたので、残りのお花見は中止いたします。実施 '+G.done.length+'回 / 予定 '+st.need+'回。\n総務部長「釧路まで葉桜だそうだ」';
+    rows=[['面',st.name],['宴会',venuesTxt],['日付',dLabel(G.day)]];
+  } else {
+    const a=o.a, s=a.sh.s, b=s.v[SD.col], d=a.d, sp=s.sp==='e'?'えぞやまざくら':'そめいよしの';
+    const when=dLabel(a.sh.party)+'、'+s.name+'でのお花見は、';
+    if(a.state==='bud'){ title='まだつぼみでした'; stamp='つぼみ'; lead='各位\n'+when+'まだつぼみのため中止いたします。満開は'+dLabel(b)+'（あと'+(-d)+'日）でした。\n係長「枝しか見えないね……」'; }
+    else if(a.state==='half'){ title='まだ咲き始めでした'; stamp='五分咲'; lead='各位\n'+when+'咲き始めのため中止いたします。満開は'+dLabel(b)+'（あと'+(-d)+'日）でした。\n係長「ちらほら、だね……」'; }
+    else if(a.state==='fall'){ title=d===3?'満開は昨日まででした':'満開はおとといまででした'; stamp='散り際'; lead='各位\n'+when+'散り際のため中止いたします。満開は'+dLabel(b)+'で、'+d+'日遅れでした。\n部長「花びらばかり飲んでるな」'; }
+    else { title='葉桜でした'; stamp='葉桜'; lead='各位\n'+when+'葉桜のため中止いたします。満開は'+dLabel(b)+'で、'+d+'日遅れでした。\n部長「……緑だな」'; }
+    rows=[['会場',s.name+'（'+sp+'）'],['敷いた日',dLabel(a.sh.placed)],['宴会の日',dLabel(a.sh.party)],['満開日',dLabel(b)+'（気象庁）'],['満開の宴会',G.done.length+'回 / '+st.need+'回'],['年',st.name+'（'+(G.stage+1)+'/'+STAGES.length+'）']];
+  }
+  UI.sheet({no:GAME_NO+' · 総務部 · 中止のお知らせ',title,lead,stamp,rows,
+    main:['この年をやり直す',restart],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+(o.a?' '+o.a.sh.s.name+' 宴会'+dShort(o.a.sh.party)+'（満開日 '+dShort(o.a.sh.s.v[SD.col])+'）':'')+'「'+title+'」',TAG)],['一覧へ',toPortal]]});
+}
+function showTitle(){
+  G.screen='title'; UI.hideHud(); G.briefed=-1;
+  UI.sheet({no:GAME_NO+' · 桜前線お花見キャッチ · 総務部回覧',title:'お花見のご案内',stamp:'回覧',
+    lead:'各位　桜前線に合わせ、満開の日に満開の場所でお花見を行います。幹事 総務部 新人（あなた）',
+    rows:[['日時・場所','各地の満開の日に、幹事がシートで確保（持ち物 紙コップ）'],
+      ['あなたの権限','ブルーシートを日本中どこへでも一瞬で敷き直せる（敷き直すと場所取りは1日目から）'],['操作','シートを地図の地点までドラッグして離す'],['失敗','宴会の日がつぼみ・咲き始め・散り際・葉桜'],
+      ['出典','気象庁「さくらの満開日」2021〜2026年・平年値（1991〜2020年） data.jma.go.jp/sakura/data/sakura004_07.html ／等期日線は内挿の概略']],
+    main:['回覧を受け取る',()=>startStage(0)],subs:[['一覧へ',toPortal]]});
+}
+
+// ---- 入力: ドラッグでシートを運ぶ ----
+const LIFT=34; // 指で隠れないようにシートは指の少し上に出す
+$('wrap').addEventListener('pointerdown',e=>{
+  if(G.screen!=='play'||G.anim)return;
+  const p=toGame(e); G.drag={x:p.x,y:p.y-LIFT,id:e.pointerId};
+});
+window.addEventListener('pointermove',e=>{
+  if(!G.drag)return; const p=toGame(e); G.drag.x=p.x; G.drag.y=p.y-LIFT;
+});
+window.addEventListener('pointerup',e=>{
+  if(!G.drag)return; const dr=G.drag; G.drag=null;
+  if(G.screen!=='play'||G.anim)return;
+  const s=venueAt(dr.x,dr.y); if(s)place(s);
+});
+window.addEventListener('pointercancel',()=>{ G.drag=null; });
+
+// ---- 描画 ----
+const FONT=getComputedStyle(document.body).fontFamily;
+const C={sea:'#D3DEE0',seaLine:'#AFC0C3',land:'#EFE9DA',coast:'#4B4740',bud:'#E6DCC6',half:'#F6D9DF',full:'#EC8FA8',fall:'#D9BCA8',leaf:'#A8C68C',ink:'#22201C',ink2:'#5E584D',sheet:'#2F6FC0',sheetD:'#24589C'};
+function rgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+const RGB={bud:rgb(C.bud),half:rgb(C.half),full:rgb(C.full),fall:rgb(C.fall),leaf:rgb(C.leaf)};
+function drawBand(){
+  if(!bandCtx){ bandCv=document.createElement('canvas'); bandCv.width=GW; bandCv.height=GH; bandCtx=bandCv.getContext('2d'); bandImg=bandCtx.createImageData(GW,GH); }
+  const fc=STAGES[G.stage].fc, t=Math.floor(G.day), D=bandImg.data;
+  for(let k=0;k<GW*GH;k++){
+    const d=t-GRID[k]; let c;
+    if(d<0) c=(fc&&d>=-3)?RGB.half:RGB.bud; else if(d<3)c=RGB.full; else if(d<5)c=RGB.fall; else c=RGB.leaf;
+    D[k*4]=c[0];D[k*4+1]=c[1];D[k*4+2]=c[2];D[k*4+3]=255;
+  }
+  bandCtx.putImageData(bandImg,0,0);
+  ctx.save(); ctx.clip(landPath); ctx.imageSmoothingEnabled=true; ctx.drawImage(bandCv,M.x0,M.y0,M.w,M.h);
+  // 等期日線
+  const today=Math.floor(G.day);
+  ctx.lineWidth=0.9; ctx.strokeStyle='rgba(60,52,44,.55)';
+  for(const L of ISO){
+    if(!fc&&L.v>today)continue;
+    ctx.beginPath();
+    for(const s of L.segs){ const a=px(s[0][0],s[0][1]),b=px(s[1][0],s[1][1]); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.font='600 10px '+FONT; ctx.fillStyle=C.ink2; ctx.textAlign='left'; ctx.textBaseline='middle';
+  const put=[];
+  for(const L of ISO){ if((!fc&&L.v>today)||!L.lab)continue; const [x,y]=px(L.lab[0],L.lab[1]); if(put.some(q=>Math.abs(q[0]-x)<34&&Math.abs(q[1]-y)<13))continue; put.push([x,y]); ctx.fillText(dShort(L.v),Math.min(x+3,W-4-ctx.measureText(dShort(L.v)).width),y); }
+}
+function drawMap(){
+  ctx.fillStyle=C.sea; ctx.fillRect(0,M.y0-2,W,H-M.y0+2);
+  // 経緯線（2度ごと）
+  ctx.strokeStyle=C.seaLine; ctx.lineWidth=0.6; ctx.beginPath();
+  for(let lo=130;lo<=146;lo+=2){ const [x]=px(lo,0); ctx.moveTo(x,M.y0); ctx.lineTo(x,M.y0+M.h); }
+  for(let la=32;la<=44;la+=2){ const [,y]=px(0,la); ctx.moveTo(0,y); ctx.lineTo(W,y); }
+  ctx.stroke();
+  ctx.fillStyle=C.land; ctx.fill(landPath);
+  drawBand();
+  ctx.strokeStyle=C.coast; ctx.lineWidth=1; ctx.stroke(landPath);
+  // 沖縄の挿入図
+  const B=OKI_BOX; ctx.fillStyle=C.sea; ctx.fillRect(B.x,B.y,B.w,B.h); ctx.strokeStyle=C.coast; ctx.lineWidth=0.8; ctx.strokeRect(B.x+.5,B.y+.5,B.w-1,B.h-1);
+  const nv=NAHA.v[SD.col];
+  ctx.fillStyle=nv!=null&&Math.floor(G.day)>nv+4?C.leaf:C.land; ctx.fill(okiPath); ctx.stroke(okiPath);
+  ctx.fillStyle=C.ink2; ctx.font='600 9.5px '+FONT; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText('那覇 ひかんざくら',B.x+5,B.y+4);
+  ctx.fillText(nv!=null?'満開 '+dShort(nv):'満開 観測なし',B.x+5,B.y+16);
+  // 凡例（日本海側の左上）
+  const lx=M.x0+8, ly=M.y0+8, fc=STAGES[G.stage].fc;
+  const items=fc?[['bud','つぼみ'],['half','3日以内に満開'],['full','満開'],['fall','散り始め'],['leaf','葉桜']]:[['bud','つぼみ'],['full','満開'],['fall','散り始め'],['leaf','葉桜']];
+  ctx.font='600 11px '+FONT; ctx.textBaseline='middle';
+  items.forEach((it,i)=>{ const y=ly+i*17; ctx.fillStyle=C[it[0]]; ctx.fillRect(lx,y,14,11); ctx.strokeStyle=C.ink2; ctx.lineWidth=.6; ctx.strokeRect(lx+.5,y+.5,13,10); ctx.fillStyle=C.ink; ctx.fillText(it[1],lx+19,y+6); });
+  const yl=ly+items.length*17+6;
+  ctx.strokeStyle='rgba(60,52,44,.7)'; ctx.lineWidth=.9; ctx.beginPath(); ctx.moveTo(lx,yl); ctx.lineTo(lx+14,yl); ctx.stroke();
+  ctx.fillStyle=C.ink; ctx.fillText(fc?'満開日の線（予想）':'満開になった日の線',lx+19,yl);
+  // 地点
+  const hov=G.drag?venueAt(G.drag.x,G.drag.y):null;
+  for(const s of SD.venues){
+    const [x,y]=px(s.lon,s.lat), done=G.done.find(d=>d.s===s);
+    if(done){ drawFlower(x,y,6); continue; }
+    ctx.beginPath(); ctx.arc(x,y,3.4,0,7); ctx.fillStyle=C.ink; ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,1.4,0,7); ctx.fillStyle='#fff'; ctx.fill();
+  }
+  // 敷いてあるシート
+  if(G.sheet){ const [x,y]=px(G.sheet.s.lon,G.sheet.s.lat); drawMiniSheet(x,y,1);
+    const left=G.sheet.party-Math.floor(G.day);
+    label(x,y-16,G.sheet.s.name+' 宴会'+dShort(G.sheet.party)+(left>0?'（あと'+left+'日）':''),false); }
+  if(G.drag){
+    const d=G.drag;
+    if(hov){ const [x,y]=px(hov.lon,hov.lat); ctx.beginPath(); ctx.arc(x,y,11,0,7); ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.stroke();
+      label(x,y-20,hov.name+'に敷く → 宴会'+dShort(Math.floor(G.day)+STAGES[G.stage].wait),true); }
+    drawMiniSheet(d.x,d.y,1.4,true);
+  }
+  // 冒頭のガイド（数秒で消える）
+  if(G.guide>0&&!G.sheet){
+    ctx.globalAlpha=Math.min(1,G.guide); const t=G.time;
+    const [x,y]=px(139.75,35.69);
+    ctx.font='700 13px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle=C.ink; ctx.fillRect(x-118,y+38,236,26);
+    ctx.fillStyle='#F3EFE4'; ctx.fillText('ブルーシートを地点までドラッグ',x,y+51);
+    ctx.globalAlpha=1;
+  }
+}
+function label(x,y,txt,strong){
+  ctx.font=(strong?'700 12px ':'600 11px ')+FONT; const w=ctx.measureText(txt).width+12;
+  let lx=Math.max(4,Math.min(W-4-w,x-w/2));
+  ctx.fillStyle=strong?C.ink:'rgba(243,239,228,.94)'; ctx.fillRect(lx,y-10,w,19);
+  if(!strong){ ctx.strokeStyle=C.ink; ctx.lineWidth=.8; ctx.strokeRect(lx+.5,y-9.5,w-1,18); }
+  ctx.fillStyle=strong?'#F3EFE4':C.ink; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(txt,lx+6,y);
+}
+function drawMiniSheet(x,y,sc,lift){
+  ctx.save(); ctx.translate(x,y); ctx.scale(sc,sc); ctx.rotate(-0.12);
+  if(lift){ ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(2,6,11,4,0,0,7); ctx.fill(); }
+  ctx.fillStyle=C.sheet; ctx.beginPath(); ctx.moveTo(-10,-6); ctx.lineTo(10,-7); ctx.lineTo(11,6); ctx.lineTo(-11,7); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle=C.sheetD; ctx.lineWidth=1; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,-6.5); ctx.lineTo(0.5,6.5); ctx.stroke();
+  ctx.fillStyle='#E9E4D4'; for(const [gx,gy] of [[-8,-4.5],[8,-5.5],[9,4.5],[-9,5]]){ ctx.beginPath(); ctx.arc(gx,gy,1,0,7); ctx.fill(); }
+  ctx.restore();
+}
+function drawFlower(x,y,r){
+  ctx.fillStyle='#F3A9BC'; ctx.strokeStyle='#9C4A60'; ctx.lineWidth=.8;
+  for(let i=0;i<5;i++){ const a=i*Math.PI*2/5-Math.PI/2; ctx.beginPath(); ctx.arc(x+Math.cos(a)*r*.55,y+Math.sin(a)*r*.55,r*.5,0,7); ctx.fill(); ctx.stroke(); }
+  ctx.beginPath(); ctx.arc(x,y,r*.28,0,7); ctx.fillStyle='#C8545F'; ctx.fill();
+}
+
+// ---- 現地の場面（上の窓）: 桜並木の公園 ----
+let SEED=1; const srand=()=>{ SEED=(SEED*16807)%2147483647; return (SEED-1)/2147483646; };
+// 桜の枝ぶり（固定の形。単位長で生成し、描くときに拡大）
+function genTree(seed){
+  SEED=seed; const segs=[],tips=[];
+  (function br(x,y,a,len,w,dep){
+    const x2=x+Math.cos(a)*len, y2=y+Math.sin(a)*len; segs.push([x,y,x2,y2,w]);
+    if(dep===0){ tips.push([x2,y2]); return; }
+    const n=dep>4?2:2+(srand()<0.45?1:0);
+    for(let i=0;i<n;i++){ const na=a+(i-(n-1)/2)*(dep>4?0.75:0.6)+(srand()-.5)*0.35; br(x2,y2,na,len*(0.66+srand()*0.14),w*0.66,dep-1); }
+  })(0,0,-Math.PI/2+(srand()-.5)*0.1,0.26,0.075,6);
+  const blobs=[]; tips.forEach((t,k)=>{ for(let j=0;j<3;j++)blobs.push({x:t[0]+(srand()-.5)*0.09,y:t[1]+(srand()-.6)*0.07,r:0.034+srand()*0.028,o:srand(),tip:j===0}); });
+  return {segs,tips,blobs};
+}
+const TREES=[genTree(7),genTree(29),genTree(101)];
+const CITY=(()=>{ SEED=11; const b=[]; let x=-4; while(x<430){ const w=18+srand()*30; b.push([x,w,0.35+srand()*0.65,srand()]); x+=w+2; } return b; })();
+const petals=[];
+function stationState(s){ return s?Math.floor(G.day)-s.v[SD.col]:null; }
+function bloomParts(d){ // 開き具合・散り具合・葉の量（0〜1）
+  if(d==null)return null;
+  return {open:d<-7?0:d<0?(d+8)/8:1, lost:d>2?Math.min(1,(d-2)/4):0, leaf:d>3?Math.min(1,(d-3)/4):0};
+}
+function drawPanel(){
+  const P=PANEL, y0=P.y, h=P.h, gy=y0+h*0.47, bot=y0+h;
+  ctx.save(); ctx.beginPath(); ctx.rect(0,y0,W,h); ctx.clip();
+  const hovS=G.drag?venueAt(G.drag.x,G.drag.y):null;
+  const s=G.anim?G.anim.sh.s:hovS||(G.sheet&&G.sheet.s)||null;
+  const d=G.anim?G.anim.d:stationState(s), st=d==null?null:bloomState(d), bp=bloomParts(d);
+  // 空
+  const sky=ctx.createLinearGradient(0,y0,0,gy); sky.addColorStop(0,'#B9D2E4'); sky.addColorStop(1,'#EDF1EC');
+  ctx.fillStyle=sky; ctx.fillRect(0,y0,W,gy-y0);
+  // 奥の街並み
+  for(const [x,w,hh,k] of CITY){ const bh=h*0.16*hh; ctx.fillStyle=k>0.5?'#C3CDD5':'#B6C2CC'; ctx.fillRect(x,gy-bh,w,bh);
+    ctx.fillStyle='rgba(236,241,245,.75)'; for(let wy=gy-bh+4;wy<gy-6;wy+=6)for(let wx=x+3;wx<x+w-4;wx+=6)ctx.fillRect(wx,wy,2.5,2.5); }
+  // 地面と園路
+  ctx.fillStyle='#B3B886'; ctx.fillRect(0,gy,W,bot-gy);
+  ctx.fillStyle='#D9CFB2'; ctx.beginPath(); ctx.moveTo(0,gy+h*0.05); ctx.lineTo(W,gy+h*0.03); ctx.lineTo(W,gy+h*0.11); ctx.lineTo(0,gy+h*0.15); ctx.closePath(); ctx.fill();
+  // 奥の桜並木
+  for(let i=0;i<13;i++){ const x=-10+i*36+(i%2)*8; farTree(x,gy+h*0.04,h*0.2*(0.85+(i%3)*0.1),st); }
+  // 提灯の列
+  lanterns(y0+h*0.30,h);
+  // 屋台
+  stall(W*0.03,gy+h*0.13,h);
+  // 手前左の桜
+  drawTree(W*0.06,gy+h*0.2,h*0.62,bp,TREES[1],false);
+  // ほかのグループ（満開ほど人が多い）
+  const crowd=st==='full'?2:st==='half'||st==='fall'?1:0;
+  if(crowd>=1) otherGroup(W*0.64,gy+h*0.2,h,1);
+  // 主役の桜
+  const treeX=W*0.8, treeY=gy+h*0.3, ts=Math.min(h*1.05,300);
+  drawTree(treeX,treeY,ts,bp,TREES[0],true);
+  if(crowd>=2) otherGroup(W*0.16,gy+h*0.36,h,0);
+  // シートと人
+  const shX=W*0.43, shY=gy+(bot-gy)*0.66, shW=Math.min(220,W*0.5), sc=Math.max(0.6,Math.min(1.2,h/310));
+  const onSheet=G.sheet&&(!hovS||hovS===G.sheet.s)||G.anim;
+  if(onSheet) drawSheetScene(shX,shY,shW,(bot-gy)*0.42);
+  drawPeople(shX,shY,shW,sc,onSheet,s,d);
+  bin(W*0.95,bot-6,h);
+  updatePetals(s,d,treeX,treeY-ts*0.7,ts,y0,h);
+  // 現地テロップ
+  ctx.fillStyle='rgba(34,32,28,.86)'; ctx.fillRect(0,y0+8,W*0.66,s?44:28);
+  ctx.fillStyle='#F3EFE4'; ctx.textAlign='left'; ctx.textBaseline='middle';
+  if(s){
+    ctx.font='700 16px '+FONT; ctx.fillText(s.name+(s.sp==='e'?'（えぞやまざくら）':''),12,y0+22);
+    ctx.font='600 12.5px '+FONT;
+    let sub;
+    if(G.anim) sub='宴会 '+dLabel(G.anim.sh.party);
+    else if(hovS&&(!G.sheet||hovS!==G.sheet.s)) sub=(G.sheet?'敷き直すと場所取りは1日目から':'ここに敷くと宴会は '+dLabel(Math.floor(G.day)+STAGES[G.stage].wait));
+    else sub='場所取り '+(Math.floor(G.day)-G.sheet.placed+1)+'日目 ・ 宴会 '+dLabel(G.sheet.party);
+    ctx.fillText(sub,12,y0+41);
+  } else { ctx.font='600 13px '+FONT; ctx.fillText('幹事 ・ シートはまだ手元',12,y0+22); }
+  ctx.restore();
+  ctx.fillStyle=C.ink; ctx.fillRect(0,y0+h,W,1);
+}
+function farTree(x,y,s,st){
+  ctx.strokeStyle='#6B5A50'; ctx.lineWidth=Math.max(1.2,s*0.05); ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y-s*0.45); ctx.moveTo(x,y-s*0.3); ctx.lineTo(x-s*0.3,y-s*0.6); ctx.moveTo(x,y-s*0.35); ctx.lineTo(x+s*0.32,y-s*0.62); ctx.stroke();
+  const col=st==null?null:st==='bud'?'rgba(150,104,112,.55)':st==='half'?'#EBC9D0':st==='full'?'#F2BACA':st==='fall'?'#E8D0CC':'#9CBB80';
+  if(!col)return;
+  ctx.fillStyle=col;
+  for(const [dx,dy,r] of [[-0.3,-0.62,0.25],[0.3,-0.64,0.26],[0,-0.78,0.3],[-0.1,-0.55,0.22],[0.15,-0.52,0.2]]){ ctx.beginPath(); ctx.arc(x+dx*s,y+dy*s,r*s,0,7); ctx.fill(); }
+}
+function lanterns(y,h){
+  const sag=h*0.04, step=40;
+  ctx.strokeStyle='#4A3F38'; ctx.lineWidth=1; ctx.beginPath();
+  for(let x=0;x<=W;x+=10){ const t=(x%(step*3))/(step*3); const yy=y+Math.sin(t*Math.PI)*sag; x?ctx.lineTo(x,yy):ctx.moveTo(x,yy); }
+  ctx.stroke();
+  const lh=Math.max(12,h*0.055), lw=lh*0.72;
+  for(let x=step/2;x<W;x+=step){
+    const t=(x%(step*3))/(step*3), yy=y+Math.sin(t*Math.PI)*sag;
+    ctx.fillStyle='#2E2622'; ctx.fillRect(x-lw*0.3,yy,lw*0.6,lh*0.14); ctx.fillRect(x-lw*0.3,yy+lh*1.0,lw*0.6,lh*0.14);
+    ctx.fillStyle='#FFF4E2'; ctx.beginPath(); ctx.ellipse(x,yy+lh*0.57,lw/2,lh*0.47,0,0,7); ctx.fill();
+    ctx.strokeStyle='#C24A3A'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.ellipse(x,yy+lh*0.57,lw/2,lh*0.47,0,0,7); ctx.stroke();
+    ctx.fillStyle='#C24A3A'; ctx.fillRect(x-lw*0.08,yy+lh*0.3,lw*0.16,lh*0.55);
+  }
+}
+function stall(x,y,h){ // たこ焼の屋台
+  const w=h*0.36, hh=h*0.24;
+  ctx.fillStyle='#8C6A4E'; ctx.fillRect(x+2,y-hh,3,hh); ctx.fillRect(x+w-5,y-hh,3,hh);
+  const p={build:'std',age:'mid',sex:'m',hair:'#2B2420',top:'#F2F0EA',low:'#3A3A3A',sleeve:1};
+  drawPerson(x+w*0.5,y-hh*0.05,h/520,p,'stand',1,{});
+  ctx.fillStyle='#E6DCC4'; ctx.fillRect(x,y-hh*0.42,w,hh*0.42);
+  ctx.fillStyle='#C24A3A'; ctx.fillRect(x,y-hh*0.42,w,hh*0.1);
+  ctx.fillStyle='#2E2622'; ctx.font='700 '+Math.max(9,hh*0.2)+'px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('たこ焼',x+w/2,y-hh*0.18);
+  const aw=hh*0.22; // 紅白の日よけ
+  for(let i=0;i<6;i++){ ctx.fillStyle=i%2?'#FFF6EA':'#C9443A'; ctx.beginPath(); const sx=x-4+i*(w+8)/6, ex=sx+(w+8)/6;
+    ctx.moveTo(sx,y-hh); ctx.lineTo(ex,y-hh); ctx.lineTo(ex,y-hh+aw); ctx.quadraticCurveTo((sx+ex)/2,y-hh+aw+5,sx,y-hh+aw); ctx.closePath(); ctx.fill(); }
+}
+function bin(x,y,h){ // 公園の網かごのごみ箱
+  const s=h/330, w=22*s, hh=34*s;
+  ctx.fillStyle='#4F7A58'; ctx.beginPath(); ctx.moveTo(x-w/2,y-hh); ctx.lineTo(x+w/2,y-hh); ctx.lineTo(x+w*0.42,y); ctx.lineTo(x-w*0.42,y); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#3B5E44'; ctx.lineWidth=1; ctx.beginPath(); for(let i=1;i<5;i++){ const xx=x-w/2+i*w/5; ctx.moveTo(xx,y-hh); ctx.lineTo(xx*0.92+x*0.08,y); } for(let j=1;j<4;j++){ const yy=y-hh+j*hh/4; ctx.moveTo(x-w/2+2,yy); ctx.lineTo(x+w/2-2,yy); } ctx.stroke();
+  ctx.fillStyle='#3B5E44'; ctx.beginPath(); ctx.ellipse(x,y-hh,w/2,3*s,0,0,7); ctx.fill();
+}
+const OTHERS=[
+  [{build:'std',age:'mid',sex:'m',hair:'#2A2420',top:'#5E7A5A',low:'#4A4E5A'},{build:'std',age:'mid',sex:'f',hair:'#4A3428',top:'#C98A5A',low:'#5A5E6A'},{build:'thin',age:'child',sex:'m',hair:'#2A2420',top:'#E1BE48',low:'#3D6A9A'}],
+  [{build:'thin',age:'old',sex:'m',hair:'#C8C3BA',top:'#7A6A58',low:'#4A4640'},{build:'big',age:'old',sex:'f',hair:'#A8A29A',top:'#5E7E8E',low:'#4A4640'}],
+];
+function otherGroup(x,y,h,k){
+  const g=OTHERS[k], sc=h/560, w=h*0.32;
+  drawSheetScene(x,y,w,h*0.07);
+  g.forEach((p,i)=>drawPerson(x+(i-(g.length-1)/2)*w*0.32,y+h*0.012,sc,p,'sit',i%2?-1:1,{}));
+}
+function drawTree(x,y,s,bp,T,main){
+  const SX=1.3;
+  ctx.strokeStyle='#4E3B2E'; ctx.lineCap='round';
+  for(const [x1,y1,x2,y2,w] of T.segs){ ctx.lineWidth=Math.max(0.8,w*s); ctx.beginPath(); ctx.moveTo(x+x1*s*SX,y+y1*s); ctx.lineTo(x+x2*s*SX,y+y2*s); ctx.stroke(); }
+  if(main){ ctx.fillStyle='rgba(0,0,0,.10)'; ctx.beginPath(); ctx.ellipse(x,y+2,s*0.5,s*0.05,0,0,7); ctx.fill(); }
+  if(!bp)return;
+  const {open,lost,leaf}=bp;
+  // 花の塊の下側の影（量感）
+  if(open>0.6&&lost<0.8){ ctx.fillStyle='#DE93A9'; for(const b of T.blobs){ if(b.o>open||b.o<lost||b.o<leaf)continue; ctx.beginPath(); ctx.arc(x+b.x*s*SX,y+b.y*s+b.r*s*0.35,b.r*s,0,7); ctx.fill(); } }
+  for(const b of T.blobs){
+    const bx=x+b.x*s*SX, by=y+b.y*s, br=b.r*s;
+    if(b.o>open){ // つぼみ: 赤みの強い膨らみ（満開が近いほど大きい）
+      if(!b.tip)continue;
+      const k=0.5+open*0.9, rx=Math.max(1.4,s*0.007*k), ry=rx*1.5;
+      ctx.fillStyle='#5E7A4A'; ctx.beginPath(); ctx.ellipse(bx,by+ry*0.7,rx*0.8,ry*0.45,0,0,7); ctx.fill();
+      ctx.fillStyle=open>0.5?'#D8708C':'#A8445C'; ctx.beginPath(); ctx.ellipse(bx,by,rx,ry,0,0,7); ctx.fill();
+      for(const o of [-1,1]){ ctx.beginPath(); ctx.ellipse(bx+o*rx*1.6,by+ry*0.4,rx*0.8,ry*0.8,o*0.5,0,7); ctx.fill(); }
+      continue; }
+    if(b.o<leaf){ ctx.fillStyle=b.o<leaf*0.5?'#7BA562':'#94B972'; ctx.beginPath(); ctx.arc(bx,by,br*0.9,0,7); ctx.fill(); continue; }
+    if(b.o<lost)continue;
+    ctx.fillStyle=b.o>0.55?'#F8D3DC':'#F1B6C6'; ctx.beginPath(); ctx.arc(bx,by,br,0,7); ctx.fill();
+    if(main&&br>6){ ctx.fillStyle='rgba(255,255,255,.55)'; ctx.beginPath(); ctx.arc(bx-br*0.3,by-br*0.35,br*0.28,0,7); ctx.fill(); }
+  }
+  if(main&&bp.lost>0){ ctx.fillStyle='rgba(244,190,204,.9)'; const n=Math.round(10+bp.lost*40); SEED=3;
+    for(let i=0;i<n;i++){ const px_=x+(srand()-.5)*s*1.1, py=y+srand()*s*0.14; ctx.beginPath(); ctx.ellipse(px_,py,2.4,1.3,srand()*3,0,7); ctx.fill(); } }
+}
+function updatePetals(s,d,cx,cy,R,y0,h){
+  if(s&&d!=null){
+    const rate=d<0?0:d<=2?0.3:d<=4?2.2:d<=7?0.6:0;
+    if(Math.random()<rate*0.5&&petals.length<160) petals.push({x:cx+(Math.random()-.5)*R*1.0,y:cy+(Math.random()-.3)*R*0.4,vx:-0.3-Math.random()*0.6,vy:0.35+Math.random()*0.4,a:Math.random()*6});
+  }
+  ctx.fillStyle='#F4B9C8';
+  for(let i=petals.length-1;i>=0;i--){ const p=petals[i];
+    if(G.screen==='play'){ p.x+=p.vx+Math.sin(p.a)*0.4; p.y+=p.vy; p.a+=0.08; }
+    if(p.y>y0+h||p.x<-10){ petals.splice(i,1); continue; }
+    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.a); ctx.beginPath(); ctx.ellipse(0,0,3,1.6,0,0,7); ctx.fill(); ctx.restore(); }
+}
+function drawSheetScene(x,y,w,hh){
+  const t=hh*0.9;
+  ctx.fillStyle=C.sheet; ctx.beginPath(); ctx.moveTo(x-w*0.42,y-t*0.5); ctx.lineTo(x+w*0.42,y-t*0.52); ctx.lineTo(x+w*0.52,y+t*0.5); ctx.lineTo(x-w*0.52,y+t*0.52); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=C.sheetD; ctx.beginPath(); ctx.moveTo(x-w*0.52,y+t*0.52); ctx.lineTo(x+w*0.52,y+t*0.5); ctx.lineTo(x+w*0.52,y+t*0.56); ctx.lineTo(x-w*0.52,y+t*0.58); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x-w*0.02,y-t*0.51); ctx.lineTo(x,y+t*0.51); ctx.moveTo(x-w*0.47,y); ctx.lineTo(x+w*0.47,y-t*0.01); ctx.stroke();
+  ctx.fillStyle='#E9E4D4'; for(const [gx,gy] of [[-0.4,-0.46],[0.4,-0.48],[0.49,0.45],[-0.49,0.47]]){ ctx.beginPath(); ctx.arc(x+gx*w,y+gy*t,2,0,7); ctx.fill(); }
+}
+// 人物: 体型(thin/std/big)・年齢(young/mid/old)・髪・服・持ち物をパスで描く。pose: sit/stand/cheer/slump
+const STAFF=[
+  {who:'新人',build:'thin',age:'young',sex:'m',hair:'#2A2420',top:'#2E3A52',low:'#2E3A52',tie:'#7A2E36'},
+  {who:'部長',build:'big',age:'old',sex:'m',hair:'#B9B4AA',top:'#4A4642',low:'#3A3734',tie:'#3D5A80',glasses:1},
+  {who:'主任',build:'std',age:'young',sex:'f',hair:'#5A3A26',top:'#D9C6A5',low:'#6C6A7A'},
+  {who:'係長',build:'std',age:'mid',sex:'m',hair:'#2E2A26',top:'#F2F0EA',low:'#4C5566',glasses:1,sleeve:1},
+  {who:'課長',build:'std',age:'old',sex:'f',hair:'#9A938C',top:'#8C5A6A',low:'#3E3A40'},
+];
+function drawPeople(x,y,w,sc,onSheet,s,d){
+  const A=G.anim;
+  if(!onSheet){ // シートを抱えて立つ幹事（新人）
+    drawPerson(x-w*0.1,y+18*sc,sc*1.05,STAFF[0],'stand',1,{roll:1});
+    return;
+  }
+  if(!A){ // 場所取り中: 新人ひとり、水筒と座布団
+    drawPerson(x-w*0.18,y+6*sc,sc,STAFF[0],'sit',1,{thermos:1});
+    return;
+  }
+  const arrive=Math.min(1,A.t/0.5);
+  const seats=[[-0.32,-0.12],[0.0,-0.18],[0.28,-0.1],[-0.16,0.22],[0.16,0.24]];
+  const pose=A.t<0.5?'sit':A.ok?'cheer':'slump';
+  STAFF.forEach((p,i)=>{
+    const [sx,sy]=seats[i]; const dx=i===0?0:(1-arrive)*(-W*0.6-i*30);
+    const bob=A.ok&&A.t>0.5?Math.sin((A.t*8)+i)*1.5:0;
+    drawPerson(x+sx*w+dx,y+sy*w*0.55+bob,sc*(sy>0?1.05:0.95),p,i===0&&!A.ok?'slump':pose,sx<0?1:-1,{can:A.ok&&i%2===1,cup:A.ok&&i%2===0});
+  });
+  if(A.t>0.6){
+    const lines=A.ok?'かんぱーい！':A.state==='leaf'?'……葉っぱだ':A.state==='fall'?'満開、昨日だって':A.state==='half'?'まだちらほら……':'つぼみ、だね……';
+    bubble(x-w*0.05,y-0.18*w*0.55-66*sc-40,lines,A.ok);
+  }
+}
+function bubble(x,y,txt,ok){
+  ctx.font='700 14px '+FONT; const tw=ctx.measureText(txt).width+22, th=28;
+  const bx=Math.max(6,Math.min(W-6-tw,x-tw/2));
+  ctx.fillStyle='#FFFDF6'; ctx.strokeStyle=C.ink; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(bx+4,y); ctx.lineTo(bx+tw-4,y); ctx.quadraticCurveTo(bx+tw,y,bx+tw,y+4); ctx.lineTo(bx+tw,y+th-4); ctx.quadraticCurveTo(bx+tw,y+th,bx+tw-4,y+th);
+  ctx.lineTo(x+8,y+th); ctx.lineTo(x-2,y+th+9); ctx.lineTo(x,y+th); ctx.lineTo(bx+4,y+th); ctx.quadraticCurveTo(bx,y+th,bx,y+th-4); ctx.lineTo(bx,y+4); ctx.quadraticCurveTo(bx,y,bx+4,y); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle=C.ink; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(txt,bx+tw/2,y+th/2+1);
+}
+function shade(hex,k){ const c=rgb(hex); return 'rgb('+c.map(v=>Math.round(v*k)).join(',')+')'; }
+function drawPerson(x,y,s,p,pose,face,item){
+  item=item||{};
+  if(p.age==='child')s*=0.66;
+  const bw=p.build==='thin'?0.82:p.build==='big'?1.32:1, old=p.age==='old';
+  const slump=pose==='slump', stand=pose==='stand';
+  ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+  const skin='#EBC6A2', skinD='#D9AE88';
+  const sw=13*bw, hw=(p.build==='big'?15:11)*bw;
+  const torsoH=stand?36:34, hipY=stand?-44:0, shY=hipY-torsoH+(slump?5:0)+(old?2:0);
+  if(stand){ // 脚と靴
+    ctx.strokeStyle=p.low; ctx.lineCap='round'; ctx.lineWidth=7*Math.min(bw,1.1);
+    ctx.beginPath(); ctx.moveTo(-4,hipY); ctx.lineTo(-5,-3); ctx.moveTo(4,hipY); ctx.lineTo(6,-3); ctx.stroke();
+    ctx.fillStyle='#2B2420'; ctx.beginPath(); ctx.ellipse(-6,-1,6,3,0,0,7); ctx.ellipse(8,-1,6,3,0,0,7); ctx.fill();
+  } else { // あぐら／横座り
+    ctx.fillStyle=p.low; ctx.beginPath();
+    if(p.sex==='f'){ ctx.ellipse(face*6,2,17*bw+3,6,0,0,7); }
+    else { ctx.moveTo(-21*bw,3); ctx.quadraticCurveTo(-20*bw,-8,0,-4); ctx.quadraticCurveTo(20*bw,-8,21*bw,3); ctx.quadraticCurveTo(0,10,-21*bw,3); }
+    ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(0,6,22*bw,3,0,0,7); ctx.fill();
+  }
+  // 胴体
+  const lean=(slump?4:old?3:0)*face;
+  ctx.fillStyle=p.top; ctx.beginPath();
+  ctx.moveTo(-hw,hipY);
+  ctx.lineTo(-sw+lean,shY+4); ctx.quadraticCurveTo(-sw+lean,shY,-sw+5+lean,shY); ctx.lineTo(sw-5+lean,shY); ctx.quadraticCurveTo(sw+lean,shY,sw+lean,shY+4);
+  if(p.build==='big'){ ctx.quadraticCurveTo(sw+7,hipY-12,hw,hipY); } else ctx.lineTo(hw,hipY);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.13)'; ctx.beginPath(); ctx.moveTo(lean,shY); ctx.lineTo(sw-5+lean,shY); ctx.quadraticCurveTo(sw+lean,shY,sw+lean,shY+4); ctx.lineTo(hw,hipY); ctx.lineTo(2,hipY); ctx.closePath(); ctx.fill();
+  if(p.tie){ ctx.fillStyle='#F2F0EA'; ctx.beginPath(); ctx.moveTo(lean-4,shY); ctx.lineTo(lean+4,shY); ctx.lineTo(lean,shY+9); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=p.tie; ctx.beginPath(); ctx.moveTo(lean-1.5,shY+1); ctx.lineTo(lean+1.5,shY+1); ctx.lineTo(lean+2.5,shY+16); ctx.lineTo(lean,shY+19); ctx.lineTo(lean-2.5,shY+16); ctx.closePath(); ctx.fill(); }
+  // 腕
+  const armC=p.sleeve?skin:p.top;
+  ctx.strokeStyle=shade(p.top,0.85); ctx.lineCap='round'; ctx.lineWidth=6*Math.min(bw,1.15);
+  const L=[-sw+2+lean,shY+4], R=[sw-2+lean,shY+4];
+  const arm=(sx,sy,ex,ey,mx,my)=>{ ctx.strokeStyle=shade(p.top,0.85); ctx.beginPath(); ctx.moveTo(sx,sy); ctx.quadraticCurveTo(mx,my,ex,ey); ctx.stroke(); if(p.sleeve){ ctx.strokeStyle=skin; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo((mx+ex)/2,(my+ey)/2); ctx.lineTo(ex,ey); ctx.stroke(); ctx.lineWidth=6*Math.min(bw,1.15);} ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(ex,ey,3,0,7); ctx.fill(); };
+  if(pose==='cheer'){
+    arm(L[0],L[1],L[0]-6,hipY-6,L[0]-8,hipY-18);
+    arm(R[0],R[1],R[0]+8,shY-20,R[0]+12,shY-4);
+    if(item.can){ ctx.fillStyle='#C9CCD0'; ctx.beginPath(); ctx.moveTo(R[0]+5,shY-31); ctx.lineTo(R[0]+11,shY-31); ctx.lineTo(R[0]+11,shY-19); ctx.lineTo(R[0]+5,shY-19); ctx.closePath(); ctx.fill(); ctx.fillStyle='#D8B23A'; ctx.fillRect(R[0]+5,shY-27,6,4); }
+    else { ctx.fillStyle='#FFFFFF'; ctx.strokeStyle='#BDB6A6'; ctx.lineWidth=.8; ctx.beginPath(); ctx.moveTo(R[0]+4,shY-31); ctx.lineTo(R[0]+12,shY-31); ctx.lineTo(R[0]+11,shY-20); ctx.lineTo(R[0]+5,shY-20); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  } else if(slump){
+    arm(L[0],L[1],-8+lean,hipY-3,L[0]-3,hipY-10); arm(R[0],R[1],8+lean,hipY-3,R[0]+3,hipY-10);
+  } else if(stand){
+    arm(L[0],L[1],L[0]-2,hipY+4,L[0]-5,hipY-12);
+    if(item.roll){ // 丸めたブルーシートを小脇に
+      ctx.save(); ctx.translate(R[0]+3,hipY-12); ctx.rotate(-0.35);
+      ctx.fillStyle=C.sheet; ctx.beginPath(); ctx.moveTo(-26,-6); ctx.lineTo(18,-6); ctx.quadraticCurveTo(24,0,18,6); ctx.lineTo(-26,6); ctx.quadraticCurveTo(-31,0,-26,-6); ctx.fill();
+      ctx.fillStyle=C.sheetD; ctx.beginPath(); ctx.ellipse(18,0,4,6,0,0,7); ctx.fill(); ctx.strokeStyle='#E9E4D4'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(-8,-6); ctx.lineTo(-8,6); ctx.moveTo(6,-6); ctx.lineTo(6,6); ctx.stroke();
+      ctx.restore();
+      arm(R[0],R[1],R[0]+2,hipY-10,R[0]+6,hipY-22);
+    } else arm(R[0],R[1],R[0]+2,hipY+4,R[0]+5,hipY-12);
+  } else {
+    arm(L[0],L[1],-10*bw,hipY-4,L[0]-4,hipY-14); arm(R[0],R[1],10*bw,hipY-4,R[0]+4,hipY-14);
+    if(item.thermos){ ctx.fillStyle='#8A9A6E'; ctx.beginPath(); ctx.moveTo(22,-18); ctx.lineTo(29,-18); ctx.lineTo(29,2); ctx.quadraticCurveTo(25.5,4,22,2); ctx.closePath(); ctx.fill(); ctx.fillStyle='#4A4A44'; ctx.fillRect(22,-21,7,4); }
+  }
+  // 首と頭
+  const hr=p.age==='child'?11:p.build==='big'?9.5:8.6, hx=lean*1.4+(slump?face*2:0), hy=shY-hr-(slump?-3:2);
+  ctx.fillStyle=skinD; ctx.fillRect(hx-2.5,shY-4,5,5);
+  if(p.sex==='f'&&p.age!=='old'){ ctx.fillStyle=p.hair; ctx.beginPath(); ctx.ellipse(hx-face*1.5,hy+5,hr+2,hr+5,0,0,7); ctx.fill(); }
+  ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(hx,hy,hr,0,7); ctx.fill();
+  ctx.fillStyle=skinD; ctx.beginPath(); ctx.arc(hx-face*(hr-1),hy+1,2,0,7); ctx.fill(); // 耳
+  // 髪
+  ctx.fillStyle=p.hair; ctx.beginPath();
+  if(p.sex==='m'&&old){ ctx.arc(hx,hy,hr+0.5,Math.PI*0.95,Math.PI*1.2); ctx.lineTo(hx,hy); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(hx,hy,hr+0.5,Math.PI*1.8,Math.PI*2.05); ctx.lineTo(hx,hy); ctx.closePath(); }
+  else if(p.sex==='f'&&old){ for(let i=0;i<6;i++){ const a=Math.PI*(1.05+i*0.18); ctx.moveTo(hx+Math.cos(a)*hr,hy+Math.sin(a)*hr); ctx.arc(hx+Math.cos(a)*hr*0.85,hy+Math.sin(a)*hr*0.85,4,0,7); } }
+  else { ctx.arc(hx,hy,hr+0.8,Math.PI*1.02,Math.PI*1.98); ctx.quadraticCurveTo(hx+face*2,hy-hr*0.3,hx-face*hr*0.2,hy-hr*0.45); ctx.closePath(); }
+  ctx.fill();
+  if(p.sex==='f'&&!old){ ctx.beginPath(); ctx.arc(hx-face*hr*0.6,hy-hr*0.75,4,0,7); ctx.fill(); }
+  // 顔
+  const fx=hx+face*2.5, eyeY=hy+(slump?1.5:0);
+  ctx.fillStyle='#2B2420';
+  if(slump){ ctx.fillRect(fx-4,eyeY,3,1.2); ctx.fillRect(fx+1.5,eyeY,3,1.2); }
+  else { ctx.beginPath(); ctx.arc(fx-2.8,eyeY,1.1,0,7); ctx.arc(fx+2.8,eyeY,1.1,0,7); ctx.fill(); }
+  if(p.glasses){ ctx.strokeStyle='#2B2420'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.arc(fx-2.8,eyeY,2.4,0,7); ctx.moveTo(fx+5.2,eyeY); ctx.arc(fx+2.8,eyeY,2.4,0,7); ctx.stroke(); }
+  ctx.strokeStyle='#8E5A48'; ctx.lineWidth=1.1; ctx.beginPath();
+  if(pose==='cheer'){ ctx.arc(fx,hy+3.2,2.6,0.15,Math.PI-0.15); } else if(slump){ ctx.arc(fx,hy+6.5,2.2,Math.PI+0.3,-0.3); } else { ctx.moveTo(fx-1.8,hy+4.5); ctx.lineTo(fx+1.8,hy+4.5); }
+  ctx.stroke();
+  if(old){ ctx.strokeStyle='rgba(120,80,60,.35)'; ctx.lineWidth=.6; ctx.beginPath(); ctx.moveTo(fx-4,hy-3.5); ctx.lineTo(fx+4,hy-3.5); ctx.stroke(); }
+  ctx.restore();
+}
+
+function draw(){
+  ctx.fillStyle='#D6E0E2'; ctx.fillRect(0,0,W,H);
+  if(!SD){ SD=stageData(0); buildGrid(SD.st); G.day=md2d('4/2'); }
+  drawPanel();
+  drawMap();
+  if(G.screen==='play'||G.screen==='pause'||G.screen==='result'){
+    const st=STAGES[G.stage];
+    const day='<span>'+dLabel(G.day)+'</span>';
+    UI.hud('さくら情報',st.name+' '+(G.stage+1)+'/'+STAGES.length,day+'　宴会 '+G.done.length+'/'+st.need);
+  }
+}
+
+// ---- メインループ ----
+function frame(ts){
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.05):0; lastTs=ts;
+  if(G.screen==='play') update(dt);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle=getComputedStyle(document.body).backgroundColor; ctx.fillRect(0,0,VW,VH);
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR,TY*DPR);
+  draw();
+  requestAnimationFrame(frame);
+}
+window.addEventListener('resize',resize); resize();
+showTitle();
+requestAnimationFrame(frame);
+</script>
 </body>
 </html>

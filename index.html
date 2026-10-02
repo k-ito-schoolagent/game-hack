@@ -2,101 +2,308 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GAME HACK — あるあるを物理にするゲーム工房</title>
-<meta name="description" content="現実のシステムを観察し、そのルールを物理として実装し、技術でクリアするゲーム集。参加型リポジトリ — issue・PR の練習歓迎。">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GAME HACK — あるあるを、物理にする。</title>
+<meta name="description" content="満員電車、ハンコ決裁、年賀状、桜前線。全員が知っている現実のしくみを、そのまま物理法則にしたスマホ用ミニゲーム集。参加型リポジトリ — issue・PR の練習歓迎。">
+<meta name="theme-color" content="#F3EFE4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1D1B18" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>遊</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<script>
+/* テーマ: 保存値 > OS 設定。描画前に決めてチラつきを防ぐ */
+try{const t=localStorage.getItem('gh-theme');if(t)document.documentElement.dataset.theme=t;}catch(_){}
+</script>
 <style>
-  :root { --ink:#eaf3fc; --bg:#0d1526; --panel:#16233c; --accent:#ffb300; --green:#7fb069; --red:#e24b4a; }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font-family: system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; line-height:1.7; }
-  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 18px 64px; }
-  header { text-align:center; margin-bottom: 28px; }
-  h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: .03em; }
-  .tagline { color:#a9c2de; font-size: 14.5px; margin: 0; }
-  .formula {
-    display:grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin: 22px 0 30px;
-  }
-  .formula div { background:var(--panel); border-radius:10px; padding:10px 12px; font-size:12.5px; color:#c9dcf2; }
-  .formula b { display:block; color:var(--accent); font-size:13px; margin-bottom:2px; }
-  h2 { font-size:19px; margin:30px 0 12px; border-left: 4px solid var(--accent); padding-left:10px; }
-  .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
-  .card {
-    display:block; background:var(--panel); border:1px solid rgba(255,255,255,.1); border-radius:14px;
-    padding:16px; color:inherit; text-decoration:none; transition: transform .12s, border-color .12s;
-  }
-  .card:hover { transform: translateY(-2px); border-color: var(--accent); }
-  .card.spec { opacity:.75; border-style:dashed; }
-  .card h3 { margin:0 0 6px; font-size:16.5px; }
-  .card p { margin:0 0 10px; font-size:13px; color:#c9dcf2; }
-  .tags { display:flex; flex-wrap:wrap; gap:5px; }
-  .tags span { font-size:11px; background:rgba(255,255,255,.09); border-radius:20px; padding:2px 9px; color:#a9c2de; }
-  .badge { display:inline-block; font-size:11px; font-weight:700; border-radius:6px; padding:2px 8px; margin-bottom:8px; }
-  .badge.play { background:var(--green); color:#0d1526; }
-  .badge.spec { background:transparent; border:1px solid var(--accent); color:var(--accent); }
-  footer { margin-top:40px; font-size:12.5px; color:#7e96b5; text-align:center; }
-  footer a { color:#a9c2de; }
-  .cta { text-align:center; margin-top:26px; }
-  .cta a {
-    display:inline-block; background:var(--accent); color:#12233f; font-weight:700; text-decoration:none;
-    border-radius:10px; padding:12px 26px; font-size:15px;
-  }
+/* 世界観: 業務帳票。紙 × 墨 × 朱。朱は判子にだけ使う */
+:root{
+  --paper:#F3EFE4; --paper2:#EAE3D2; --ink:#22201C; --ink2:#5E584D; --ink3:#8A8273; --rule:#CDC3AC; --shu:#C8372D;
+  --head:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --body:"BIZ UDGothic","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --ease:cubic-bezier(.87,0,.13,1);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--paper:#1D1B18;--paper2:#26231F;--ink:#ECE6D8;--ink2:#B4AC9C;--ink3:#7F786B;--rule:#3B3730;--shu:#E0584B;color-scheme:dark}
+}
+:root[data-theme="dark"]{--paper:#1D1B18;--paper2:#26231F;--ink:#ECE6D8;--ink2:#B4AC9C;--ink3:#7F786B;--rule:#3B3730;--shu:#E0584B;color-scheme:dark}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.85;font-feature-settings:"palt" 0}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+/* 見出し帯 */
+.bar{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--ink)}
+.bar .wrap{display:flex;align-items:center;height:56px;gap:8px}
+.logo{font-family:var(--head);font-weight:900;font-size:18px;letter-spacing:.08em;text-decoration:none;margin-right:auto;display:flex;align-items:center;min-height:44px}
+.nav{display:none;gap:4px}
+.nav a{font-size:14px;text-decoration:none;padding:0 12px;min-height:44px;display:flex;align-items:center;color:var(--ink2)}
+.nav a:hover,.nav a.on{color:var(--ink);text-decoration:underline;text-underline-offset:6px}
+.iconbtn{width:44px;height:44px;border:0;background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer;font:inherit}
+.iconbtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6}
+.menu-btn{display:grid}
+@media (min-width:860px){.nav{display:flex}.menu-btn{display:none}}
+
+/* ドロワー */
+.drawer-bg{position:fixed;inset:0;background:rgba(20,18,15,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(84vw,340px);background:var(--paper);border-left:1px solid var(--ink);transform:translateX(calc(100% + 4px));visibility:hidden;transition:transform .32s var(--ease),visibility 0s .32s;z-index:41;padding:12px 0 calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column}
+.drawer .close{align-self:flex-end;margin-right:8px}
+.drawer a{display:flex;align-items:baseline;gap:14px;padding:14px 24px;text-decoration:none;font-family:var(--head);font-weight:700;font-size:20px;border-bottom:1px solid var(--rule)}
+.drawer a small{font-family:var(--body);font-weight:400;font-size:12px;color:var(--ink3);width:2em}
+.drawer a:first-of-type{border-top:1px solid var(--ink)}
+body.open .drawer{transform:none;visibility:visible;transition:transform .32s var(--ease)}
+body.open .drawer-bg{opacity:1;pointer-events:auto}
+
+/* 冒頭（全体で唯一の山） */
+.hero{padding:56px 0 48px;border-bottom:1px solid var(--ink)}
+.hero .wrap{position:relative}
+.issue{font-size:12.5px;letter-spacing:.16em;color:var(--ink2);margin:0 0 18px}
+.hero h1{font-family:var(--head);font-weight:900;font-size:clamp(46px,13vw,112px);line-height:1.08;letter-spacing:-.01em;margin:0}
+.hero h1 span{display:block}
+.hero .lede{max-width:34em;margin:28px 0 0;font-size:16.5px;color:var(--ink2)}
+.seal{position:absolute;right:20px;top:-6px;width:92px;height:92px;border:5px solid var(--shu);border-radius:8px;color:var(--shu);display:grid;place-items:center;font-family:var(--head);font-weight:900;font-size:21px;line-height:1.1;text-align:center;transform:rotate(-7deg);box-shadow:inset 0 0 0 3px var(--paper),inset 0 0 0 5px var(--shu)}
+@media (max-width:520px){.seal{width:68px;height:68px;font-size:15px;border-width:4px;top:-30px;right:16px}}
+.hero .meta{display:grid;grid-template-columns:repeat(3,minmax(0,max-content));gap:0 40px;margin:36px 0 0;padding:0;list-style:none;font-size:13px;line-height:1.5;color:var(--ink2)}
+.hero .meta b{display:block;color:var(--ink);font-family:var(--head);font-size:34px;line-height:1.2;font-weight:900;font-feature-settings:"tnum"}
+@media (max-width:520px){.hero .meta{gap:0 28px}}
+.hero .lede{text-wrap:pretty}
+
+/* セクション共通（静かに入る） */
+section{padding:64px 0}
+.sec-h{display:flex;align-items:baseline;gap:16px;margin:0 0 28px}
+.sec-h h2{font-family:var(--head);font-weight:900;font-size:26px;margin:0;letter-spacing:.02em}
+.sec-h .count{font-size:13px;color:var(--ink3);margin-left:auto;font-feature-settings:"tnum"}
+
+/* ゲーム一覧: 帳票の行 */
+.ledger{list-style:none;margin:0;padding:0;border-top:2px solid var(--ink)}
+.row{border-bottom:1px solid var(--rule)}
+.row a{display:grid;grid-template-columns:52px 1fr 28px;gap:0 16px;align-items:start;padding:20px 4px 22px;text-decoration:none;transition:background-color .15s}
+.row a:hover{background:var(--paper2)}
+.row a:active{background:var(--paper2)}
+.mark{width:52px;height:52px;border:2px solid var(--ink);border-radius:3px;display:grid;place-items:center;font-family:var(--head);font-weight:900;font-size:26px;line-height:1;margin-top:4px}
+.row .no{font-size:12px;letter-spacing:.12em;color:var(--ink3);font-feature-settings:"tnum"}
+.row h3{font-family:var(--head);font-weight:900;font-size:22px;line-height:1.35;margin:2px 0 6px}
+.row p{margin:0;font-size:14.5px;color:var(--ink2);line-height:1.75}
+.row dl{grid-column:2/4;grid-row:2;display:grid;gap:2px;margin:12px 0 0;font-size:13px;line-height:1.6}
+.row dl div{display:flex;gap:8px}
+.row dt{color:var(--ink3);flex:none;width:2.6em}
+.row dd{margin:0}
+.arrow{grid-column:3;grid-row:1;align-self:center;width:24px;height:24px;stroke:var(--ink);fill:none;stroke-width:1.6;transition:transform .2s var(--ease)}
+.row a:hover .arrow{transform:translateX(4px)}
+.ledger .loading{padding:20px 4px;color:var(--ink3);font-size:14px}
+@media (min-width:860px){
+  .row a{grid-template-columns:64px minmax(0,1.1fr) minmax(0,1fr) 28px;gap:0 28px;padding:24px 8px}
+  .mark{width:60px;height:60px;font-size:30px}
+  .row dl{grid-column:3;grid-row:1;display:block;margin:6px 0 0;font-size:13.5px}
+  .arrow{grid-column:4}
+  .row dl div{padding:3px 0}
+  .row dt{min-width:4em}
+}
+
+/* 発想の型: 番号つきの本文。箱に入れない */
+.method{border-top:2px solid var(--ink);margin:0;padding:0;list-style:none;counter-reset:m}
+.method li{display:grid;grid-template-columns:44px 1fr;gap:0 16px;padding:26px 0 28px;border-bottom:1px solid var(--rule)}
+.method .n{font-family:var(--head);font-weight:900;font-size:15px;color:var(--ink3);padding-top:4px;font-feature-settings:"tnum"}
+.method h3{font-family:var(--head);font-weight:900;font-size:21px;line-height:1.45;margin:0 0 8px}
+.method p{margin:0;max-width:40em;color:var(--ink2);font-size:15.5px}
+.method .ex{margin-top:10px;font-size:14px;color:var(--ink)}
+.method .ex b{font-weight:700;margin-right:.5em;color:var(--ink3)}
+@media (min-width:860px){
+  .method li{grid-template-columns:72px minmax(0,1fr) minmax(0,1.3fr);gap:0 32px}
+  .method h3{margin:0}
+  .method .body{grid-column:3}
+  .method .n{font-size:17px}
+}
+.intro{max-width:40em;color:var(--ink2);margin:-8px 0 28px}
+
+.more{margin:24px 0 0;font-size:14.5px}
+.more a{display:inline-flex;align-items:center;min-height:44px;text-underline-offset:4px}
+/* 参加 */
+.join{border-top:1px solid var(--ink)}
+.join p{max-width:40em;margin:0 0 20px;color:var(--ink2)}
+.steps{list-style:none;margin:0 0 28px;padding:0;border-top:1px solid var(--rule)}
+.steps li{border-bottom:1px solid var(--rule)}
+.steps a{display:grid;grid-template-columns:4.6em 1fr auto;gap:12px;align-items:baseline;padding:16px 4px;text-decoration:none}
+.steps a:hover{background:var(--paper2)}
+.steps .lv{font-size:12.5px;color:var(--ink3)}
+.steps b{font-family:var(--head);font-weight:700;font-size:17px}
+.steps span{display:block;font-size:13.5px;color:var(--ink2);font-weight:400;font-family:var(--body)}
+.steps .go{font-size:13px;color:var(--ink2)}
+
+footer{border-top:2px solid var(--ink);padding:28px 0 calc(40px + env(safe-area-inset-bottom));font-size:13px;color:var(--ink2)}
+footer p{margin:0 0 6px}
+
+/* ページ遷移: 紙が下から覆う / 上へ抜ける */
+.veil{position:fixed;inset:0;background:var(--ink);z-index:100;transform-origin:top;transform:scaleY(1);transition:transform .6s var(--ease);pointer-events:none}
+body.loaded .veil{transform:scaleY(0)}
+body.exiting .veil{transform-origin:bottom;transform:scaleY(1)}
+@media (prefers-reduced-motion:reduce){.veil{display:none}html{scroll-behavior:auto}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>🎮 GAME HACK</h1>
-    <p class="tagline">あるあるを物理にするゲーム工房 — 現実のシステムを、そのまま遊べる物理にする。</p>
-  </header>
+<div class="veil" aria-hidden="true"></div>
 
-  <div class="formula">
-    <div><b>① 題材</b>みんなが知っている現実（説明不要）</div>
-    <div><b>② 物理化</b>概念をそのまま物理オブジェクトにする</div>
-    <div><b>③ 技術でクリア</b>運ではなく習熟。実データ＝固定パターン</div>
-    <div><b>④ 失敗が見せ場</b>負けた瞬間が一番共有したくなる</div>
+<header class="bar">
+  <div class="wrap">
+    <a class="logo" href="#top">GAME HACK</a>
+    <nav class="nav" aria-label="ページ内">
+      <a href="#games">ゲーム一覧</a>
+      <a href="#method">発想の型</a>
+      <a href="#join">参加する</a>
+      <a href="https://github.com/k-ito-schoolagent/game-hack">GitHub</a>
+    </nav>
+    <button class="iconbtn" id="theme" aria-label="表示の明暗を切り替え">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <button class="iconbtn menu-btn" id="menu" aria-label="メニューを開く" aria-expanded="false" aria-controls="drawer">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="drawer-bg" id="drawerBg"></div>
+<nav class="drawer" id="drawer" aria-label="メニュー" aria-hidden="true">
+  <button class="iconbtn close" id="close" aria-label="メニューを閉じる"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  <a href="#games"><small>01</small>ゲーム一覧</a>
+  <a href="#method"><small>02</small>発想の型</a>
+  <a href="#join"><small>03</small>参加する</a>
+  <a href="https://github.com/k-ito-schoolagent/game-hack"><small>04</small>GitHub</a>
+</nav>
+
+<main id="top">
+  <div class="hero">
+    <div class="wrap">
+      <p class="issue">現実のしくみを遊ぶ工房</p>
+      <div class="seal" aria-hidden="true"><span>現実<br>認可</span></div>
+      <h1><span>あるあるを、</span><span>物理にする。</span></h1>
+      <p class="lede">満員電車、ハンコ決裁、年賀状、桜前線、終電。だれもが知っている現実のしくみを、そのままゲームの物理法則に書き写しました。運では勝てません。覚えて、うまくなってください。</p>
+      <ul class="meta">
+        <li><b id="nGames">10</b>本のゲーム</li>
+        <li><b>1</b>本の指で遊ぶ</li>
+        <li><b>0</b>回の運まかせ</li>
+      </ul>
+    </div>
   </div>
 
-  <h2>遊べるゲーム</h2>
-  <div id="playable" class="grid"><p>読み込み中…</p></div>
+  <section id="games">
+    <div class="wrap">
+      <div class="sec-h"><h2>ゲーム一覧</h2><span class="count" id="count"></span></div>
+      <ol class="ledger" id="ledger"><li class="loading">読み込み中</li></ol>
+    </div>
+  </section>
 
-  <h2>仕様書公開中（つくってくれる人募集）</h2>
-  <p style="font-size:13.5px;color:#a9c2de;margin:0 0 12px">
-    発想の型に沿った設計書（SPEC.md）まで用意してあります。挑戦したい人は
-    <a href="https://github.com/k-ito-schoolagent/game-hack/issues" style="color:var(--accent)">issue</a> で宣言してから作ってください。はじめての PR 歓迎です。
-  </p>
-  <div id="specs" class="grid"></div>
+  <section id="method">
+    <div class="wrap">
+      <div class="sec-h"><h2>発想の型</h2></div>
+      <p class="intro">ここにあるゲームは、すべて同じ六つの型でできています。新しく作るときも、この六つを満たしているかを確かめてください。</p>
+      <ol class="method">
+        <li><span class="n">01</span><h3>題材はファンタジーではなく、全員が知っている現実</h3>
+          <div class="body"><p>台風、カレンダー、満員電車、年賀状。ルールの説明がほぼ要らず、だれにでも一瞬で伝わります。説明が三行を超える題材は、まだ「あるある」になっていません。</p>
+          <p class="ex"><b>例</b>朝の満員電車／月末の決裁書類／年末の郵便局</p></div></li>
+        <li><span class="n">02</span><h3>抽象的な概念を、物理にする</h3>
+          <div class="body"><p>予定は重力で崩れる箱、台風は予報円つきの円、日本列島は掴める物体。現実のしくみのルールを、そのままゲームの物理法則に翻訳します。比喩ではなく、当たり判定と重さを持たせるのがコツです。</p>
+          <p class="ex"><b>例</b>「混雑」→ 奥へ押し合う乗客の体／「決裁」→ ベルトを流れてくる書類</p></div></li>
+        <li><span class="n">03</span><h3>現実ではありえない権限を、一つだけ与える</h3>
+          <div class="body"><p>「日本列島を動かせる」「他人の予定を無理やりねじ込める」。現実では絶対に持てない力を一つだけ渡します。この倒錯が、笑いと快感の核になります。二つ以上渡すと、ただの万能ゲームになります。</p>
+          <p class="ex"><b>例</b>乗客を指でつまんで押し込める／太平洋高気圧を指で動かせる</p></div></li>
+        <li><span class="n">04</span><h3>失敗を、いちばんの見せ場にする</h3>
+          <div class="body"><p>予定が崩れる箱の雪崩、上陸した地方名のテロップ、「ドアが閉まりません」の車内放送。負けた瞬間がいちばん面白いように作ると、もう一回遊びたくなり、だれかに見せたくなります。失敗の理由は必ずプレイヤーの操作に帰るようにして、理不尽な負けは作りません。</p>
+          <p class="ex"><b>例</b>タクシー代の領収書が印刷される／監査の付箋が書類を埋める</p></div></li>
+        <li><span class="n">05</span><h3>本物のデータと UI にこだわる</h3>
+          <div class="body"><p>気象庁の台風名リスト、実在の海岸線、本物の稟議書の決裁欄、駅の発車標。実在感が没入を生み、「これ見て」と言いたくなる理由になります。データは一次情報を確かめ、出典をゲームの中に書きます。乱数ではなく実データか固定の並びを使うので、覚えれば必ずうまくなります。</p>
+          <p class="ex"><b>例</b>桜の満開日の平年値／実在の郵便番号／路線のラインカラー</p></div></li>
+        <li><span class="n">06</span><h3>操作は、一つに絞る</h3>
+          <div class="body"><p>ドラッグだけ、タップだけ、スライドだけ。スマホを縦に持って、親指一本で遊べるようにします。操作を増やしたくなったら、それは題材の物理化がまだ足りないサインです。</p>
+          <p class="ex"><b>例</b>ドラッグして離す／タイミングでタップ／縦にスライド</p></div></li>
+      </ol>
+      <p class="more"><a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/METHOD.md">見分け方と企画シートは METHOD.md へ</a></p>
+    </div>
+  </section>
 
-  <div class="cta">
-    <a href="https://github.com/k-ito-schoolagent/game-hack">GitHub で参加する（issue・PR の練習歓迎）</a>
+  <section id="join" class="join">
+    <div class="wrap">
+      <div class="sec-h"><h2>参加する</h2></div>
+      <p>GitHub がはじめての人の練習場所でもあります。issue を書く、名前を一行足す、ゲームを一本つくる。どれも同じだけ立派な参加です。</p>
+      <ol class="steps">
+        <li><a href="https://github.com/k-ito-schoolagent/game-hack/issues"><span class="lv">やさしい</span><b>issue で話してみる<span>「これをゲームにしてほしい」「ここが分かりにくい」</span></b><span class="go">Issues</span></a></li>
+        <li><a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md#練習2はじめてのプルリクエスト15分"><span class="lv">ふつう</span><b>名前を一行足してみる<span>ブラウザだけで、はじめてのプルリクエスト</span></b><span class="go">手順</span></a></li>
+        <li><a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md#3-ゲームをつくる"><span class="lv">じっくり</span><b>ゲームを一本つくる<span>雛形をコピーして、HTML 一枚で。ビルドは要りません</span></b><span class="go">雛形</span></a></li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>コードは MIT License。ゲームのアイデア・題材は自由に使ってかまいません。</p>
+    <p>各ゲームで使っている実データの出典は、それぞれのゲームの最初の画面に書いてあります。</p>
   </div>
+</footer>
 
-  <footer>
-    <p>参加のしかた・練習メニューは <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> へ。
-    コードは MIT License。各ゲームのデータ出典はゲーム内に明記。</p>
-  </footer>
-</div>
 <script>
-fetch('games.json').then(r => r.json()).then(games => {
-  const render = g => {
-    const a = document.createElement('a');
-    a.className = 'card' + (g.status === 'spec' ? ' spec' : '');
-    a.href = g.dir + '/';
-    a.innerHTML =
-      `<span class="badge ${g.status === 'playable' ? 'play' : 'spec'}">${g.status === 'playable' ? '遊べる' : '仕様書'}</span>` +
-      `<h3>${g.title}</h3><p>${g.summary}</p>` +
-      `<div class="tags">${g.tags.map(t => `<span>${t}</span>`).join('')}</div>`;
-    return a;
-  };
-  const play = document.getElementById('playable');
-  const spec = document.getElementById('specs');
-  play.innerHTML = '';
-  for (const g of games) (g.status === 'playable' ? play : spec).appendChild(render(g));
-  if (!play.children.length) play.innerHTML = '<p>準備中</p>';
-  if (!spec.children.length) spec.innerHTML = '<p>現在募集中の仕様はありません</p>';
-}).catch(() => {
-  document.getElementById('playable').innerHTML = '<p>games.json を読み込めませんでした</p>';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* 一覧 */
+fetch('games.json').then(r=>r.json()).then(games=>{
+  const list=$('#ledger');
+  list.innerHTML=games.map((g,i)=>{
+    const no=g.no||('No.'+String(i+1).padStart(2,'0'));
+    const play=g.status==='playable';
+    const meta=[['権限',g.power],['操作',g.op]].filter(m=>m[1]).map(m=>'<div><dt>'+m[0]+'</dt><dd>'+esc(m[1])+'</dd></div>').join('');
+    return '<li class="row"><a href="'+esc(g.dir)+'/">'+
+      '<span class="mark" aria-hidden="true">'+esc(g.mark||g.title[0])+'</span>'+
+      '<div><span class="no">'+esc(no)+(play?'':' ・ 仕様書のみ')+'</span><h3>'+esc(g.title)+'</h3><p>'+esc(g.summary)+'</p></div>'+
+      (meta?'<dl>'+meta+'</dl>':'')+
+      '<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'+
+      '</a></li>';
+  }).join('');
+  const n=games.filter(g=>g.status==='playable').length;
+  $('#count').textContent=n===games.length?games.length+' 本':'遊べる '+n+' 本 / 全 '+games.length+' 本';
+  $('#nGames').textContent=games.length;
+  bindLinks();
+}).catch(()=>{ $('#ledger').innerHTML='<li class="loading">games.json を読み込めませんでした。ページを再読み込みしてください。</li>'; });
+
+/* テーマ切替 */
+$('#theme').addEventListener('click',()=>{
+  const cur=document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.dataset.theme=next;
+  try{localStorage.setItem('gh-theme',next);}catch(_){}
 });
+
+/* ドロワー */
+function drawer(open){
+  document.body.classList.toggle('open',open);
+  $('#menu').setAttribute('aria-expanded',open);
+  $('#drawer').setAttribute('aria-hidden',!open);
+  if(open)$('#close').focus();
+}
+$('#menu').addEventListener('click',()=>drawer(true));
+$('#close').addEventListener('click',()=>drawer(false));
+$('#drawerBg').addEventListener('click',()=>drawer(false));
+$('#drawer').querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>drawer(false)));
+addEventListener('keydown',e=>{ if(e.key==='Escape')drawer(false); });
+
+/* ナビの現在地 */
+const navLinks=[...document.querySelectorAll('.nav a[href^="#"]')];
+const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting)navLinks.forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+e.target.id)); }),{rootMargin:'-40% 0px -55% 0px'});
+['games','method','join'].forEach(id=>io.observe(document.getElementById(id)));
+
+/* ページ遷移: 読み込みで幕が上がり、ゲームへのリンクで幕が下りる */
+requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.add('loaded')));
+addEventListener('pageshow',e=>{ if(e.persisted){document.body.classList.remove('exiting');document.body.classList.add('loaded');} });
+function bindLinks(){
+  document.querySelectorAll('.row a').forEach(a=>a.addEventListener('click',e=>{
+    if(e.metaKey||e.ctrlKey||e.shiftKey||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    e.preventDefault(); document.body.classList.add('exiting');
+    setTimeout(()=>{location.href=a.href;},560);
+  }));
+}
 </script>
 </body>
 </html>

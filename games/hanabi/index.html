@@ -2,40 +2,827 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>花火打上げ職人（仕様書公開中） | GAME HACK</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>花火打上げ職人 | GAME HACK</title>
+<meta name="description" content="花火師の若い衆として、実在の花火大会の夜の風（気象庁10分値）を読み、風に流される分を見越して夜空の印で玉を開かせる。読み違えると観覧席の上で開いて打上げ中止。">
+<meta name="theme-color" content="#0b1020">
+<!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>火</text></svg>">
 <style>
-  body{margin:0;background:#0d1526;color:#eaf3fc;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.8}
-  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
-  .badge{display:inline-block;font-size:12px;font-weight:700;border:1px solid #ffb300;color:#ffb300;border-radius:6px;padding:2px 10px;margin-bottom:14px}
-  h1{font-size:26px;margin:0 0 14px}
-  p,li{font-size:14.5px;color:#c9dcf2}
-  a{color:#ffb300}
-  .box{background:#16233c;border-radius:12px;padding:14px 16px;margin:14px 0}
-  .box b{color:#ffb300}
+/* ================================================================
+ * GAME HACK 共通UI（ここから）— 全ゲームで同じものをコピーして使う
+ * 世界観: 業務帳票。紙 × 墨 × 朱（ハンコの赤）。
+ * - 朱は「判子」と「失敗」にだけ使う。ボタンや装飾には使わない
+ * - 角丸は 2px まで。影・グラデーション・絵文字は使わない
+ * ================================================================ */
+:root{
+  --paper:#F3EFE4; --paper2:#E8E1CF; --ink:#22201C; --ink2:#5E584D; --rule:#CDC3AC; --shu:#C8372D;
+  --font:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--scene,#2b2a27);font-family:var(--font);color:var(--ink);-webkit-text-size-adjust:100%}
+#wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+canvas{display:block;width:100%;height:100%}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+/* HUD: 帳票の見出し帯。左=どこ / 中=いまの数値 / 右=一時停止 */
+#hud{position:absolute;left:0;right:0;top:0;padding-top:var(--safe-t);background:var(--paper);border-bottom:1px solid var(--ink);display:none;grid-template-columns:1fr auto 52px;align-items:center;height:calc(48px + var(--safe-t));box-sizing:border-box;font-feature-settings:"tnum";z-index:5}
+#hud.on{display:grid}
+#hudL{padding-left:14px;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hudL small{font-weight:500;color:var(--ink2);font-size:12px;margin-left:6px}
+#hudC{padding:0 12px;font-size:15px;font-weight:700;text-align:right;white-space:nowrap}
+#hudC .warn{color:var(--shu)}
+#pauseBtn{width:52px;height:48px;border:0;border-left:1px solid var(--rule);background:transparent;display:grid;place-items:center}
+#pauseBtn i{display:block;width:12px;height:14px;border-left:4px solid var(--ink);border-right:4px solid var(--ink);box-sizing:border-box}
+/* シート: 下から出る帳票。親指で押せる位置にボタンを置く */
+#sheetBg{position:absolute;inset:0;background:rgba(34,32,28,.5);display:none;z-index:10}
+#sheetBg.on{display:block}
+#sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
+#sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
+#sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
+#sheet dt{color:var(--ink2)}
+#sheet dd{margin:0;font-weight:600;font-feature-settings:"tnum"}
+#sheet .acts{display:grid;gap:8px}
+.btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
+.btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn:active{transform:translateY(1px);opacity:.9}
+.sub{display:flex;justify-content:center;gap:4px}
+.sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
+/* 判子: 結果シートの右上に押される。中身は最大4字 */
+.stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
+.stamp.round{border-radius:50%}
+.stamp span{display:block}
+@keyframes stampIn{from{transform:rotate(-8deg) scale(1.9);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:.92}}
+@media (prefers-reduced-motion:reduce){#sheet,.stamp{animation:none}}
+/* ===== GAME HACK 共通UI（ここまで）===== */
+/* ===== ゲーム固有の見た目: 花火大会の夜 =====
+ * HUD     = 夜に馴染む濃紺の帯（画面下の番組帯と同じ書式。生成りの文字・金茶の二重罫）
+ * タイトル = 大会の番組表（濃紺刷りのプログラム）
+ * 結果    = 煙火店の打上げ日報（帳面の罫・屋号・親方の確認印）
+ * 朱は判子と失敗の値だけ。 */
+:root{--scene:#0b1020;--paper:#F2EAD6;--paper2:#E6DBC0;--ink:#2A2118;--ink2:#6B5D48;--rule:#B49A72;--shu:#C8372D}
+#hud{--paper:#121a33;--ink:#EFE6CC;--ink2:#B3AA92;--rule:#3a4466;border-bottom:0;box-shadow:0 1px 0 #B89B5E,0 3px 0 #121a33,0 4px 0 #B89B5E}
+#hudL{letter-spacing:.12em}
+#hudC .warn{color:#FF8E72}
+#pauseBtn{border-left:1px solid #3a4466}
+.stamp{font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho","BIZ UDMincho",serif;font-weight:900}
+.btn{border-radius:0;letter-spacing:.2em}
+/* 番組表（タイトル・一時停止） */
+#sheet.prog{--paper:#131b37;--ink:#EFE6CC;--ink2:#B3AA92;--rule:#36406a;border-top:0;padding-top:30px;box-shadow:inset 0 3px 0 #B89B5E,inset 0 6px 0 #131b37,inset 0 7px 0 #B89B5E}
+#sheet.prog .no{color:#D9BE7E;letter-spacing:.3em;font-weight:700}
+#sheet.prog h1{letter-spacing:.08em;font-weight:800}
+#sheet.prog .lead{border-top:1px solid #B89B5E;padding-top:10px}
+#sheet.prog dl{border-top:3px double #B89B5E}
+#sheet.prog dl div{display:flex;align-items:baseline;border-bottom:0;padding:6px 0}
+#sheet.prog dl div::after{content:"";order:1;flex:1 1 12px;min-width:12px;border-bottom:1px dotted #8a8470;margin:0 6px;transform:translateY(-4px)}
+#sheet.prog dt{order:0;flex:none;color:#D9BE7E;font-weight:700;white-space:nowrap}
+#sheet.prog dd{order:2;flex:0 1 auto;max-width:72%;text-align:right}
+#sheet.prog dl div:last-child{border-bottom:3px double #B89B5E;padding-bottom:10px}
+#sheet.prog .sub button{color:#EFE6CC}
+/* 煙火店の打上げ日報（結果） */
+#sheet.chou{border-top:0;padding-left:30px;box-shadow:inset 0 4px 0 var(--ink),inset 12px 0 0 var(--paper),inset 13px 0 0 var(--rule),inset 16px 0 0 var(--paper),inset 17px 0 0 var(--rule)}
+#sheet.chou .no{color:var(--ink);letter-spacing:.24em;font-weight:700}
+#sheet.chou h1{letter-spacing:.06em}
+#sheet.chou .lead{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:8px 0;line-height:1.85}
+#sheet.chou dl{border-top:2px solid var(--ink)}
+#sheet.chou dl div{grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule)}
+#sheet.chou dt{border-right:1px solid var(--rule);margin-right:10px}
+#sheet.chou dl div:last-child{min-height:46px;align-items:center}
+#sheet.chou dl div:last-child dd{position:relative;min-height:40px}
+#sheet.chou dl div:last-child dd::after{content:"親方";position:absolute;left:0;top:50%;width:40px;height:40px;margin-top:-20px;border:2px solid var(--shu);border-radius:50%;color:var(--shu);display:grid;place-items:center;font:900 13px/1 "Hiragino Mincho ProN","Yu Mincho",serif;transform:rotate(-6deg);opacity:.9}
+#hud,#sheet.prog,#sheet.chou{color:var(--ink)}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <span class="badge">仕様書公開中・制作者募集</span>
-  <h1>花火打上げ職人</h1>
-  <p>実風データ＋固定の演目プログラム。風を読む間合いと打上げリズムの技術。失敗＝風に流されて観客の歓声がざわめきに。</p>
-  <div class="box">
-    <b>発想の型</b>
-    <ul>
-      <li>題材: 打上げ職人の「間」と風読み</li>
-      <li>物理化: 花火＝放物線＋風で流される点。観客＝歓声メーター。演目＝固定プログラム（尺玉・スターマイン）</li>
-      <li>技術: 実風データは固定。風速・風向の変化を読んで打上げタイミングと角度を合わせるリズム×読みの技術</li>
-      <li>失敗の見せ場: 風に流されて観客の歓声がざわめきに変わる。最悪は「打上げ中止」テロップ</li>
-      <li>データ: 気象庁の風速・風向実績（地点別・時別）</li>
-      <li>操作: タイミングタップで打上げ。スワイプで角度微調整</li>
-    </ul>
-  </div>
-  <p>つくってみたい人は <a href="https://github.com/k-ito-schoolagent/game-hack/issues">issue</a> で宣言してください。
-  詳しい設計書は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/games/hanabi/SPEC.md">SPEC.md</a>。
-  はじめてのプルリクエスト歓迎です（<a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">参加のしかた</a>）。</p>
-  <p><a href="../../">← GAME HACK ポータルへ</a></p>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <!-- 共通UI: ここから -->
+  <div id="hud"><div id="hudL"></div><div id="hudC"></div><button id="pauseBtn" aria-label="一時停止"><i></i></button></div>
+  <div id="sheetBg"><div id="sheet" role="dialog" aria-modal="true"></div></div>
+  <!-- 共通UI: ここまで -->
 </div>
+<script>
+'use strict';
+/* ============================================================
+ * 花火打上げ職人
+ * 型: 題材(花火大会の打上げ) × 物理化(風＝玉を横に流す力・突風＝空を横切る帯) × 権限(風が見える) × 技術(帯の来る間を読んで打つ) × 見せ場(観覧席の上で開いて中止)
+ * ============================================================ */
+
+
+// ================================================================
+// GAME HACK 共通UI（ここから）— 書き換えずにコピーする
+// ================================================================
+// 論理座標: 横幅 W=420 固定。高さ H は端末の縦横比に合わせて 700〜920 で伸びる（上下の黒帯を出さない）
+// 描画は H を見てレイアウトする（上端=HUD 下、下端=親指ゾーン）
+const W=420; let H=760;
+const HUD_H=48;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0,SAFE_T=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=window.innerWidth; VH=window.innerHeight;
+  cv.width=Math.round(VW*DPR); cv.height=Math.round(VH*DPR);
+  H=Math.max(700,Math.min(920,Math.round(W*VH/VW)));
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+  SAFE_T=(parseFloat(getComputedStyle($('hud')).paddingTop)||0)/SC;
+  if(typeof onResize==='function')onResize();
+}
+// 画面座標 → 論理座標
+function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
+// DOM 要素の中心 → 論理座標（下部ボタンとの距離判定などに使う）
+function elCenter(el){ const r=el.getBoundingClientRect(); return toGame({clientX:r.left+r.width/2,clientY:r.top+r.height/2}); }
+// HUD の下端（論理座標）。ゲームの描画はここから下に置く
+function topY(){ return HUD_H+SAFE_T; }
+// 振動（対応端末のみ）
+function buzz(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(_){} }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const UI={
+  hud(l,lSmall,c){ $('hud').classList.add('on'); $('hudL').innerHTML=esc(l)+(lSmall?'<small>'+esc(lSmall)+'</small>':''); $('hudC').innerHTML=c||''; },
+  hideHud(){ $('hud').classList.remove('on'); },
+  /* シートを開く
+   * o = { no:'No.01 · 乗務報告', title, lead, rows:[[ラベル,値],...], stamp:'不可'|'発車'(最大4字), round:true(丸印),
+   *       main:[ラベル,fn], subs:[[ラベル,fn],...] } */
+  sheet(o){
+    const s=$('sheet');
+    let h='';
+    if(o.stamp){ const t=[...o.stamp]; const lines=t.length===4?[t.slice(0,2).join(''),t.slice(2).join('')]:t.length===3?[t.join('')]:[t.join('')];
+      const fs=t.length<=2?27:t.length===3?20:22;
+      h+='<div class="stamp'+(o.round?' round':'')+'" style="font-size:'+fs+'px">'+lines.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'; }
+    if(o.no)h+='<p class="no">'+esc(o.no)+'</p>';
+    h+='<h1>'+esc(o.title)+'</h1>';
+    if(o.lead)h+='<p class="lead">'+esc(o.lead)+'</p>';
+    if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
+    h+='<div class="acts">';
+    if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
+    h+='</div>';
+    s.innerHTML=h; s.scrollTop=0;
+    s.querySelectorAll('button').forEach(b=>{
+      const k=b.dataset.k, fn=k==='main'?o.main[1]:o.subs[+k.slice(1)][1];
+      b.addEventListener('click',e=>{ e.stopPropagation(); fn(); });
+    });
+    $('sheetBg').classList.add('on');
+    const m=s.querySelector('.btn'); if(m)setTimeout(()=>m.focus({preventScroll:true}),50);
+  },
+  close(){ $('sheetBg').classList.remove('on'); },
+  open(){ return $('sheetBg').classList.contains('on'); },
+};
+// 共有（𝕏）とポータルへ
+function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function toPortal(){ location.href='../../'; }
+// 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
+let pausedFrom=null;
+function pause(){
+  if(G.screen!=='play')return;
+  pausedFrom='play'; G.screen='pause';
+  UI.sheet({no:GAME_NO+' · 一時停止中',title:'一時停止',main:['再開する',resume],subs:[['この面をやり直す',()=>{UI.close();restart();}],['一覧へ戻る',toPortal]]});
+}
+function resume(){ if(G.screen!=='pause')return; UI.close(); G.screen='play'; lastTs=0; }
+$('pauseBtn').addEventListener('click',e=>{ e.stopPropagation(); G.screen==='pause'?resume():pause(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden)pause(); });
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ G.screen==='pause'?resume():pause(); } });
+// ===== GAME HACK 共通UI（ここまで）=====
+
+// ---- ゲーム固有 ----------------------------------------------
+const GAME_NO='No.09';            // 一覧の通し番号（games.json の順）
+const TAG='花火打上げ職人';        // 共有ハッシュタグ
+
+// SIM-BEGIN（風と玉の物理。node の検証スクリプトもこの範囲をそのまま読む）
+const DT=1/120;          // 物理の固定刻み（フレームレートに依存させない）
+// 風 1m/s が玉を横に流す速さ（論理px/秒）は面ごとの st.kx（会場ごとの画面の縮尺。概略）
+const TAU_V=0.35;        // 玉の横速度が風に追いつく時定数（秒）
+const GUST_C=90;         // 突風の帯が空を横切る速さ（論理px/秒）
+const PX_M=1.8*8;        // st.kx=8 の会場で 1論理px＝1.8m（十号玉の開花径 約320m から換算）
+const BEAR={北:0,北北東:22.5,北東:45,東北東:67.5,東:90,東南東:112.5,南東:135,南南東:157.5,南:180,南南西:202.5,南西:225,西南西:247.5,西:270,西北西:292.5,北西:315,北北西:337.5};
+// 玉の種類: alt=開花高（空の高さに対する比） T=昇りの秒数 r=開花半径 tol=印の許容（px） smoke=煙の濃さ
+const KINDS={
+  botan:  {name:'牡丹',gou:'五号玉',alt:.40,T:1.5,r:50,tol:15,life:1.5,smoke:.50},
+  kiku:   {name:'菊',gou:'七号玉',alt:.54,T:1.8,r:68,tol:16,life:2.1,smoke:.55},
+  yashi:  {name:'椰子',gou:'七号玉',alt:.52,T:1.8,r:74,tol:16,life:2.4,smoke:.55},
+  dosei:  {name:'型物「土星」',gou:'五号玉',alt:.44,T:1.6,r:56,tol:15,life:1.9,smoke:.45},
+  heart:  {name:'型物「ハート」',gou:'五号玉',alt:.44,T:1.6,r:54,tol:15,life:1.9,smoke:.45},
+  smile:  {name:'型物「にこちゃん」',gou:'五号玉',alt:.44,T:1.6,r:54,tol:15,life:1.9,smoke:.45},
+  yae:    {name:'八重芯変化菊',gou:'十号玉',alt:.68,T:2.1,r:90,tol:18,life:2.5,smoke:.65},
+  kamuro: {name:'冠菊',gou:'十号玉',alt:.64,T:2.1,r:96,tol:18,life:3.4,smoke:.75},
+  sanjaku:{name:'正三尺玉',gou:'三尺玉',alt:.84,T:2.8,r:125,tol:22,life:3.6,smoke:.9},
+  mine:   {name:'スターマイン',gou:'速射連発',alt:.38,T:1.3,r:34,tol:20,life:1.4,smoke:.2,n:7},
+};
+// 10分値の行: [平均風速 m/s, 風向, 最大瞬間風速 m/s]（気象庁 過去の気象データ）
+const STAGES=[
+  {name:'長岡まつり大花火大会',short:'長岡',date:'2025年8月2日',station:'アメダス長岡',url:'prec_no=54&block_no=0529',
+   river:'信濃川',tolK:1,right:90,kx:13,hum:82,d0:19*60+20,m0:19*60+20,m1:21*60+10,dur:48,seed:11,crowdL:20,crowdR:400,
+   rows:[[2.6,'西北西',4.2],[2.3,'西北西',3.4],[2.2,'西',3.5],[2.3,'西',3.8],[2.1,'西北西',3.9],[2.1,'西北西',3.6],[1.8,'南西',3.1],[2.0,'南西',3.4],[2.2,'南西',3.6],[1.5,'南西',2.7],[1.5,'南南西',2.8],[1.9,'南南西',3.7]],
+   prog:[{k:'botan',x:150,at:2,m:'l'},{k:'kiku',x:180,at:7,m:'m'},{k:'dosei',x:150,at:13,m:'l'},{k:'yashi',x:120,at:20,m:'g'},{k:'yae',x:150,at:27,m:'m'},{k:'sanjaku',x:140,at:35,m:'g'}]},
+  {name:'全国花火競技大会「大曲の花火」',short:'大曲',date:'2025年8月30日',station:'アメダス大曲',url:'prec_no=32&block_no=0195',
+   river:'雄物川',tolK:.9,right:90,kx:14,hum:95,d0:18*60+50,m0:18*60+50,m1:21*60+30,dur:66,seed:53,crowdL:20,crowdR:400,
+   rows:[[1.0,'西南西',1.7],[0.9,'南西',1.5],[1.1,'西南西',1.8],[1.2,'西',2.3],[1.2,'西',2.1],[1.1,'西',2.6],[1.7,'西南西',2.5],[1.4,'西南西',2.8],[0.9,'西',1.8],[1.1,'西北西',2.2],[1.2,'西北西',2.4],[1.3,'北西',2.1],[1.2,'北西',2.0],[1.2,'北西',1.9],[0.9,'西北西',1.9],[0.5,'西北西',1.0],[0.6,'西北西',1.1]],
+   prog:[{k:'kiku',x:190,at:2,m:'m'},{k:'yashi',x:195,at:7,m:'g'},{k:'yae',x:185,at:14,m:'m'},{k:'kamuro',x:190,at:22,m:'l'},{k:'yae',x:195,at:29,m:'g'},{k:'mine',x:190,at:36,m:'m'},{k:'kamuro',x:185,at:44,m:'m'},{k:'sanjaku',x:190,at:53,m:'g'}]},
+  {name:'諏訪湖祭湖上花火大会',short:'諏訪湖',date:'2025年8月15日',station:'諏訪',url:'prec_no=48&block_no=47620',
+   river:'諏訪湖',tolK:.8,right:67.5,kx:9,hum:75,d0:19*60,m0:19*60,m1:21*60,dur:52,seed:23,crowdL:20,crowdR:236,
+   rows:[[6.4,'西北西',8.1],[6.4,'西北西',8.9],[5.9,'西',9.0],[6.2,'西北西',8.3],[5.1,'西北西',7.3],[4.7,'西北西',6.2],[4.6,'西北西',6.0],[4.3,'西',5.6],[4.1,'西',5.2],[2.8,'西',4.1],[4.6,'西',6.9],[5.1,'西北西',6.8],[4.2,'西北西',5.5]],
+   prog:[{k:'kiku',x:110,at:2,m:'l'},{k:'heart',x:100,at:7,m:'g'},{k:'mine',x:150,at:13,m:'l'},{k:'yae',x:70,at:20,m:'g'},{k:'yashi',x:150,at:26,m:'l'},{k:'kamuro',x:80,at:32,m:'g'},{k:'yae',x:140,at:39,m:'l'}]},
+  {name:'隅田川花火大会',short:'隅田川',date:'2025年7月26日',station:'東京（北の丸公園）',url:'prec_no=44&block_no=47662',
+   river:'隅田川',tolK:.75,right:180,kx:8,hum:71,d0:19*60,m0:19*60,m1:20*60+30,dur:50,seed:37,crowdL:236,crowdR:400,
+   rows:[[5.8,'南',9.2],[4.6,'南南西',7.9],[5.5,'南',9.3],[5.2,'南',9.4],[4.0,'南',8.3],[5.0,'南',8.6],[4.4,'南',7.7],[4.7,'南',7.5],[4.7,'南',7.5],[4.5,'南',7.4]],
+   prog:[{k:'botan',x:310,at:2,m:'l'},{k:'smile',x:365,at:7,m:'m'},{k:'kiku',x:390,at:12,m:'g'},{k:'mine',x:320,at:19,m:'l'},{k:'kamuro',x:335,at:25,m:'l'},{k:'yae',x:400,at:32,m:'g'},{k:'yashi',x:330,at:39,m:'m'}]},
+];
+// 突風の帯（固定シーケンス。面ごとに決まった種から作るので毎回同じ）
+function mkPulses(seed,dur){ let s=seed>>>0; const r=()=>(s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296;
+  const P=[]; let t=-10; while(t<dur+14){ t+=3.0+r()*2.6; P.push({t,a:.7+r()*.3,w:.6+r()*.35}); } return P; }
+STAGES.forEach(st=>{ st.pulses=mkPulses(st.seed,st.dur); });
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+function realMin(st,gt){ return st.m0+(st.m1-st.m0)*clamp(gt/st.dur,0,1.2); }
+// 10分値の線形補間 → {spd,gust,dir}
+function base(st,gt){
+  const f=(realMin(st,gt)-st.d0)/10, i=clamp(Math.floor(f),0,st.rows.length-1), j=Math.min(i+1,st.rows.length-1), u=clamp(f-i,0,1);
+  const A=st.rows[i],B=st.rows[j]; let da=BEAR[B[1]]-BEAR[A[1]]; if(da>180)da-=360; if(da<-180)da+=360;
+  return {spd:A[0]+(B[0]-A[0])*u, gust:A[2]+(B[2]-A[2])*u, dir:(BEAR[A[1]]+da*u+360)%360, row:u<.5?A:B};
+}
+// 画面右方向の成分（風が「吹いていく先」と画面右の方位の内積）
+function crossK(st,dir){ return Math.cos(((dir+180)-st.right)*Math.PI/180); }
+// 突風の強さ 0..1（帯は風下へ向かって動く）
+function gustG(st,gt,x,sgn){
+  let g=0; for(const p of st.pulses){ const d=gt-p.t-sgn*(x-210)/GUST_C; if(d<-3||d>3)continue; g+=p.a*Math.exp(-d*d/(2*p.w*p.w)); }
+  return g>1?1:g;
+}
+// 高さ a(0..1) での画面横方向の風（m/s）。上空ほど強い（べき乗則の概略）
+function ux(st,gt,x,a){
+  const b=base(st,gt), c=crossK(st,b.dir), sgn=c>=0?1:-1, lull=b.spd*.7;
+  return (lull+(b.gust-lull)*gustG(st,gt,x,sgn))*c*(1+.4*a);
+}
+// 玉 1 刻みぶん進める（ゲームも検証もこの関数だけを使う）
+function stepShell(st,s){
+  const K=KINDS[s.k], a=s.alt*(1-(1-s.t/s.T)**2);
+  const u=ux(st,s.t0+s.t,s.x,a)*st.kx;
+  s.vx+=(u-s.vx)*DT/TAU_V; s.x+=s.vx*DT; s.t+=DT; s.a=a;
+  return s.t>=s.T;
+}
+function newShell(k,x0,t0,j){ const K=KINDS[k]; const sub=k==='mine';
+  return {k,x:sub?x0+(j-3)*9:x0,x0,vx:0,t:0,t0,T:K.T,alt:sub?K.alt-.04+.05*(j%3):K.alt,a:0,j:j||0}; }
+// 発射から開花までを一気に計算（印の位置を決める・検証用）
+function flyAll(st,k,x0,t0){
+  if(k==='mine'){ let sx=0; for(let j=0;j<7;j++){ const s=newShell(k,x0,t0+j*.16,j); while(!stepShell(st,s)); sx+=s.x; } return sx/7; }
+  const s=newShell(k,x0,t0); while(!stepShell(st,s)); return s.x;
+}
+// 煙: 開花点に残り、風で流れ、湿度が高いほど長く残る
+function smokeTau(st){ return 5*(1+(st.hum-60)/15); }
+function stepPuff(st,p,gt){ p.x+=ux(st,gt,p.x,p.a)*st.kx*.85*DT; p.r+=5*DT; p.al*=Math.exp(-DT/smokeTau(st)); }
+function smokeAt(puffs,x,y){ let d=0; for(const p of puffs){ const q=Math.hypot(p.x-x,p.y-y)/p.r; if(q<1)d+=p.al*(1-q*q); } return d; }
+const SMOKE_HIDE=.38;
+const smokeAl=(st,K)=>K.smoke*st.hum/80;   // 湿度が高いほど煙が濃い
+// 印の位置: 番組の「at」秒に打てば印ちょうどで開く（＝理論上ノーミスで打てる時刻が必ずある）
+// m='g' 突風の帯に乗せる / 'l' 帯の合間 / 'm' その中間（at の前後2秒で探す）
+STAGES.forEach(st=>{ st.prog.forEach(p=>{
+  const xs=[]; for(let t=Math.max(0,p.at-2);t<=p.at+2;t+=.05)xs.push(flyAll(st,p.k,p.x,Math.round(t/DT)*DT));
+  const c=crossK(st,base(st,p.at).dir)>=0?1:-1, hi=c>0?Math.max(...xs):Math.min(...xs), lo=c>0?Math.min(...xs):Math.max(...xs);
+  p.tx=Math.round(lo+(hi-lo)*(p.m==='g'?.8:p.m==='l'?.12:.46));
+}); });
+// SIM-END
+
+// ---- 状態 ----------------------------------------------------
+const G={screen:'title',stage:0,gt:0,acc:0,i:0,miss:0,hits:0,shells:[],bursts:[],puffs:[],traces:[],texts:[],
+  pend:null,fx:null,flash:0,flashCol:'#fff',cheer:0,duck:0,duckX:0,guide:0,maxDev:0,lastShot:null};
+let lastTs=0;
+let LY={};
+function onResize(){
+  const top=topY();
+  const stripY=H-54, bankY=stripY-96, riverY=Math.round(top+(H-top)*.56);
+  const bargeY=Math.round(riverY+(bankY-riverY)*.34), y0=bargeY-6;
+  LY={top,stripY,bankY,riverY,bargeY,y0,altPx:y0-top-40};
+  buildCrowd();
+}
+const burstY=k=>LY.y0-KINDS[k].alt*LY.altPx;
+const rScale=()=>LY.altPx/430;
+const hhmm=m=>{ m=Math.round(m); return Math.floor(m/60)+':'+String(m%60).padStart(2,'0'); };
+
+function startStage(i){
+  G.stage=i; const st=STAGES[i];
+  Object.assign(G,{embers:[],endWait:0,gt:0,acc:0,i:0,miss:0,hits:0,shells:[],bursts:[],puffs:[],traces:[],texts:[],pend:null,fx:null,flash:0,cheer:0,duck:0,guide:3.8,maxDev:0,lastShot:null});
+  initWind(); G.screen='play'; UI.close(); lastTs=0;
+}
+function restart(){ startStage(G.stage); }
+
+// ---- 入力: 1回のタップ＝1発 ----
+function launch(){
+  if(G.screen!=='play'||G.shells.length||G.pend)return;
+  const st=STAGES[G.stage], p=st.prog[G.i]; if(!p)return;
+  const b=base(st,G.gt);
+  G.pend={i:G.i,k:p.k,n:p.k==='mine'?7:1,done:0,xs:[],gust:gustG(st,G.gt,p.x,crossK(st,b.dir)>=0?1:-1),t0:G.gt,spd:b.spd,gmax:b.gust,dir:b.row[1]};
+  if(p.k==='mine'){ for(let j=0;j<7;j++)G.shells.push(Object.assign(newShell('mine',p.x,G.gt+j*.16,j),{wait:j*.16,trail:[]})); }
+  else G.shells.push(Object.assign(newShell(p.k,p.x,G.gt),{wait:0,trail:[]}));
+  G.guide=Math.min(G.guide,.6); buzz(12);
+}
+$('wrap').addEventListener('pointerdown',e=>{
+  if(G.screen!=='play'||UI.open())return;
+  const p=toGame(e); if(p.y<topY())return;
+  launch();
+});
+window.addEventListener('keydown',e=>{ if(e.key===' '||e.key==='Enter'){ if(G.screen==='play'){ e.preventDefault(); launch(); } } });
+
+// ---- 更新 ----------------------------------------------------
+function physStep(){
+  const st=STAGES[G.stage];
+  for(const s of G.shells){
+    if(s.wait>0){ s.wait-=DT; continue; }
+    const done=stepShell(st,s);
+    if(G.fr%2===0){ s.trail.push([s.x,LY.y0-s.a*LY.altPx]); }
+    if(done){ s.dead=true; burst(st,s); }
+  }
+  if(G.shells.some(s=>s.dead))G.shells=G.shells.filter(s=>!s.dead);
+  for(const p of G.puffs)stepPuff(st,p,G.gt);
+  if(G.puffs.length&&G.puffs[0].al<.02)G.puffs.shift();
+  G.gt+=DT;
+}
+function burst(st,s,auto){
+  const K=KINDS[s.k], y=LY.y0-s.alt*LY.altPx;
+  const hid=!auto&&!(s.k==='mine'&&s.j>0)&&smokeAt(G.puffs,s.x,y)>SMOKE_HIDE;   // スターマインは自分の煙では隠れない
+  addBurst(s.k,s.x,y,hid,ux(st,G.gt,s.x,s.alt)*st.kx*.5);
+  G.puffs.push({x:s.x,y,r:K.r*rScale(),al:smokeAl(st,K),a:s.alt,b:G.gt});
+  if(auto)return;
+  G.traces.push({pts:s.trail,life:1.6});
+  const P=G.pend; P.done++; P.xs.push(s.x); P.hid=P.hid||hid;
+  if(P.done<P.n)return;
+  judge(st,P);
+}
+function judge(st,P){
+  const p=st.prog[P.i], K=KINDS[P.k], y=burstY(P.k);
+  const bx=P.xs.reduce((a,b)=>a+b,0)/P.xs.length, d=bx-p.tx;
+  G.lastShot=Object.assign(P,{bx,d,y,no:P.i+1});
+  G.maxDev=Math.max(G.maxDev,Math.abs(d));
+  G.pend=null; G.i++;
+  if(bx<st.crowdL||bx>st.crowdR){ return failFx('crowd'); }
+  if(P.hid){ G.miss++; say(bx,y-K.r*rScale()-8,'見えない…'); if(G.miss>=3)return failFx('smoke'); return; }
+  if(Math.abs(d)<=K.tol*st.tolK){ G.hits++; G.cheer=1; say(bx,y-K.r*rScale()-8,P.i%2?'鍵屋ー！':'玉屋ー！'); }
+  else { G.miss++; say(bx,y-K.r*rScale()-8,'あぁ…'); if(G.miss>=3)return failFx('zure'); }
+}
+function say(x,y,t){ G.texts.push({x:clamp(x,40,W-40),y:Math.max(LY.top+18,y),t,life:1.4}); }
+
+function update(dt){
+  const st=STAGES[G.stage];
+  G.acc+=dt; G.fr=G.fr||0;
+  while(G.acc>=DT){ G.acc-=DT; G.fr++; physStep(); }
+  if(G.guide>0)G.guide-=dt;
+  if(G.screen==='play'&&!G.shells.length&&!G.pend){
+    if(G.i>=st.prog.length){ G.endWait=(G.endWait||0)+dt; if(G.endWait>1.1){ G.endWait=0; finaleFx(); } }
+    else if(G.gt>=st.dur) failFx('time');
+  }
+}
+// 画面内の演出（判子の前に canvas で起こす）
+function failFx(type){
+  G.screen='fx'; G.fx={type,t:0,dur:type==='crowd'?1.2:1.1}; buzz([30,40,80]);
+  if(type==='crowd'){ G.duck=1; G.duckX=G.lastShot.bx; const y=G.lastShot.y;
+    G.embers=[]; for(let i=0;i<70;i++){ const a=Math.random()*Math.PI*2, v=30+Math.random()*90; G.embers.push({x:G.lastShot.bx+Math.cos(a)*30,y:y+Math.sin(a)*30,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.5,px:0,py:0}); }
+    for(let i=0;i<5;i++)G.texts.push({x:clamp(G.lastShot.bx+(i-2)*58,40,W-40),y:LY.bankY-6-(i%2)*16,t:['うわっ','ざわ…','きゃー','危ない','ざわ…'][i],life:1.6}); }
+  if(type==='smoke'){ for(let i=0;i<6;i++)G.puffs.push({x:60+i*60,y:LY.top+80+(i%3)*60,r:90,al:.0,a:.6,grow:true}); }
+}
+function finaleFx(){
+  G.screen='fx'; G.fx={type:'finale',t:0,dur:2.6,n:0}; G.cheer=1;
+}
+function fxUpdate(dt){
+  const st=STAGES[G.stage], f=G.fx; f.t+=dt;
+  G.acc+=dt; while(G.acc>=DT){ G.acc-=DT; G.fr++; const sh=G.shells; G.shells=[]; physStep(); G.shells=sh; }
+  if(f.type==='finale'){
+    const xs=[120,300,210,160,260,90,330,210];
+    while(f.n<xs.length&&f.t>f.n*.22){ const k=['kamuro','yae','sanjaku','kamuro','yae','kiku','kiku','kamuro'][f.n];
+      const s=newShell(k,xs[f.n],G.gt); s.alt=KINDS[k].alt*(.85+.1*(f.n%3)); burst(st,s,true); f.n++; G.cheer=1;
+      if(f.n%2)say(xs[f.n-1],burstY(k)-60,f.n%4===1?'玉屋ー！':'鍵屋ー！'); }
+  }
+  if(f.type==='smoke'){ for(const p of G.puffs)if(p.grow){ p.al=Math.min(.8,p.al+dt*.9); p.r+=dt*40; } }
+  if(f.t>=f.dur){ G.fx=null; f.type==='finale'?clear():fail(f.type); }
+}
+
+// ---- 結果 ----------------------------------------------------
+function fail(type){
+  G.screen='result'; setTimeout(()=>sheetKind('chou'));
+  const st=STAGES[G.stage], L=G.lastShot, N=st.prog.length, now=hhmm(realMin(st,G.gt));
+  let title,lead,stamp;
+  const m=v=>Math.round(Math.abs(v)*PX_M/st.kx);
+  const side=v=>v<0?'左':'右';
+  if(type==='crowd'){ const K=KINDS[L.k];
+    title='観覧席の上で開花'; stamp='中止';
+    lead=`第${L.no}番 ${K.gou}「${K.name}」が${L.dir}の風に流され、印から${side(L.d)}へ${m(L.d)}m、観覧席の真上で開きました。${L.gust>.5?'突風の帯が筒の上を通る最中に打っています。':''}\n「本部よりお知らせします。安全確保のため、ただいま打上げを中止しております」`; }
+  else if(type==='smoke'){ const K=KINDS[L.k];
+    title='煙で花火が見えない'; stamp='煙幕';
+    lead=`第${L.no}番 ${K.gou}「${K.name}」は、前の玉の煙が残る中で開きました。風速${L.spd.toFixed(1)}m/s・湿度${st.hum}%で、煙が流れていません。\n「煙のため、花火が見えにくくなっております。しばらくお待ちください」`; }
+  else if(type==='zure'){ const K=KINDS[L.k];
+    title='印からずれて3発'; stamp='交代';
+    lead=`第${L.no}番 ${K.gou}「${K.name}」が印から${side(L.d)}へ${m(L.d)}m。\n親方「風の帯が筒に来る前か後か、見てから打て。……代われ」`; }
+  else { title='終了時刻を過ぎた'; stamp='時間切';
+    lead=`${hhmm(st.m1)}を過ぎても、筒に${N-G.i}発が残っています。\n「以上をもちまして、本日の打上げはすべて終了いたしました」`; }
+  UI.sheet({no:GAME_NO+' · 宵星煙火店 打上げ日報',title,lead,stamp,
+    rows:[['会場',st.name],['時刻',st.date+' '+now],['決まった玉',G.hits+' / '+N+' 発'],['この時刻の風',fmtWind(st,G.gt)],['確認','']],
+    main:['この会場をやり直す',restart],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.short+' '+now+'、第'+(L?L.no:G.i)+'番で「'+title+'」（決まった玉 '+G.hits+'/'+N+'発・'+fmtWind(st,G.gt)+'）',TAG)],['一覧へ',toPortal]]});
+}
+function fmtWind(st,gt){ const b=base(st,gt); return b.row[1]+'の風 '+b.spd.toFixed(1)+'m/s（瞬間'+b.gust.toFixed(1)+'）'; }
+function clear(){
+  G.screen='result'; setTimeout(()=>sheetKind('chou'));
+  const st=STAGES[G.stage], N=st.prog.length, last=G.stage>=STAGES.length-1, now=hhmm(realMin(st,G.gt));
+  const gmax=Math.max(...st.rows.map(r=>r[2]));
+  UI.sheet({no:GAME_NO+' · 宵星煙火店 打上げ日報',title:st.short+' 打上げ終了',stamp:last?'玉屋':'鍵屋',round:true,
+    lead:last?'四会場、番組どおりに上げきりました。\n「本日の花火大会は、すべての番組を終了いたしました。お帰りの際は足元にお気をつけください」':'大玉の連発に、土手から拍手が続いています。\n親方「次の会場、行くぞ」',
+    rows:[['会場',st.name+'（'+st.date+'）'],['決まった玉',G.hits+' / '+N+' 発（ずれ '+G.miss+'）'],['最後の玉',now],['最大瞬間風速',gmax.toFixed(1)+' m/s'],['確認','']],
+    main:[last?'はじめから':'次の会場へ',()=>startStage(last?0:G.stage+1)],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.short+'（'+st.date+'）を打ち上げきった。決まった玉 '+G.hits+'/'+N+'発・最大瞬間風速'+gmax.toFixed(1)+'m/s',TAG)],['一覧へ',toPortal]]});
+}
+function sheetKind(k){ $('sheet').className=k; }
+function showTitle(){
+  G.screen='title'; UI.hideHud(); G.stage=0; initWind();
+  UI.sheet({no:GAME_NO+' · 令和七年 夏の花火大会 番組表',title:'花火打上げ職人',
+    lead:'宵星煙火店の若い衆として、四会場の番組を打ち上げる。\n風に流される分を見越し、夜空の「印」で玉を開かせる。',
+    rows:[['第一会場','長岡　8月2日 19:20'],['第二会場','大曲　8月30日 18:50'],['第三会場','諏訪湖　8月15日 19:00'],['第四会場','隅田川　7月26日 19:00'],
+      ['あなたの権限','風が見える（夜空を流れる風の筋と、突風の帯）'],['操作','タップで打上げ（1回で1発）'],['失敗','観覧席の上で開く／煙の中で開く／印から3発ずれる'],
+      ['風況提供（出典）','気象庁「過去の気象データ」10分値（アメダス長岡・アメダス大曲・諏訪・東京）data.jma.go.jp/stats/etrn/ ／画面の向き・突風の周期・上空の増速は概略値。番組は本作の固定番組']],
+    main:['はじめる',()=>startStage(0)],subs:[['一覧へ',toPortal]]});
+  sheetKind('prog');
+}
+
+// ================================================================
+// 描画
+// ================================================================
+const FONT=getComputedStyle(document.body).fontFamily;
+function rng(seed){ let s=seed>>>0; return ()=>(s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296; }
+function mix(a,b,t){ const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);
+  const r=(pa>>16)+(((pb>>16)-(pa>>16))*t), g=((pa>>8)&255)+((((pb>>8)&255)-((pa>>8)&255))*t), bl=(pa&255)+(((pb&255)-(pa&255))*t);
+  return 'rgb('+(r|0)+','+(g|0)+','+(bl|0)+')'; }
+
+// ---- 風の筋（権限）: ゲームの物理と同じ ux() を描く ----
+let WP=[];
+function initWind(){ WP=[]; for(let i=0;i<170;i++)WP.push({x:Math.random()*W,y:0,fy:Math.random(),life:Math.random()*3}); }
+function drawWind(dt){
+  const st=STAGES[G.stage], b=base(st,G.gt), c=crossK(st,b.dir), sgn=c>=0?1:-1;
+  const top=LY.top+6, bot=LY.riverY-10;
+  ctx.lineCap='round';
+  for(const p of WP){
+    const y=top+(bot-top)*p.fy, a=clamp((LY.y0-y)/LY.altPx,0,1);
+    const g=gustG(st,G.gt,p.x,sgn), u=ux(st,G.gt,p.x,a)*st.kx;
+    if(G.screen==='play'||G.screen==='fx'){ p.x+=u*dt*1.0; p.life-=dt; }
+    if(p.x<-20||p.x>W+20||p.life<0){ p.x=Math.abs(u)<4?Math.random()*W:(u>0?-10-Math.random()*30:W+10+Math.random()*30); p.fy=Math.random(); p.life=2+Math.random()*3; }
+    const len=Math.max(5,Math.abs(u)*.22)*(1+g*.8);
+    ctx.strokeStyle='rgba(190,225,255,'+(.10+.42*g).toFixed(3)+')'; ctx.lineWidth=1+g*1.2;
+    ctx.beginPath(); ctx.moveTo(p.x,y); ctx.lineTo(p.x-Math.sign(u||1)*len,y+Math.sin(p.x*.05+p.fy*20)*1.5); ctx.stroke();
+  }
+}
+
+// ---- 空・背景 ----
+function drawSky(){
+  const st=STAGES[G.stage];
+  const gr=ctx.createLinearGradient(0,0,0,LY.riverY);
+  const tops={nagaoka:'#070b18',suwa:'#081022',sumida:'#0b0f1e',omagari:'#0a0f17'};
+  gr.addColorStop(0,'#060914'); gr.addColorStop(.7,'#101a33'); gr.addColorStop(1,st.short==='隅田川'?'#2a2a3e':'#1a2440');
+  ctx.fillStyle=gr; ctx.fillRect(0,0,W,LY.riverY+2);
+  if(G.flash>0){ ctx.globalAlpha=Math.min(.35,G.flash*.3); ctx.fillStyle=G.flashCol; ctx.fillRect(0,0,W,LY.riverY); ctx.globalAlpha=1; }
+}
+function drawFar(){
+  const st=STAGES[G.stage], R=LY.riverY, sky=R-LY.top, r=rng(st.seed*7+1), lit=G.flash;
+  const dark=mix('#0d1222','#3a4058',Math.min(1,lit*.4));
+  if(st.short==='長岡'){
+    ctx.fillStyle='#0c1325'; ctx.beginPath(); ctx.moveTo(0,R-40);
+    for(let x=0;x<=W;x+=20)ctx.lineTo(x,R-40-28*Math.sin(x*.012+1)-12*Math.sin(x*.05)); ctx.lineTo(W,R); ctx.lineTo(0,R); ctx.fill();
+    cityRow(r,R,22,'#111a2e');
+    // 長生橋（トラス）
+    ctx.strokeStyle=mix('#2c3550','#8890a8',Math.min(1,lit*.5)); ctx.lineWidth=1.4;
+    const bx0=230,bx1=W,by=R-14; ctx.beginPath(); ctx.moveTo(bx0,by); ctx.lineTo(bx1,by);
+    for(let x=bx0;x<bx1;x+=38){ ctx.moveTo(x,by); ctx.quadraticCurveTo(x+19,by-22,x+38,by); for(let k=1;k<4;k++){ ctx.moveTo(x+k*9.5,by); ctx.lineTo(x+k*9.5,by-22*Math.sin(Math.PI*k/4)); } }
+    ctx.stroke();
+    for(let x=bx0+4;x<bx1;x+=9){ ctx.fillStyle='rgba(255,214,140,.7)'; ctx.fillRect(x,by-2,1.6,1.6); }
+  } else if(st.short==='諏訪湖'){
+    ctx.fillStyle='#0b1222'; ctx.beginPath(); ctx.moveTo(0,R-70);
+    for(let x=0;x<=W;x+=14)ctx.lineTo(x,R-62-40*Math.sin(x*.009+.4)-14*Math.sin(x*.04)); ctx.lineTo(W,R); ctx.lineTo(0,R); ctx.fill();
+    ctx.fillStyle='#0f1830'; ctx.beginPath(); ctx.moveTo(0,R-24);
+    for(let x=0;x<=W;x+=14)ctx.lineTo(x,R-22-12*Math.sin(x*.02+2)); ctx.lineTo(W,R); ctx.lineTo(0,R); ctx.fill();
+    for(let i=0;i<70;i++){ const x=r()*W,y=R-2-r()*14; ctx.fillStyle=r()<.7?'rgba(255,214,150,.75)':'rgba(220,235,255,.6)'; ctx.fillRect(x,y,1.5,1.5); }
+    // 初島
+    ctx.fillStyle='#0a1020'; ctx.beginPath(); ctx.ellipse(110,R+3,26,5,0,Math.PI,0); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(96,R); ctx.quadraticCurveTo(104,R-14,112,R-2); ctx.quadraticCurveTo(118,R-12,126,R); ctx.fill();
+  } else if(st.short==='隅田川'){
+    cityRow(r,R,70,'#141a2c');
+    // 東京スカイツリー（対岸）
+    const tx=292, th=Math.min(sky*.66,360), tb=R-8;
+    ctx.fillStyle=mix('#1b2238','#4a5370',Math.min(1,lit*.5));
+    ctx.beginPath(); ctx.moveTo(tx-20,tb); ctx.quadraticCurveTo(tx-6,tb-th*.4,tx-4,tb-th*.72); ctx.lineTo(tx+4,tb-th*.72); ctx.quadraticCurveTo(tx+6,tb-th*.4,tx+20,tb); ctx.fill();
+    ctx.fillRect(tx-8,tb-th*.56,16,5); ctx.fillRect(tx-6,tb-th*.71,12,4); ctx.fillRect(tx-1.5,tb-th,3,th*.29);
+    ctx.strokeStyle='rgba(150,200,255,.55)'; ctx.lineWidth=1; ctx.beginPath();
+    for(let k=1;k<10;k++){ const y=tb-th*.7*k/10, w=20-16*(k/10)**.7; ctx.moveTo(tx-w,y); ctx.lineTo(tx+w,y); } ctx.stroke();
+    ctx.fillStyle='rgba(170,215,255,.9)'; ctx.fillRect(tx-8,tb-th*.56+1,16,2); ctx.fillRect(tx-6,tb-th*.71+1,12,1.5);
+    ctx.fillStyle='#ff5b4d'; ctx.fillRect(tx-1,tb-th-2,2,2);
+  } else {
+    ctx.fillStyle='#0b1320'; ctx.beginPath(); ctx.moveTo(0,R-30);
+    ctx.quadraticCurveTo(90,R-50,170,R-80); ctx.quadraticCurveTo(215,R-104,262,R-78); ctx.quadraticCurveTo(330,R-44,W,R-36); ctx.lineTo(W,R); ctx.lineTo(0,R); ctx.fill();
+    ctx.fillStyle='#09101b'; for(let x=0;x<W;x+=9){ const h=8+r()*8; ctx.beginPath(); ctx.moveTo(x,R-6); ctx.lineTo(x+4.5,R-6-h); ctx.lineTo(x+9,R-6); ctx.fill(); }
+    ctx.fillStyle='#1a2235'; ctx.fillRect(0,R-6,W,6);
+    for(let i=0;i<40;i++){ ctx.fillStyle='rgba(255,210,140,.55)'; ctx.fillRect(r()*W,R-4,1.3,1.3); }
+  }
+}
+function cityRow(r,R,hMax,col){
+  let x=-4; while(x<W){ const w=12+r()*26, h=10+r()*hMax; ctx.fillStyle=col; ctx.fillRect(x,R-h,w,h);
+    for(let yy=R-h+4;yy<R-3;yy+=6)for(let xx=x+3;xx<x+w-3;xx+=5)if(r()<.32){ ctx.fillStyle=r()<.8?'rgba(255,220,150,.55)':'rgba(200,230,255,.5)'; ctx.fillRect(xx,yy,2,2.2); }
+    x+=w+1; }
+}
+function drawWater(){
+  const R=LY.riverY, B=LY.bankY;
+  const gr=ctx.createLinearGradient(0,R,0,B); gr.addColorStop(0,'#141d36'); gr.addColorStop(1,'#070b16');
+  ctx.fillStyle=gr; ctx.fillRect(0,R,W,B-R);
+  if(G.flash>0){ ctx.globalAlpha=Math.min(.25,G.flash*.2); ctx.fillStyle=G.flashCol; ctx.fillRect(0,R,W,B-R); ctx.globalAlpha=1; }
+  // 川面に映る花火（上下反転・縦に潰す・揺らぐ）
+  ctx.save(); ctx.beginPath(); ctx.rect(0,R,W,B-R); ctx.clip();
+  ctx.globalCompositeOperation='lighter';
+  for(const b of G.bursts){ const t=G.gt-b.t0, K=KINDS[b.k], f=1-t/K.life; if(f<=0)continue;
+    for(let yy=R+2;yy<B;yy+=3){ const w=K.r*rScale()*.8*(1-(yy-R)/(B-R)*.4)*(.6+.4*Math.sin(yy*.9+G.gt*7)), dy=(yy-R);
+      ctx.globalAlpha=Math.min(.5,f*.35*(1-dy/(B-R))); ctx.fillStyle=b.col; ctx.fillRect(b.x-w/2+Math.sin(yy*.7+G.gt*5)*4,yy,w,1.3); } }
+  ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+  // 街明かりの映り込み
+  const r=rng(STAGES[G.stage].seed*3);
+  for(let i=0;i<34;i++){ const x=r()*W,len=4+r()*16; ctx.fillStyle='rgba(255,210,150,'+(.12+r()*.15)+')'; ctx.fillRect(x+Math.sin(G.gt*2+i)*2,R+3+r()*(B-R)*.5,len,1); }
+  ctx.restore();
+}
+function drawSide(){
+  const st=STAGES[G.stage], R=LY.riverY, B=LY.bankY, dk=G.duck?1:0;
+  if(st.short==='隅田川'){ // 左手前から対岸へ渡る橋。欄干に人が鈴なり
+    const x1=st.crowdL+6;
+    ctx.fillStyle='#10172a'; ctx.beginPath(); ctx.moveTo(0,B-30); ctx.lineTo(x1,R-6); ctx.lineTo(x1,R+2); ctx.lineTo(0,B-8); ctx.fill();
+    ctx.strokeStyle='#0c1220'; ctx.lineWidth=3; ctx.beginPath(); for(let k=0;k<3;k++){ const u0=k/3,u1=(k+1)/3, xa=u0*x1,xb=u1*x1, ya=(B-8)+(R+2-(B-8))*u0, yb=(B-8)+(R+2-(B-8))*u1; ctx.moveTo(xa,ya); ctx.quadraticCurveTo((xa+xb)/2,(ya+yb)/2+22*(1-u0),xb,yb); } ctx.stroke();
+    ctx.strokeStyle='rgba(140,160,200,.55)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(0,B-36); ctx.lineTo(x1,R-9); ctx.stroke();
+    const lit=.15+Math.min(.8,G.flash*.5), types=['man','yukataW','kata','couple','elder','student','yukataW','kid'];
+    for(let k=26;k>=0;k--){ const u=k/27, x=u*x1+4, y=(B-30)+(R-6-(B-30))*u+1, sc=.36-.28*u;
+      person(x,y+dk*sc*8,sc,types[k%8],lit,{x,ph:k,col:YUKATA[k%6]}); }
+    ctx.fillStyle='rgba(255,220,150,.85)'; for(let k=0;k<6;k++){ const u=(k+.5)/6; ctx.fillRect(u*x1,(B-40)+(R-12-(B-40))*u-6+4*u,1.8,1.8); }
+  }
+  if(st.short==='諏訪湖'){ // 右手の湖畔公園。観覧の人
+    const x0=st.crowdR+14, lit=.15+Math.min(.8,G.flash*.5);
+    ctx.fillStyle='#141a1c'; ctx.beginPath(); ctx.moveTo(x0+70,R+1); ctx.lineTo(W,R); ctx.lineTo(W,B); ctx.lineTo(x0+10,B); ctx.lineTo(x0+70,R+1); ctx.fill();
+    ctx.strokeStyle='rgba(200,190,160,.35)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x0+70,R+1); ctx.lineTo(x0+10,B); ctx.stroke();
+    const types=['man','yukataW','kid','couple','elder','yukataW','student','big'];
+    for(let k=0;k<16;k++){ const u=1-k/16, y=R+4+(B-R-2)*(1-u), xl=x0+70-60*(1-u), sc=.14+.3*(1-u);
+      for(let j=0;j<3;j++){ const x=xl+12+j*(W-xl)/3+((k*7+j*5)%9); if(x>W+10)continue;
+        person(x,y+(G.duck?sc*6:0),sc,types[(k*3+j)%8],lit,{x,ph:k+j,col:YUKATA[(k+j)%6]}); } }
+  }
+}
+function drawBuoys(){
+  const st=STAGES[G.stage];
+  for(const cx of [st.crowdL,st.crowdR]){ if(cx<=24||cx>=396)continue;
+    for(let k=0;k<4;k++){ const y=LY.riverY+6+k*(LY.bankY-LY.riverY-12)/3, s=2+k*.8;
+      ctx.fillStyle='#e0702a'; ctx.beginPath(); ctx.arc(cx+(k-1.5)*(cx<210?-3:3),y+Math.sin(G.gt*2+k)*1,s,0,7); ctx.fill(); } }
+}
+function drawBarge(){
+  const st=STAGES[G.stage], y=LY.bargeY, p=st.prog[G.i];
+  const xs=[...new Set(st.prog.map(q=>q.x))], x0=Math.min(...xs)-26, x1=Math.max(...xs)+26;
+  ctx.fillStyle='#1c1f26'; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.lineTo(x1-6,y+9); ctx.lineTo(x0+6,y+9); ctx.fill();
+  ctx.fillStyle='#2b2f39'; ctx.fillRect(x0,y-2,x1-x0,3);
+  // 筒（モルタル）。次に使う筒の口に火種
+  for(const x of xs){ ctx.fillStyle='#4a4e57'; ctx.fillRect(x-4,y-12,8,11); ctx.fillStyle='#22252c'; ctx.fillRect(x-4,y-12,8,2); }
+  if(p&&G.screen==='play'&&!G.shells.length&&!G.pend){ const f=.6+.4*Math.sin(G.gt*12);
+    ctx.fillStyle='rgba(255,170,60,'+f+')'; ctx.beginPath(); ctx.arc(p.x,y-13,2.4,0,7); ctx.fill(); }
+  // 吹き流し（その時刻の風を受ける）
+  const fx=x1-8, top=y-40, b=base(st,G.gt), u=ux(st,G.gt,fx,0);
+  ctx.strokeStyle='#8a8f99'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(fx,y-2); ctx.lineTo(fx,top); ctx.stroke();
+  const L=24, ang=clamp(u/8,-1,1)*1.25;
+  ctx.fillStyle='#d8d2c2'; ctx.beginPath(); ctx.moveTo(fx,top);
+  const ex=fx+Math.sin(ang)*L, ey=top+Math.cos(ang)*L*.95;
+  ctx.quadraticCurveTo(fx+Math.sin(ang)*L*.5+Math.sin(G.gt*9)*2,top+4,ex,ey-3);
+  ctx.lineTo(ex,ey+2); ctx.quadraticCurveTo(fx+Math.sin(ang)*L*.5,top+10,fx,top+7); ctx.fill();
+  // 職人（法被姿）
+  person(x0+14,y-1,.55,'hapi',0);
+}
+function drawMarker(){
+  const st=STAGES[G.stage], p=st.prog[G.i]; if(!p||G.screen==='result'||G.screen==='title')return;
+  const K=KINDS[p.k], y=burstY(p.k), r=K.r*rScale()*.55, x=p.tx;
+  ctx.save(); ctx.strokeStyle='rgba(243,239,228,.55)'; ctx.lineWidth=1.2; ctx.setLineDash([3,5]);
+  ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(243,239,228,.8)'; ctx.beginPath(); ctx.arc(x,y,K.tol*st.tolK,0,7); ctx.stroke();   // 芯がここに入れば決まり
+  ctx.beginPath(); ctx.moveTo(x-5,y); ctx.lineTo(x+5,y); ctx.moveTo(x,y-5); ctx.lineTo(x,y+5); ctx.stroke();
+  ctx.fillStyle='rgba(243,239,228,.75)'; ctx.font='600 11px '+FONT; ctx.textAlign='center';
+  ctx.fillText('第'+(G.i+1)+'番',x,y-r-6);
+  ctx.restore();
+}
+// ---- 花火 ----
+const PAL=[['#ffd36b','#ff7a4d'],['#ff6a5a','#ffe0a0'],['#8fd8ff','#ffffff'],['#b6ff8a','#ffd36b'],['#ff9ad5','#9fe3ff'],['#ffffff','#ffb347']];
+function addBurst(k,x,y,hid,vx){
+  const K=KINDS[k], pal=PAL[Math.floor(Math.random()*PAL.length)];
+  const b={k,x,y,t0:G.gt,col:k==='kamuro'?'#ffcf6a':pal[0],col2:pal[1],hid,vx,st:[]};
+  const n=k==='sanjaku'?170:k==='yashi'?14:k==='mine'?28:k==='botan'?60:90;
+  if(['dosei','heart','smile'].includes(k)){
+    for(let i=0;i<48;i++){ let a=i/48*Math.PI*2,dx,dy;
+      if(k==='heart'){ dx=16*Math.sin(a)**3/17; dy=-(13*Math.cos(a)-5*Math.cos(2*a)-2*Math.cos(3*a)-Math.cos(4*a))/17; }
+      else { dx=Math.cos(a)*.62; dy=Math.sin(a)*.62; }
+      b.st.push({dx,dy,c:0}); }
+    if(k==='dosei')for(let i=0;i<36;i++){ const a=i/36*Math.PI*2; b.st.push({dx:Math.cos(a)*1.05,dy:Math.sin(a)*.28-Math.cos(a)*.18,c:1}); }
+    if(k==='smile'){ b.st.push({dx:-.22,dy:-.18,c:1},{dx:.22,dy:-.18,c:1}); for(let i=0;i<9;i++){ const a=.5+i/8*2.14; b.st.push({dx:Math.cos(a)*.35,dy:Math.sin(a)*.32,c:1}); } }
+  } else {
+    for(let i=0;i<n;i++){ const z=Math.random()*2-1, a=Math.random()*Math.PI*2, q=Math.sqrt(1-z*z);
+      b.st.push({dx:Math.cos(a)*q,dy:Math.sin(a)*q,c:0,s:.92+Math.random()*.12}); }
+    if(k==='yae'||k==='sanjaku')for(let i=0;i<40;i++){ const a=Math.random()*Math.PI*2; b.st.push({dx:Math.cos(a)*.42,dy:Math.sin(a)*.42,c:1,s:1}); }
+  }
+  G.bursts.push(b); G.flash=Math.min(1.4,G.flash+(K.r/90)); G.flashCol=b.col;
+}
+function drawBursts(){
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.lineCap='round';
+  G.bursts=G.bursts.filter(b=>G.gt-b.t0<KINDS[b.k].life);
+  for(const b of G.bursts){
+    const K=KINDS[b.k], t=G.gt-b.t0, f=1-t/K.life, R=K.r*rScale();
+    const dens=smokeAt(G.puffs,b.x,b.y);
+    const vis=b.hid?.18:Math.max(.25,1-dens*.6);
+    const grav=b.k==='kamuro'?26:b.k==='yashi'?22:b.k==='sanjaku'?14:10;
+    const ex=b.k==='kamuro'?2.2:b.k==='yashi'?2.4:3.4;
+    const P=tt=>{ const g=1-Math.exp(-tt*ex); return g; };
+    const tl=b.k==='kamuro'?.55:b.k==='yashi'?.45:b.k==='botan'||b.k==='mine'?0:.16;
+    for(const s of b.st){
+      const rr=R*(s.s||1);
+      const px=tt=>b.x+s.dx*rr*P(tt)+b.vx*tt, py=tt=>b.y+s.dy*rr*P(tt)+grav*tt*tt;
+      const col=s.c?b.col2:(t>K.life*.45&&b.k!=='kamuro'?b.col2:b.col);
+      const al=(f<.3?f/.3:1)*vis*(b.k==='kamuro'?(.6+.4*Math.random()):1);
+      ctx.globalAlpha=al;
+      if(tl>0){ ctx.strokeStyle=col; ctx.lineWidth=b.k==='yashi'?3:1.5; ctx.beginPath(); ctx.moveTo(px(Math.max(0,t-tl)),py(Math.max(0,t-tl)));
+        ctx.lineTo(px(t*.5+Math.max(0,t-tl)*.5),py(t*.5+Math.max(0,t-tl)*.5)); ctx.lineTo(px(t),py(t)); ctx.stroke(); }
+      ctx.fillStyle=col; ctx.beginPath(); ctx.arc(px(t),py(t),b.k==='yashi'?2.6:1.8,0,7); ctx.fill();
+    }
+    if(t<.12){ ctx.globalAlpha=(1-t/.12)*.8*vis; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(b.x,b.y,R*.25,0,7); ctx.fill(); }
+  }
+  ctx.restore();
+}
+function drawShells(){
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  for(const tr of G.traces){ if(tr.pts.length<2)continue; ctx.globalAlpha=Math.min(.35,tr.life*.3); ctx.strokeStyle='#ffd9a0'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(tr.pts[0][0],tr.pts[0][1]); for(const q of tr.pts)ctx.lineTo(q[0],q[1]); ctx.stroke(); }
+  for(const s of G.shells){ if(s.wait>0)continue; const n=s.trail.length;
+    for(let i=Math.max(0,n-14);i<n;i++){ const q=s.trail[i]; ctx.globalAlpha=(i-(n-14))/14*.8; ctx.fillStyle='#ffcc80'; ctx.fillRect(q[0]-1+Math.random()*2-1,q[1],1.6,1.6); }
+    const y=LY.y0-s.a*LY.altPx; ctx.globalAlpha=1; ctx.fillStyle='#fff3d0'; ctx.beginPath(); ctx.arc(s.x,y,2.2,0,7); ctx.fill(); }
+  ctx.restore();
+}
+function drawSmoke(){
+  for(const p of G.puffs){ if(p.al<.02)continue;
+    const lit=Math.min(1,G.flash*.5), age=p.b===undefined?1:clamp((G.gt-p.b)/1.2,0,1);
+    ctx.fillStyle=mix('#2c3242','#7a8296',lit); ctx.globalAlpha=Math.min(.62,p.al*.7)*age;
+    ctx.beginPath(); for(let k=0;k<5;k++){ const a=k*1.26+p.r*.01; ctx.moveTo(p.x+Math.cos(a)*p.r*.35+p.r*.65,p.y+Math.sin(a)*p.r*.3);
+      ctx.arc(p.x+Math.cos(a)*p.r*.35,p.y+Math.sin(a)*p.r*.3,p.r*.65,0,7); } ctx.fill(); }
+  ctx.globalAlpha=1;
+}
+
+// ---- 土手の観客（後ろ姿）----
+let CROWD=[];
+const CTYPES=['yukataW','kata','man','elder','kid','big','student','couple','yukataW','stroller','man','kidF','yukataW','big','elder','student'];
+const YUKATA=['#2e3d6b','#6b2e4a','#d9d2c0','#3b5a4a','#5a3e6b','#27324f'];
+function buildCrowd(){
+  CROWD=[]; const r=rng(99);
+  let x=-6; let i=0;   // 後列（小さめ）
+  while(x<W+20){ CROWD.push({x,row:0,type:CTYPES[(i*5+3)%CTYPES.length],col:YUKATA[i%YUKATA.length],s:.62+r()*.08,ph:r()*6}); x+=24+r()*10; i++; }
+  x=8; i=0;
+  while(x<W+20){ const type=CTYPES[i%CTYPES.length]; CROWD.push({x,row:1,type,col:YUKATA[(i*3+1)%YUKATA.length],s:.9+r()*.1,ph:r()*6});
+    x+=(type==='couple'?62:type==='big'?46:type==='stroller'?54:38)+r()*8; i++; }
+}
+function drawBank(){
+  const B=LY.bankY, S=LY.stripY;
+  ctx.fillStyle='#0b1110'; ctx.beginPath(); ctx.moveTo(0,B+6); ctx.quadraticCurveTo(W/2,B-6,W,B+4); ctx.lineTo(W,S); ctx.lineTo(0,S); ctx.fill();
+  // 提灯（屋台の並び）
+  for(let k=0;k<12;k++){ const x=12+k*36, y=B-2+Math.sin(k*.9)*2;
+    ctx.fillStyle='rgba(255,120,70,.18)'; ctx.beginPath(); ctx.arc(x,y,9,0,7); ctx.fill();
+    ctx.fillStyle=k%3===1?'#f2e3c0':'#e5553e'; ctx.beginPath(); ctx.ellipse(x,y,3.6,5,0,0,7); ctx.fill(); }
+  ctx.strokeStyle='rgba(30,30,30,.9)'; ctx.lineWidth=.8; ctx.beginPath(); ctx.moveTo(0,B-8); for(let k=0;k<12;k++)ctx.lineTo(12+k*36,B-7+Math.sin(k*.9)*2); ctx.stroke();
+  // 屋台（左右の端）
+  stall(18,B+8,'#e8e0cc','#c84b3a'); stall(W-60,B+6,'#e8e0cc','#2f6aa8');
+  const lit=.18+Math.min(.8,G.flash*.5);
+  for(const c of CROWD){ const base=c.row?S+6:B+40;
+    const duck=G.duck&&Math.abs(c.x-G.duckX)<130?4*c.s:0;
+    person(c.x,base+duck,c.s*(c.row?1.25:1),c.type,lit,c);
+  }
+}
+function stall(x,y,a,b){ ctx.fillStyle='#3a2a1e'; ctx.fillRect(x,y-18,42,18);
+  for(let k=0;k<6;k++){ ctx.fillStyle=k%2?a:b; ctx.fillRect(x-2+k*7.6,y-26,7.6,8); }
+  ctx.fillStyle='rgba(255,200,120,.75)'; ctx.fillRect(x+4,y-16,34,6); }
+// 1人を描く（後ろ姿。頭・髪・肩・服・持ち物）。y は描画の下端
+function person(x,y,s,type,lit,c){
+  const ph=c?c.ph:0, arms=G.cheer>0&&c&&((c.x*7|0)%3!==0);
+  const sk=mix('#1a1c22','#6c625a',lit), hair=mix('#07080b','#2a2a30',lit);
+  const clothBase=c?c.col:'#1f2a44', cloth=mix(mix(clothBase,'#06080e',.62),clothBase,lit*.8);
+  const sway=Math.sin(G.gt*1.3+ph)*.8;
+  ctx.save(); ctx.translate(x+sway,y); ctx.scale(s,s);
+  const body=(w,h,col)=>{ ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(-w/2,0); ctx.lineTo(-w/2+1,-h+10); ctx.quadraticCurveTo(-w/2+2,-h,-w/2+12,-h-2); ctx.lineTo(w/2-12,-h-2); ctx.quadraticCurveTo(w/2-2,-h,w/2-1,-h+10); ctx.lineTo(w/2,0); ctx.fill(); };
+  const head=(hy,r,col)=>{ ctx.fillStyle=col; ctx.beginPath(); ctx.arc(0,hy,r,0,7); ctx.fill(); };
+  const armUp=(side,h,col)=>{ ctx.strokeStyle=col; ctx.lineWidth=6; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(side*14,-h+4); ctx.lineTo(side*20,-h-22); ctx.stroke(); ctx.fillStyle=sk; ctx.beginPath(); ctx.arc(side*20,-h-25,3.2,0,7); ctx.fill(); };
+  switch(type){
+    case 'hapi': // 法被の職人（はちまき）
+      body(30,44,'#1d3f78'); ctx.fillStyle='#e9e2d0'; ctx.fillRect(-15,-26,30,2.4);
+      head(-53,9,hair); ctx.fillStyle='#e9e2d0'; ctx.fillRect(-9,-56,18,3); break;
+    case 'man':
+      if(arms)armUp(1,56,cloth); body(40,56,cloth); ctx.fillStyle=sk; ctx.fillRect(-4,-64,8,8); head(-70,11,hair); break;
+    case 'big':
+      if(arms)armUp(-1,58,cloth); body(54,58,cloth); ctx.fillStyle=sk; ctx.fillRect(-5,-66,10,8); head(-73,12.5,hair);
+      ctx.fillStyle=mix('#0a0a0a','#333',lit); ctx.beginPath(); ctx.arc(0,-76,12.6,Math.PI,0); ctx.fill(); break;
+    case 'yukataW': { // 浴衣の女性: 結い上げ髪・かんざし・帯の結び
+      if(arms)armUp(1,54,cloth); body(36,54,cloth);
+      { const ob=mix(mix(c&&c.ph>3?'#c8463c':'#c9a54a','#06080e',.55),c&&c.ph>3?'#c8463c':'#c9a54a',lit);
+      ctx.fillStyle=ob; ctx.fillRect(-17,-31,34,9);
+      ctx.beginPath(); ctx.ellipse(-6,-29,7,4.5,-.35,0,7); ctx.ellipse(6,-29,7,4.5,.35,0,7); ctx.fill();
+      }
+      ctx.fillStyle=sk; ctx.fillRect(-3.5,-62,7,8); head(-67,10,hair); ctx.beginPath(); ctx.arc(0,-78,6.5,0,7); ctx.fill();
+      ctx.strokeStyle=mix('#7a6a50','#e8d8a0',lit); ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(-9,-82); ctx.lineTo(9,-74); ctx.stroke();
+      ctx.fillStyle='#e5553e'; ctx.beginPath(); ctx.arc(9,-74,2,0,7); ctx.fill(); break; }
+    case 'kata': // 肩車: 父親の肩に子ども
+      body(44,56,cloth); ctx.fillStyle=sk; ctx.fillRect(-4,-64,8,8); head(-70,11,hair);
+      { const c2=mix(mix('#c8a040','#06080e',.6),'#c8a040',lit); ctx.save(); ctx.translate(0,-80);
+        ctx.fillStyle=c2; ctx.beginPath(); ctx.moveTo(-11,4); ctx.lineTo(-10,-18); ctx.quadraticCurveTo(0,-23,10,-18); ctx.lineTo(11,4); ctx.fill();
+        ctx.fillStyle=sk; ctx.fillRect(-14,-2,6,9); ctx.fillRect(8,-2,6,9);
+        ctx.strokeStyle=c2; ctx.lineWidth=4; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-8,-16); ctx.lineTo(arms?-16:-14,arms?-34:-6); ctx.moveTo(8,-16); ctx.lineTo(arms?16:14,arms?-34:-6); ctx.stroke();
+        head(-27,7.5,hair); ctx.fillStyle=hair; ctx.beginPath(); ctx.arc(-6,-31,3,0,7); ctx.arc(6,-31,3,0,7); ctx.fill(); ctx.restore(); }
+      break;
+    case 'elder': // 高齢者: 丸い背中・帽子・杖
+      ctx.save(); ctx.translate(0,0); ctx.fillStyle=cloth; ctx.beginPath(); ctx.moveTo(-18,0); ctx.lineTo(-17,-34); ctx.quadraticCurveTo(-10,-54,6,-50); ctx.quadraticCurveTo(18,-44,18,-30); ctx.lineTo(18,0); ctx.fill();
+      ctx.fillStyle=sk; head(-55,9,mix('#4a4a4a','#9a9a9a',lit)); ctx.fillStyle=mix('#1a1a14','#5a5440',lit); ctx.beginPath(); ctx.ellipse(-1,-61,13,3,0,0,7); ctx.fill(); ctx.fillRect(-7,-68,13,7);
+      ctx.strokeStyle=mix('#3a2a1a','#8a6a40',lit); ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(20,-24); ctx.lineTo(26,0); ctx.stroke(); ctx.restore(); break;
+    case 'kid': case 'kidF': // 子ども: うちわ
+      body(26,36,cloth); ctx.fillStyle=sk; head(-43,9,hair);
+      if(type==='kidF'){ ctx.fillStyle=hair; ctx.beginPath(); ctx.arc(-8,-48,4,0,7); ctx.arc(8,-48,4,0,7); ctx.fill(); }
+      ctx.strokeStyle=mix('#5a4a30','#b09060',lit); ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(12,-24); ctx.lineTo(18,-44); ctx.stroke();
+      ctx.fillStyle=mix(mix('#e8e0d0','#06080e',.6),'#e8e0d0',lit); ctx.beginPath(); ctx.arc(19,-50,7,0,7); ctx.fill(); break;
+    case 'student': // 学生: スマホを掲げる
+      body(34,54,cloth); ctx.fillStyle=sk; ctx.fillRect(-3.5,-62,7,8); head(-68,10.5,hair);
+      ctx.strokeStyle=cloth; ctx.lineWidth=5; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(12,-50); ctx.lineTo(16,-84); ctx.stroke();
+      ctx.fillStyle='#0a0a0a'; ctx.fillRect(12,-100,10,16); ctx.fillStyle='rgba(170,210,255,.85)'; ctx.fillRect(13,-99,8,14); break;
+    case 'couple':
+      ctx.save(); ctx.translate(-14,0); body(38,56,cloth); ctx.fillStyle=sk; ctx.fillRect(-4,-64,8,8); head(-70,11,hair); ctx.restore();
+      ctx.save(); ctx.translate(16,4); ctx.rotate(-.08); const cc=mix(mix('#c46a8a','#06080e',.62),'#c46a8a',lit); body(32,52,cc);
+      ctx.fillStyle=mix('#5a4a2a','#c9a54a',lit); ctx.fillRect(-15,-28,30,7); ctx.fillStyle=sk; ctx.fillRect(-3,-60,6,8); head(-65,9.5,hair); ctx.fillRect(-9.5,-66,19,14); ctx.restore(); break;
+    case 'stroller': // ベビーカーを押す人
+      body(36,54,cloth); ctx.fillStyle=sk; ctx.fillRect(-3.5,-62,7,8); head(-67,10,hair);
+      ctx.fillStyle=mix('#1a2030','#5a6680',lit); ctx.beginPath(); ctx.moveTo(22,-20); ctx.quadraticCurveTo(24,-44,46,-40); ctx.lineTo(46,-20); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle=mix('#1a2030','#5a6680',lit); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(16,-36); ctx.lineTo(24,-22); ctx.stroke(); break;
+  }
+  ctx.restore();
+}
+// ---- 番組表（下の帯）----
+function drawStrip(){
+  const st=STAGES[G.stage], S=LY.stripY, p=st.prog[Math.min(G.i,st.prog.length-1)];
+  ctx.fillStyle='#121a33'; ctx.fillRect(0,S,W,H-S); ctx.fillStyle='#B89B5E'; ctx.fillRect(0,S,W,1); ctx.fillRect(0,S+3,W,1);
+  ctx.textAlign='left'; ctx.fillStyle='#B3AA92'; ctx.font='500 11px '+FONT;
+  ctx.fillText(st.name+' 番組',14,S+18);
+  ctx.fillStyle='#EFE6CC'; ctx.font='700 15px '+FONT;
+  const K=KINDS[p.k];
+  ctx.fillText(G.i<st.prog.length?('第'+(G.i+1)+'番　'+K.gou+'　'+K.name):'打止め',14,S+38);
+  ctx.textAlign='right'; ctx.fillStyle='#B3AA92'; ctx.font='500 11px '+FONT; ctx.fillText(st.station+' 10分値',W-14,S+18);
+  const b=base(st,G.gt); ctx.fillStyle='#EFE6CC'; ctx.font='700 14px '+FONT;
+  ctx.fillText(b.row[1]+' '+b.spd.toFixed(1)+'m/s　瞬間'+b.gust.toFixed(1),W-14,S+38);
+}
+function drawTelop(){
+  const f=G.fx; let t=null;
+  if(f&&f.type==='crowd'&&f.t>.35)t='（場内放送）安全確保のため、ただいま打上げを中止しております';
+  if(f&&f.type==='smoke'&&f.t>.3)t='（場内放送）煙のため、花火が見えにくくなっております';
+  if(f&&f.type==='time'&&f.t>.2)t='（場内放送）以上をもちまして、本日の打上げは終了いたしました';
+  if(f&&f.type==='zure'&&f.t>.2)t='親方「……代われ」';
+  if(G.screen==='play'&&G.guide>0)t='親方「風の筋を見ろ。流される分を見越して、印で開かせろ」';
+  if(!t)return;
+  ctx.font='600 12.5px '+FONT; const w=Math.min(W-24,ctx.measureText(t).width+24), y=LY.top+10;
+  ctx.globalAlpha=G.screen==='play'?Math.min(1,G.guide):1;
+  ctx.fillStyle='rgba(16,18,26,.86)'; ctx.fillRect((W-w)/2,y,w,26); ctx.strokeStyle='rgba(243,239,228,.4)'; ctx.lineWidth=1; ctx.strokeRect((W-w)/2+.5,y+.5,w-1,25);
+  ctx.fillStyle='#F3EFE4'; ctx.textAlign='center'; ctx.fillText(t,W/2,y+17.5,W-36); ctx.globalAlpha=1;
+}
+function drawEmbers(dt){ // 観覧席へ降る燃えかす
+  if(!G.embers||!G.embers.length)return;
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.lineCap='round';
+  for(const e of G.embers){ e.px=e.x; e.py=e.y; e.vy+=260*dt; e.vx*=.99; e.x+=e.vx*dt; e.y+=e.vy*dt;
+    if(e.y>LY.stripY)continue; ctx.strokeStyle='rgba(255,170,70,.85)'; ctx.lineWidth=1.8; ctx.beginPath(); ctx.moveTo(e.px-e.vx*.05,e.py-e.vy*.05); ctx.lineTo(e.x,e.y); ctx.stroke(); }
+  ctx.restore();
+}
+function drawTexts(dt){
+  ctx.textAlign='center'; ctx.font='700 14px '+FONT;
+  G.texts=G.texts.filter(t=>(t.life-=dt)>0);
+  for(const t of G.texts){ ctx.globalAlpha=Math.min(1,t.life*1.5); ctx.fillStyle='#F3EFE4'; ctx.fillText(t.t,t.x,t.y-(1.4-t.life)*10); }
+  ctx.globalAlpha=1;
+}
+
+let lastDraw=0;
+function draw(){
+  const now=performance.now(), dt=lastDraw?Math.min(.05,(now-lastDraw)/1000):0; lastDraw=now;
+  if(!LY.top)onResize();
+  if(G.screen==='fx')fxUpdate(dt);
+  if(G.screen==='pause'&&$('sheet').className!=='prog')sheetKind('prog');
+  G.flash=Math.max(0,G.flash-dt*2.2); G.cheer=Math.max(0,G.cheer-dt*.7); if(G.screen==='play')G.duck=0;
+  for(const tr of G.traces)tr.life-=dt; G.traces=G.traces.filter(t=>t.life>0);
+  drawSky(); drawWind(dt); drawFar(); drawSmoke(); drawMarker(); drawShells(); drawBursts(); drawWater(); drawSide(); drawBuoys(); drawBarge(); drawBank(); drawEmbers(dt); drawStrip(); drawTexts(dt); drawTelop();
+  const st=STAGES[G.stage];
+  if(G.screen==='play'||G.screen==='pause'||G.screen==='fx'){
+    const rem=st.prog.length-G.i, late=realMin(st,G.gt)>st.m1-15;
+    UI.hud(st.short,(G.stage+1)+'/'+STAGES.length,(late?'<span class="warn">':'')+hhmm(realMin(st,G.gt))+(late?'</span>':'')+'　残'+rem+'発　'+(G.miss>=2?'<span class="warn">ずれ'+G.miss+'/3</span>':'ずれ'+G.miss+'/3'));
+  }
+}
+
+// ---- メインループ ----
+function frame(ts){
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.05):0; lastTs=ts;
+  if(G.screen==='play') update(dt);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle=getComputedStyle(document.body).backgroundColor; ctx.fillRect(0,0,VW,VH);
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR,TY*DPR);
+  draw();
+  requestAnimationFrame(frame);
+}
+window.addEventListener('resize',resize); resize();
+showTitle();
+requestAnimationFrame(frame);
+</script>
 </body>
 </html>

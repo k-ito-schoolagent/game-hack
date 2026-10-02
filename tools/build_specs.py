@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""仕様書ステータスのゲームについて、SPEC.md と プレースホルダ index.html を生成する。
+"""仕様書ステータス（status: spec）のゲームについて、SPEC.md と プレースホルダ index.html を生成する。
 使い方: python3 tools/build_specs.py
 """
 import json
@@ -78,40 +78,40 @@ PLACEHOLDER_HTML = """<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title}（仕様書公開中） | GAME HACK</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{title}（仕様書） | GAME HACK</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>{mark}</text></svg>">
 <style>
-  body{{margin:0;background:#0d1526;color:#eaf3fc;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.8}}
-  .wrap{{max-width:640px;margin:0 auto;padding:40px 20px 64px}}
-  .badge{{display:inline-block;font-size:12px;font-weight:700;border:1px solid #ffb300;color:#ffb300;border-radius:6px;padding:2px 10px;margin-bottom:14px}}
-  h1{{font-size:26px;margin:0 0 14px}}
-  p,li{{font-size:14.5px;color:#c9dcf2}}
-  a{{color:#ffb300}}
-  .box{{background:#16233c;border-radius:12px;padding:14px 16px;margin:14px 0}}
-  .box b{{color:#ffb300}}
+  :root{{--paper:#F3EFE4;--ink:#22201C;--ink2:#5E584D;--rule:#CDC3AC}}
+  @media (prefers-color-scheme:dark){{:root{{--paper:#1D1B18;--ink:#ECE6D8;--ink2:#B4AC9C;--rule:#3B3730}}}}
+  body{{margin:0;background:var(--paper);color:var(--ink);font-family:"Hiragino Sans","BIZ UDGothic","Yu Gothic",sans-serif;line-height:1.85}}
+  .wrap{{max-width:680px;margin:0 auto;padding:40px 20px 64px}}
+  .no{{font-size:12.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 8px}}
+  h1{{font-size:30px;line-height:1.35;margin:0 0 14px}}
+  p{{color:var(--ink2)}}
+  dl{{border-top:2px solid var(--ink);margin:28px 0}}
+  dl div{{display:grid;grid-template-columns:7em 1fr;gap:12px;border-bottom:1px solid var(--rule);padding:12px 0;font-size:15px}}
+  dt{{color:var(--ink2)}} dd{{margin:0}}
+  a{{color:inherit;text-underline-offset:3px}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <span class="badge">仕様書公開中・制作者募集</span>
+  <p class="no">{no} ・ 仕様書のみ ・ 制作者募集</p>
   <h1>{title}</h1>
   <p>{summary}</p>
-  <div class="box">
-    <b>発想の型</b>
-    <ul>
-      <li>題材: {theme}</li>
-      <li>物理化: {physics}</li>
-      <li>技術: {skill}</li>
-      <li>失敗の見せ場: {fail}</li>
-      <li>データ: {data}</li>
-      <li>操作: {controls}</li>
-    </ul>
-  </div>
+  <dl>
+    <div><dt>題材</dt><dd>{theme}</dd></div>
+    <div><dt>物理化</dt><dd>{physics}</dd></div>
+    <div><dt>権限</dt><dd>{power}</dd></div>
+    <div><dt>技術</dt><dd>{skill}</dd></div>
+    <div><dt>失敗の見せ場</dt><dd>{fail}</dd></div>
+    <div><dt>データ</dt><dd>{data}</dd></div>
+    <div><dt>操作</dt><dd>{controls}</dd></div>
+  </dl>
   <p>つくってみたい人は <a href="https://github.com/k-ito-schoolagent/game-hack/issues">issue</a> で宣言してください。
-  詳しい設計書は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/games/{id}/SPEC.md">SPEC.md</a>。
-  はじめてのプルリクエスト歓迎です（<a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">参加のしかた</a>）。</p>
-  <p><a href="../../">← GAME HACK ポータルへ</a></p>
+  設計書は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/games/{id}/SPEC.md">SPEC.md</a>、考え方は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/METHOD.md">発想の型</a>。</p>
+  <p><a href="../../">一覧へ戻る</a></p>
 </div>
 </body>
 </html>
@@ -127,10 +127,13 @@ SPEC_MD = """# {title}（仕様書）
 |---|---|
 | 題材（みんなが知っている現実） | {theme} |
 | 物理化（概念→物理オブジェクト） | {physics} |
+| ありえない権限（一つだけ） | {power} |
 | 技術（習熟でクリア可能にするもの） | {skill} |
 | 失敗の見せ場 | {fail} |
 | データ（実データ＝固定パターン） | {data} |
-| 操作（スマホ親指・1操作） | {controls} |
+| 操作（一つだけ・親指） | {controls} |
+
+考え方は [METHOD.md](../../METHOD.md) を参照。
 
 ## 実装の約束（GAME HACK 共通）
 
@@ -155,6 +158,9 @@ def main():
         fields = dict(spec)
         fields["id"] = g["id"]
         fields["summary"] = g["summary"]
+        fields["no"] = g.get("no", "")
+        fields["mark"] = g.get("mark", g["title"][0])
+        fields["power"] = g.get("power", "")
         with open(os.path.join(d, "index.html"), "w") as f:
             f.write(PLACEHOLDER_HTML.format(**fields))
         with open(os.path.join(d, "SPEC.md"), "w") as f:

@@ -2,40 +2,753 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ダム放流オペレーション（仕様書公開中） | GAME HACK</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>ダム放流オペレーション | GAME HACK</title>
+<meta name="description" content="大雨の日のダム管理所。この先の雨がすべて分かる権限で、ゲートの開度ひとつで下流の氾濫と渇水の両方を防ぐ。雨は気象庁アメダスの実測値。">
+<meta name="theme-color" content="#3a403c">
+<!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>堰</text></svg>">
 <style>
-  body{margin:0;background:#0d1526;color:#eaf3fc;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.8}
-  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
-  .badge{display:inline-block;font-size:12px;font-weight:700;border:1px solid #ffb300;color:#ffb300;border-radius:6px;padding:2px 10px;margin-bottom:14px}
-  h1{font-size:26px;margin:0 0 14px}
-  p,li{font-size:14.5px;color:#c9dcf2}
-  a{color:#ffb300}
-  .box{background:#16233c;border-radius:12px;padding:14px 16px;margin:14px 0}
-  .box b{color:#ffb300}
+/* ================================================================
+ * GAME HACK 共通UI（ここから）— 全ゲームで同じものをコピーして使う
+ * 世界観: 業務帳票。紙 × 墨 × 朱（ハンコの赤）。
+ * - 朱は「判子」と「失敗」にだけ使う。ボタンや装飾には使わない
+ * - 角丸は 2px まで。影・グラデーション・絵文字は使わない
+ * ================================================================ */
+:root{
+  --paper:#F3EFE4; --paper2:#E8E1CF; --ink:#22201C; --ink2:#5E584D; --rule:#CDC3AC; --shu:#C8372D;
+  --font:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--scene,#2b2a27);font-family:var(--font);color:var(--ink);-webkit-text-size-adjust:100%}
+#wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+canvas{display:block;width:100%;height:100%}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+/* HUD: 帳票の見出し帯。左=どこ / 中=いまの数値 / 右=一時停止 */
+#hud{position:absolute;left:0;right:0;top:0;padding-top:var(--safe-t);background:var(--paper);border-bottom:1px solid var(--ink);display:none;grid-template-columns:1fr auto 52px;align-items:center;height:calc(48px + var(--safe-t));box-sizing:border-box;font-feature-settings:"tnum";z-index:5}
+#hud.on{display:grid}
+#hudL{padding-left:14px;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hudL small{font-weight:500;color:var(--ink2);font-size:12px;margin-left:6px}
+#hudC{padding:0 12px;font-size:15px;font-weight:700;text-align:right;white-space:nowrap}
+#hudC .warn{color:var(--shu)}
+#pauseBtn{width:52px;height:48px;border:0;border-left:1px solid var(--rule);background:transparent;display:grid;place-items:center}
+#pauseBtn i{display:block;width:12px;height:14px;border-left:4px solid var(--ink);border-right:4px solid var(--ink);box-sizing:border-box}
+/* シート: 下から出る帳票。親指で押せる位置にボタンを置く */
+#sheetBg{position:absolute;inset:0;background:rgba(34,32,28,.5);display:none;z-index:10}
+#sheetBg.on{display:block}
+#sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
+#sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
+#sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
+#sheet dt{color:var(--ink2)}
+#sheet dd{margin:0;font-weight:600;font-feature-settings:"tnum"}
+#sheet .acts{display:grid;gap:8px}
+.btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
+.btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn:active{transform:translateY(1px);opacity:.9}
+.sub{display:flex;justify-content:center;gap:4px}
+.sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
+/* 判子: 結果シートの右上に押される。中身は最大4字 */
+.stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
+.stamp.round{border-radius:50%}
+.stamp span{display:block}
+@keyframes stampIn{from{transform:rotate(-8deg) scale(1.9);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:.92}}
+@media (prefers-reduced-motion:reduce){#sheet,.stamp{animation:none}}
+/* ===== GAME HACK 共通UI（ここまで）===== */
+/* ---- ゲーム固有の見た目: ダム管理所（操作卓の表示と、所内の操作記録・放流通知の様式） ---- */
+:root{--scene:#4d5752;--paper:#FAFAF5;--paper2:#ECEDE6;--ink:#1F2421;--ink2:#55605A;--rule:#B5BBB2;--shu:#C8372D;
+  --mincho:"Hiragino Mincho ProN","Yu Mincho","YuMincho","BIZ UDMincho","Noto Serif JP",serif}
+/* HUD: 操作卓の上の表示盤。濃い鋼板に、時刻は計器の緑 */
+#hud{background:#2b302d;border-bottom:2px solid #121512;color:#E9E6DA}
+#hudL{color:#E9E6DA}
+#hudL small{color:#A9B0A8}
+#hudC{color:#9FE08A;letter-spacing:.02em}
+#hudC small{font-weight:500;color:#A9B0A8;font-size:12px;margin-left:4px}
+#hudC .warn{color:#FF8A6E}
+#pauseBtn{border-left:1px solid #4a514c}
+#pauseBtn i{border-left-color:#E9E6DA;border-right-color:#E9E6DA}
+#pauseBtn:focus-visible{outline-color:#E9E6DA}
+/* シート: 役所の様式（明朝の表題・罫で囲んだ記載欄） */
+#sheet{border-top:6px double var(--ink);padding-top:20px}
+#sheet .no{letter-spacing:.08em;border-bottom:1px solid var(--rule);padding-bottom:6px;margin-bottom:10px}
+#sheet h1{font-family:var(--mincho);font-weight:700;letter-spacing:.02em;font-size:22px}
+#sheet .lead{font-size:14.5px}
+#sheet dl{border:1px solid var(--ink)}
+#sheet dl div{padding:0;grid-template-columns:8.4em 1fr}
+#sheet dl div:last-child{border-bottom:0}
+#sheet dt{background:var(--paper2);border-right:1px solid var(--rule);padding:8px 8px;font-size:13px}
+#sheet dd{padding:8px 10px}
+.btn{border-radius:0;background:#2b302d;border-bottom:3px solid #121512}
+/* 判子: 管理所長の角印（朱一重・明朝）。無事は日付印のような二重丸 */
+.stamp{font-family:var(--mincho);border-width:3px;border-radius:2px;box-shadow:none;transform:rotate(-4deg);
+  animation-name:stampInDam}
+.stamp.round{box-shadow:inset 0 0 0 3px var(--paper),inset 0 0 0 5px var(--shu)}
+@keyframes stampInDam{from{transform:rotate(-4deg) scale(1.9);opacity:0}to{transform:rotate(-4deg) scale(1);opacity:.92}}
+/* タイトル＝洪水警戒体制の発令通知 */
+body[data-sheet=title] #sheet::before{content:"洪水警戒体制 発令通知";display:block;font-family:var(--mincho);font-weight:700;font-size:13px;letter-spacing:.3em;text-align:center;border:1px solid var(--ink);padding:5px 0;margin:0 0 12px}
+body[data-sheet=title] #sheet h1{padding-right:0}
+/* 結果＝ダム操作記録。右上に所長確認欄（判子はここに押される） */
+body[data-sheet=result] #sheet::before{content:"所長確認";position:absolute;top:8px;right:12px;width:84px;height:114px;box-sizing:border-box;border:1px solid var(--ink);font-size:10px;letter-spacing:.2em;color:var(--ink2);display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;background:var(--paper)}
+body[data-sheet=result] .stamp{top:14px;right:16px}
+#sheet dd{white-space:pre-line;font-feature-settings:"tnum"}
+#sheet dl div:last-child dd{font-size:13px;line-height:1.7}
+body[data-sheet=result] #sheet h1{min-height:60px}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <span class="badge">仕様書公開中・制作者募集</span>
-  <h1>ダム放流オペレーション</h1>
-  <p>実雨量・流量データの洪水を放流量スライダーで捌く。失敗は2方向＝下流氾濫 or 放ちすぎ渇水。貯水率を読む先読みバランス技術。</p>
-  <div class="box">
-    <b>発想の型</b>
-    <ul>
-      <li>題材: ダム管理者の「放流判断」の重さ（治水は両方向に失敗がある）</li>
-      <li>物理化: ダム＝貯水ゲージ。雨＝実データの流入カーブ。放流＝スライダーで開くゲート。下流＝水位ライン</li>
-      <li>技術: 実雨量データは固定。先の降雨を読んで事前放流する先読みバランス技術。満水=氾濫、放ちすぎ=渇水、両方を避ける</li>
-      <li>失敗の見せ場: 下流氾濫（街のマスが水没）または渇水（取水制限テロップ）</li>
-      <li>データ: 国土交通省 川の防災情報（雨量・ダム流入量）または気象庁の降水実績</li>
-      <li>操作: 放流量スライダー（親指操作）。貯水率・予報カーブ表示</li>
-    </ul>
-  </div>
-  <p>つくってみたい人は <a href="https://github.com/k-ito-schoolagent/game-hack/issues">issue</a> で宣言してください。
-  詳しい設計書は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/games/dam-ops/SPEC.md">SPEC.md</a>。
-  はじめてのプルリクエスト歓迎です（<a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">参加のしかた</a>）。</p>
-  <p><a href="../../">← GAME HACK ポータルへ</a></p>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <!-- 共通UI: ここから -->
+  <div id="hud"><div id="hudL"></div><div id="hudC"></div><button id="pauseBtn" aria-label="一時停止"><i></i></button></div>
+  <div id="sheetBg"><div id="sheet" role="dialog" aria-modal="true"></div></div>
+  <!-- 共通UI: ここまで -->
 </div>
+<script>
+'use strict';
+/* ============================================================
+ * GAME HACK ダム放流オペレーション
+ * 型: 題材(大雨の日のダムの放流判断) × 物理化(雨=流入カーブ、放流=ゲート開度、治水=下流の水位計) × 権限(この先の雨がすべて分かる) × 技術(先読みの事前放流) × 見せ場(緊急放流で町が浸水／取水制限)
+ *
+ * 約束:
+ *  - 乱数で勝敗を決めない（雨は気象庁アメダスの実測値）
+ *  - 失敗はプレイヤーの操作・判断に帰因できる
+ *  - 操作は1つに絞る。スマホ縦持ち・親指操作・タップ領域44px以上
+ *  - 単一ファイル・外部依存なし・ビルド不要
+ * ============================================================ */
+
+// ================================================================
+// GAME HACK 共通UI（ここから）— 書き換えずにコピーする
+// ================================================================
+// 論理座標: 横幅 W=420 固定。高さ H は端末の縦横比に合わせて 700〜920 で伸びる（上下の黒帯を出さない）
+// 描画は H を見てレイアウトする（上端=HUD 下、下端=親指ゾーン）
+const W=420; let H=760;
+const HUD_H=48;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0,SAFE_T=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=window.innerWidth; VH=window.innerHeight;
+  cv.width=Math.round(VW*DPR); cv.height=Math.round(VH*DPR);
+  H=Math.max(700,Math.min(920,Math.round(W*VH/VW)));
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+  SAFE_T=(parseFloat(getComputedStyle($('hud')).paddingTop)||0)/SC;
+  if(typeof onResize==='function')onResize();
+}
+// 画面座標 → 論理座標
+function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
+// DOM 要素の中心 → 論理座標（下部ボタンとの距離判定などに使う）
+function elCenter(el){ const r=el.getBoundingClientRect(); return toGame({clientX:r.left+r.width/2,clientY:r.top+r.height/2}); }
+// HUD の下端（論理座標）。ゲームの描画はここから下に置く
+function topY(){ return HUD_H+SAFE_T; }
+// 振動（対応端末のみ）
+function buzz(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(_){} }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const UI={
+  hud(l,lSmall,c){ $('hud').classList.add('on'); $('hudL').innerHTML=esc(l)+(lSmall?'<small>'+esc(lSmall)+'</small>':''); $('hudC').innerHTML=c||''; },
+  hideHud(){ $('hud').classList.remove('on'); },
+  /* シートを開く
+   * o = { no:'No.01 · 乗務報告', title, lead, rows:[[ラベル,値],...], stamp:'不可'|'発車'(最大4字), round:true(丸印),
+   *       main:[ラベル,fn], subs:[[ラベル,fn],...] } */
+  sheet(o){
+    const s=$('sheet');
+    let h='';
+    if(o.stamp){ const t=[...o.stamp]; const lines=t.length===4?[t.slice(0,2).join(''),t.slice(2).join('')]:t.length===3?[t.join('')]:[t.join('')];
+      const fs=t.length<=2?27:t.length===3?20:22;
+      h+='<div class="stamp'+(o.round?' round':'')+'" style="font-size:'+fs+'px">'+lines.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'; }
+    if(o.no)h+='<p class="no">'+esc(o.no)+'</p>';
+    h+='<h1>'+esc(o.title)+'</h1>';
+    if(o.lead)h+='<p class="lead">'+esc(o.lead)+'</p>';
+    if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
+    h+='<div class="acts">';
+    if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
+    h+='</div>';
+    s.innerHTML=h; s.scrollTop=0;
+    s.querySelectorAll('button').forEach(b=>{
+      const k=b.dataset.k, fn=k==='main'?o.main[1]:o.subs[+k.slice(1)][1];
+      b.addEventListener('click',e=>{ e.stopPropagation(); fn(); });
+    });
+    $('sheetBg').classList.add('on');
+    const m=s.querySelector('.btn'); if(m)setTimeout(()=>m.focus({preventScroll:true}),50);
+  },
+  close(){ $('sheetBg').classList.remove('on'); },
+  open(){ return $('sheetBg').classList.contains('on'); },
+};
+// 共有（𝕏）とポータルへ
+function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function toPortal(){ location.href='../../'; }
+// 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
+let pausedFrom=null;
+function pause(){
+  if(G.screen!=='play')return;
+  pausedFrom='play'; G.screen='pause';
+  UI.sheet({no:GAME_NO+' · 一時停止中',title:'一時停止',main:['再開する',resume],subs:[['この面をやり直す',()=>{UI.close();restart();}],['一覧へ戻る',toPortal]]});
+}
+function resume(){ if(G.screen!=='pause')return; UI.close(); G.screen='play'; lastTs=0; }
+$('pauseBtn').addEventListener('click',e=>{ e.stopPropagation(); G.screen==='pause'?resume():pause(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden)pause(); });
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ G.screen==='pause'?resume():pause(); } });
+// ===== GAME HACK 共通UI（ここまで）=====
+
+// ---- ゲーム固有 ----------------------------------------------
+const GAME_NO='No.06';
+const TAG='ダム放流オペレーション';
+
+// ==STAGES-BEGIN==
+// 雨: 気象庁 アメダス 時間降水量（mm、各要素は「その時刻から1時間」の雨。配列の先頭 = date0 の 0時）
+// https://www.data.jma.go.jp/stats/etrn/view/hourly_a1.php?prec_no=..&block_no=..&year=..&month=..&day=..
+// ダムはモデルダム（諸元・集水面積・流入量は概略値）。from/to = 操作する時間帯（配列の何時間目から何時間目まで）
+const STAGES=[
+  {name:'第1面',place:'相模湖',ev:'令和5年 台風第2号と梅雨前線',st:'アメダス相模湖（神奈川県相模原市）prec_no=46 block_no=0387',
+   date0:[2023,6,1],from:22,to:62,A:395,S0:1400,
+   rain:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3.5,3,2.5,1.5,3,1.5,2.5,6.5,6,3,8,6,7.5,8.5,5,24,4,3.5,5,12,13.5,13.5,32,11,7,7,5.5,6.5,7.5,8.5,5.5,5,1,0,0,0,0]},
+  {name:'第2面',place:'宇和',ev:'平成30年7月豪雨',st:'アメダス宇和（愛媛県西予市）prec_no=73 block_no=0961',
+   date0:[2018,7,4],from:44,to:88,A:279,S0:1400,
+   rain:[0,0,0,1,1.5,0,0,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.5,0,0,0,0,0,1.5,1,4.5,8,11.5,16,6.5,3,3,0,1,0.5,0,0,0,0,0.5,1.5,2.5,9.5,5,4.5,10,3.5,3.5,5.5,2,5,5,6,7,19,26,9,4,7.5,6,4.5,5.5,2,18,10.5,3,6,13,14,33,25,36,26,39,21.5,1.5,0,1.5,0,1.5,0.5,1,3,6]},
+  {name:'第3面',place:'萩原',ev:'令和2年7月豪雨',st:'アメダス萩原（岐阜県下呂市）prec_no=52 block_no=0483',
+   date0:[2020,7,5],from:48,to:88,A:195,S0:1400,
+   rain:[0,0,0,0,0,0,0,0,0,0,0,0,0,0.5,2,0.5,0,0,0,0,3,5.5,2,14.5,7,0.5,2.5,13,13.5,2,2,1.5,1.5,0.5,3,8.5,6.5,14.5,9,8,10.5,8.5,11.5,5,5,3.5,1,4,8,2.5,1,6,14.5,7.5,0.5,3,10,2,7,9.5,6,8.5,9.5,6.5,18,0.5,1.5,8,42,48.5,36,9,58.5,56.5,6,12,10,5.5,29,14,1,0.5,0,0,0,0,0,0]},
+  {name:'第4面',place:'相模湖',ev:'令和元年東日本台風（台風第19号）',st:'アメダス相模湖（神奈川県相模原市）prec_no=46 block_no=0387',
+   date0:[2019,10,10],from:36,to:76,A:134,S0:1400,
+   rain:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,2,3.5,1,0.5,0,0,0,0,0,0,0,0,0.5,1.5,2,4,0.5,0,1,4,2,0.5,1.5,4,4.5,2.5,4,6.5,10,8.5,27,40.5,32.5,17,22.5,17.5,37,26.5,43,39,39,40,35.5,39.5,60,45.5,1.5,0,0,0,0,0,0,0,0]},
+];
+// ==STAGES-END==
+
+// ==SIM-BEGIN==
+// モデルダム（概略値）。S=有効貯水量[万m³]（最低水位=0、常時満水位=Sn、洪水時最高水位=Sn+Sfc）
+const DT=0.05; // シミュレーション刻み（時間）
+const DAM={f:0.7,k:3,base:10,Al:25,kl:1.2,lbase:4,Sn:1500,Sfc:1200,Qmax:1100,Qlev:700,endRate:0.8,
+  ELmin:172,ELn:190,ELf:198,ELtop:201};
+const SF=DAM.Sn+DAM.Sfc;
+function elOf(S){ return S<=DAM.Sn?DAM.ELmin+(DAM.ELn-DAM.ELmin)*S/DAM.Sn:DAM.ELn+(DAM.ELf-DAM.ELn)*(S-DAM.Sn)/DAM.Sfc; }
+function gateCap(S){ return DAM.Qmax*Math.min(1,Math.sqrt(Math.max(0,elOf(S)-160)/(DAM.ELn-160))); }
+// 雨（実測）→ ダム流入量 I と 支川から下流の町に来る流量 L（ゲート操作に左右されないので先に全部計算できる）
+function prep(st){
+  const I=[],L=[],R=[]; let qr=0,ql=0; const nTot=Math.round(st.to/DT), j0=Math.round(st.from/DT);
+  for(let j=0;j<nTot;j++){
+    const r=st.rain[Math.floor(j*DT+1e-9)]||0;
+    qr+=(st.A*DAM.f*r/3.6-qr)/DAM.k*DT; ql+=(DAM.Al*DAM.f*r/3.6-ql)/DAM.kl*DT;
+    if(j>=j0){ I.push(DAM.base+qr); L.push(DAM.lbase+ql); R.push(r); }
+  }
+  return {I,L,R,n:I.length};
+}
+// 1刻み進める。g=ゲート開度(0..1)。洪水時最高水位に達したら流入量と同じだけ流す（異常洪水時防災操作）
+function stepDam(S,g,I,L){
+  let Q=g*gateCap(S), emg=false;
+  if(S>=SF-1e-6&&I>Q){ Q=I; emg=true; }
+  S=Math.min(SF,S+(I-Q)*0.36*DT);
+  return {S,Q,Qt:Q+L,emg};
+}
+// 失敗判定: 下流の流量が堤防の高さ（Qlev）を超えたら氾濫、最低水位を割ったら渇水
+function judge(r){ return r.Qt>DAM.Qlev?'flood':r.S<=0?'dry':null; }
+// ==SIM-END==
+
+// 下流の水位観測所: 流量 → 水位[m]（堤防天端 7.5m = Qlev）
+const LV={wait:3.0,caution:4.0,judge:5.3,danger:6.2,crown:7.5,land:3.6};
+function stageOf(Qt){ return 0.6+6.9*Math.pow(Math.max(0,Qt)/DAM.Qlev,0.6); }
+const HPS=0.7; // 1秒で何時間進むか
+
+const G={screen:'title',stage:0,j:0,acc:0,S:0,g:0,Q:0,Qt:0,emg:false,D:null,histQ:[],telop:null,siren:0,anim:null,log:[],
+  maxI:0,maxQ:0,maxH:0,maxS:0,minS:0,lastAnnQ:0,guide:0,cause:null};
+let lastTs=0;
+const fmt=n=>Math.round(n).toLocaleString('ja-JP');
+const pad=n=>String(n).padStart(2,'0');
+function clockAt(st,hours){ // hours = 配列先頭からの時間
+  const d=new Date(st.date0[0],st.date0[1]-1,st.date0[2],0,0); d.setMinutes(Math.round(hours*60));
+  return {md:(d.getMonth()+1)+'月'+d.getDate()+'日',hm:pad(d.getHours())+':'+pad(d.getMinutes()),short:(d.getMonth()+1)+'/'+d.getDate()};
+}
+function nowClock(){ const st=STAGES[G.stage]; return clockAt(st,st.from+G.j*DT); }
+
+function startStage(i){
+  const st=STAGES[i];
+  Object.assign(G,{stage:i,j:0,acc:0,S:st.S0,g:0,Q:0,Qt:0,emg:false,D:prep(st),histQ:[],telop:null,siren:0,anim:null,
+    maxI:0,maxQ:0,maxH:0,maxS:st.S0,minS:st.S0,lastAnnQ:0,guide:4.5,cause:null,maxQt:0,maxQtAt:'',emgSaid:false});
+  if(i===0)G.log=[];
+  G.Qt=G.D.L[0]; G.oplog=[]; G.screen='play'; lastTs=0; document.body.dataset.sheet='pause'; UI.close();
+}
+function restart(){ startStage(G.stage); }
+
+function say(text,sec){ G.telop={text,t:sec||3.2}; }
+function update(dt){
+  if(G.guide>0)G.guide-=dt;
+  if(G.telop){ G.telop.t-=dt; if(G.telop.t<=0)G.telop=null; }
+  if(G.siren>0)G.siren-=dt;
+  const D=G.D;
+  G.acc+=dt*HPS/DT;
+  while(G.acc>=1&&G.j<D.n){
+    G.acc-=1;
+    const prevQ=G.Q;
+    const r=stepDam(G.S,G.g,D.I[G.j],D.L[G.j]);
+    G.S=r.S; G.Q=r.Q; G.Qt=r.Qt; G.emg=r.emg;
+    G.histQ.push(r.Q);
+    G.maxI=Math.max(G.maxI,D.I[G.j]); G.maxQ=Math.max(G.maxQ,r.Q); G.maxS=Math.max(G.maxS,r.S); G.minS=Math.min(G.minS,r.S);
+    if(r.Qt>G.maxQt){ G.maxQt=r.Qt; G.maxQtAt=nowClock().md+' '+nowClock().hm; }
+    G.j++;
+    if(G.j%Math.round(6/DT)===0) logOp();
+    // 放流警報: 放流開始・大きく増やしたとき
+    if(prevQ<30&&r.Q>=30){ G.siren=3.5; G.lastAnnQ=r.Q; say('こちらはダム管理所です。ただいまからダムの放流を始めます。川の水が増えますので、川に近づかないでください。',4.2); }
+    else if(r.Q-G.lastAnnQ>=250){ G.siren=3.5; G.lastAnnQ=r.Q; say('こちらはダム管理所です。ダムの放流量を毎秒'+fmt(Math.round(r.Q/10)*10)+'立方メートルに増やします。川の水位が急に上がります。',4.2); }
+    else if(r.Q<G.lastAnnQ-250)G.lastAnnQ=r.Q;
+    if(r.emg&&!G.emgSaid){ G.emgSaid=true; G.siren=5; say('こちらはダム管理所です。ダムが満水に近づいたため、流入量と同じ量を放流する操作を始めます。',4.5); }
+    const k=judge(r);
+    if(k) return startFail(k==='flood'?'flood':'dry');
+  }
+  if(G.j>=D.n){
+    if(G.S<DAM.endRate*DAM.Sn) return startFail('short');
+    return clear();
+  }
+}
+
+// ---- 失敗演出 → 結果シート ----
+function startFail(kind){
+  const c=nowClock();
+  G.anim={kind,t:0,at:c.md+' '+c.hm,Q:G.Q,Qt:G.Qt,g:G.g,emg:G.emg,S:G.S,el:elOf(G.S),h:stageOf(G.Qt)};
+  G.screen='anim'; buzz(kind==='flood'?[60,40,60,40,120]:[40,60,40]); G.siren=kind==='flood'?6:0;
+  if(kind==='flood') say('氾濫発生情報　下流の水位観測所付近で堤防から水があふれています。命を守る行動をとってください。',9);
+  else say('取水制限のお知らせ　ダムの貯水量が減ったため、水道・農業用水の取水制限を始めます。',9);
+}
+function logOp(at){
+  const c=nowClock(), d=c.md.replace(/^\d+月/,'');
+  G.oplog.push(d+' '+c.hm+'　'+Math.round(G.g*100)+'%　'+fmt(G.D.I[Math.min(G.j,G.D.n-1)])+'→'+fmt(G.Q));
+}
+function opRows(){ return '時刻　開度　流入→放流 m³/s\n'+G.oplog.slice(-6).join('\n'); }
+function failSheet(){
+  const a=G.anim, st=STAGES[G.stage], gp=Math.round(a.g*100);
+  let title,lead,stamp;
+  if(a.kind==='flood'){
+    stamp='氾濫';
+    if(a.emg){ title='下流で氾濫（緊急放流）';
+      lead=a.at+'、ゲート開度 '+gp+'% のまま貯水位が洪水時最高水位 EL'+DAM.ELf.toFixed(1)+'m に達し、流入量と同じ毎秒 '+fmt(a.Q)+' m³ を流すしかなくなりました。\n下流の水位観測所は '+a.h.toFixed(2)+'m、堤防の高さ '+LV.crown.toFixed(1)+'m を越えました。'; }
+    else { title='下流で氾濫（放流しすぎ）';
+      lead=a.at+'、ゲート開度 '+gp+'% で毎秒 '+fmt(a.Q)+' m³ を放流。支川の水と合わせて下流は毎秒 '+fmt(a.Qt)+' m³ になり、水位観測所は '+a.h.toFixed(2)+'m、堤防の高さ '+LV.crown.toFixed(1)+'m を越えました。'; }
+  }else if(a.kind==='dry'){
+    stamp='渇水'; title='最低水位を割りました';
+    lead=a.at+'、ゲート開度 '+gp+'% で毎秒 '+fmt(a.Q)+' m³ を流し続け、貯水位が最低水位 EL'+DAM.ELmin.toFixed(1)+'m を下回りました。取水口から水が取れません。';
+  }else{
+    stamp='渇水'; title='取水制限';
+    lead=a.at+'、雨は上がりましたが貯水率は '+Math.round(a.S/DAM.Sn*100)+'%。洪水に備えて流しすぎ、利水に必要な '+Math.round(DAM.endRate*100)+'% まで戻りませんでした。';
+  }
+  G.screen='result'; logOp(); document.body.dataset.sheet='result';
+  UI.sheet({no:GAME_NO+' · ダム操作記録',title,lead,stamp,
+    rows:[['出水',st.name+' '+st.ev],['雨の観測点',st.place+'（'+clockAt(st,st.from).md+'〜）'],['最大流入量','毎秒 '+fmt(G.maxI)+' m³'],['最大放流量','毎秒 '+fmt(Math.max(G.maxQ,a.Q))+' m³'],['下流の最高水位',Math.max(stageOf(G.maxQt),a.h).toFixed(2)+' m'],['操作記録',opRows()]],
+    main:['この面をやり直す',restart],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+' '+st.ev+'（'+st.place+'の雨）で「'+title+'」。'+a.at+' 放流 毎秒'+fmt(a.Q)+'m³、下流水位 '+a.h.toFixed(2)+'m',TAG)],['一覧へ',toPortal]]});
+}
+function clear(){
+  const st=STAGES[G.stage], last=G.stage>=STAGES.length-1;
+  const rec={st,maxI:G.maxI,maxQ:G.maxQ,h:stageOf(G.maxQt),el:elOf(G.maxS),rate:Math.round(G.S/DAM.Sn*100)};
+  G.log[G.stage]=rec;
+  G.screen='result'; logOp(); document.body.dataset.sheet='result';
+  const cut=Math.round((1-G.maxQ/Math.max(1,G.maxI))*100);
+  const rows=[['出水',st.name+' '+st.ev],['最大流入量','毎秒 '+fmt(G.maxI)+' m³'],['最大放流量','毎秒 '+fmt(G.maxQ)+' m³（ピークを'+cut+'% カット）'],
+    ['下流の最高水位',rec.h.toFixed(2)+' m（'+G.maxQtAt+'）'],['最高貯水位','EL '+rec.el.toFixed(2)+' m'],['終了時の貯水率',rec.rate+' %'],['操作記録',opRows()]];
+  if(last){
+    const done=G.log.filter(Boolean).length;
+    rows.splice(rows.length-1,0,['4面の記録',G.log.map(r=>r?r.st.place+' '+r.h.toFixed(1)+'m':'—').join(' / ')]);
+    UI.sheet({no:GAME_NO+' · ダム操作記録',title:'全4面 下流は無事',lead:'台風第19号の雨（アメダス相模湖 '+clockAt(st,53).md+' 05時からの16時間で '+st.rain.slice(53,69).reduce((a,b)=>a+b,0)+'mm）を受けきり、堤防を一度も越えさせませんでした。',stamp:'無事',round:true,rows,
+      main:['はじめから',()=>startStage(0)],
+      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】全'+done+'面クリア。台風第19号の雨で最大流入 毎秒'+fmt(G.maxI)+'m³ → 放流 '+fmt(G.maxQ)+'m³、下流の最高水位 '+rec.h.toFixed(2)+'m',TAG)],['一覧へ',toPortal]]});
+    return;
+  }
+  UI.sheet({no:GAME_NO+' · ダム操作記録',title:st.name+' 下流は無事',lead:clockAt(st,st.to).md+' '+clockAt(st,st.to).hm+'、雨は上がりました。堤防は一度も越えていません。',stamp:'無事',round:true,rows,
+    main:['次の面へ',()=>startStage(G.stage+1)],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+' '+st.ev+'（'+st.place+'の雨）を無事に。最大流入 毎秒'+fmt(G.maxI)+'m³ → 放流 '+fmt(G.maxQ)+'m³、下流の最高水位 '+rec.h.toFixed(2)+'m',TAG)],['一覧へ',toPortal]]});
+}
+function showTitle(){
+  G.screen='title'; UI.hideHud(); document.body.dataset.sheet='title'; G.D=prep(STAGES[0]); G.S=STAGES[0].S0; G.j=0; G.histQ=[]; G.Q=0; G.Qt=G.D.L[0];
+  UI.sheet({no:GAME_NO+' · 業務内容',title:'ダム放流オペレーション',
+    lead:'洪水警戒体制を発令する。\n当直者は放流ゲートの操作にあたること。溜めすぎれば緊急放流で下流があふれ、流しすぎれば雨のあとに水が足りなくなる。\n　　　　　　　　　　　　　　ダム管理所長',
+    rows:[['あなたの権限','この先の雨がすべて分かる（予報が100%当たる）。流入量のこの先のカーブが表に出ている'],
+      ['操作','右のレバーを上下にスライドして、ゲートの開度を決める'],
+      ['失敗','下流の水位が堤防を越える（氾濫）／貯水位が最低水位を割る・雨のあとの貯水率が80%未満（渇水）'],
+      ['出典','雨量: 気象庁 過去の気象データ アメダス時間降水量（相模湖・宇和・萩原）／ ダム諸元・流入量・下流の水位: 実際の雨から計算した概略値（モデルダム）'],
+      ['出典URL','data.jma.go.jp/stats/etrn/']],
+    main:['はじめる',()=>startStage(0)],subs:[['一覧へ',toPortal]]});
+}
+
+// ---- レイアウト（H を見て決める） ----
+const Lo={};
+function onResize(){
+  const T=topY(), avail=H-T;
+  Lo.aTop=T; Lo.aBot=T+Math.round(avail*0.33);
+  Lo.bTop=Lo.aBot; Lo.bBot=Lo.bTop+Math.round(avail*0.21);
+  Lo.pTop=Lo.bBot; Lo.pBot=H;
+  Lo.slX=338; Lo.slW=72; Lo.slTop=Lo.pTop+58; Lo.slBot=H-40;
+  Lo.cx0=40; Lo.cx1=322; Lo.cTop=Lo.pTop+30; Lo.cBot=Lo.pTop+Math.round((H-Lo.pTop)*0.56);
+  Lo.rTop=Lo.cBot+22;
+}
+
+// ---- 入力: レバー（縦スライド）だけ ----
+let drag=false;
+function setGateFromY(y){ G.g=Math.max(0,Math.min(1,(Lo.slBot-y)/(Lo.slBot-Lo.slTop))); G.g=Math.round(G.g*100)/100; }
+$('wrap').addEventListener('pointerdown',e=>{
+  if(G.screen!=='play')return;
+  const p=toGame(e);
+  if(p.x>=Lo.slX-24&&p.y>=Lo.slTop-30&&p.y<=Lo.slBot+30){ drag=true; setGateFromY(p.y); try{$('wrap').setPointerCapture(e.pointerId);}catch(_){} }
+});
+$('wrap').addEventListener('pointermove',e=>{ if(drag&&G.screen==='play')setGateFromY(toGame(e).y); });
+['pointerup','pointercancel'].forEach(t=>$('wrap').addEventListener(t,()=>{drag=false;}));
+window.addEventListener('keydown',e=>{
+  if(G.screen!=='play')return;
+  if(e.key==='ArrowUp'){ G.g=Math.min(1,Math.round(G.g*100+5)/100); e.preventDefault(); }
+  if(e.key==='ArrowDown'){ G.g=Math.max(0,Math.round(G.g*100-5)/100); e.preventDefault(); }
+});
+
+// ---- 描画の部品 ----
+const FONT=getComputedStyle(document.body).fontFamily;
+function font(px,w){ ctx.font=(w||500)+' '+px+'px '+FONT; }
+function poly(pts,fill){ ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]); ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); }
+function line(x1,y1,x2,y2,c,w){ ctx.strokeStyle=c; ctx.lineWidth=w||1; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+function rrect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function label(t,x,y,c,bg,px,align){
+  font(px||10,600); ctx.textAlign=align||'left'; ctx.textBaseline='middle';
+  if(bg){ const w=ctx.measureText(t).width; const x0=align==='right'?x-w-3:align==='center'?x-w/2-3:x-3; ctx.fillStyle=bg; ctx.fillRect(x0,y-(px||10)/2-2,w+6,(px||10)+4); }
+  ctx.fillStyle=c; ctx.fillText(t,x,y); ctx.textBaseline='alphabetic';
+}
+
+// 人物（体型・年齢・持ち物が分かるように）。x=足元中央, y=足元, s=縮尺, dir=向き(1右/-1左)
+const PEOPLE={
+  elder:{h:25,sh:7,hair:'#d8d6d0',skin:'#e9c7a4',top:'#9a7b55',top2:'#7f6444',bot:'#5c5a55',bend:4,cane:true},
+  child:{h:17,sh:5,hair:'#2a2420',skin:'#f1cfae',top:'#e8e2d0',top2:'#cfc8b3',bot:'#2f3e66',cap:'#f2c230',bag:'#a3262a'},
+  worker:{h:29,sh:7,hair:'#1e1b18',skin:'#e7c19c',top:'#2f3a52',top2:'#232c40',bot:'#2f3a52',case:true},
+  mother:{h:27,sh:6,hair:'#4a3426',skin:'#efcaa6',top:'#c7795a',top2:'#a96248',bot:'#6b6f7a',stroller:true,long:true},
+  big:{h:30,sh:10,hair:'#26221e',skin:'#d9ae86',top:'#3f6a4a',top2:'#30533a',bot:'#4d4a44',wide:true},
+  student:{h:27,sh:6,hair:'#1a1714',skin:'#eac6a2',top:'#ffffff',top2:'#dcdcd6',bot:'#2b2f3d',pack:'#3d5c8c'},
+};
+function drawPerson(x,y,kind,s,dir){
+  const p=PEOPLE[kind]; s=s||1; dir=dir||1;
+  ctx.save(); ctx.translate(x,y); ctx.scale(s*dir,s);
+  const h=p.h, leg=h*0.45, torso=h*0.33, head=h*0.11, sw=p.sh;
+  const hipY=-leg, shY=-leg-torso, bx=p.bend||0;
+  ctx.lineCap='round';
+  // 脚
+  line(-sw*0.35,0,-sw*0.3,hipY,p.bot,sw*0.45); line(sw*0.35,0,sw*0.3,hipY,p.bot,sw*0.45);
+  line(-sw*0.45,0,-sw*0.1,0,'#2a2724',2); line(sw*0.25,0,sw*0.6,0,'#2a2724',2);
+  if(p.long) poly([[-sw*0.7,hipY+leg*0.55],[sw*0.75,hipY+leg*0.55],[sw*0.55,hipY],[-sw*0.55,hipY]],p.bot);
+  // 背中の荷物（後ろ側 = -x）
+  if(p.bag){ ctx.fillStyle=p.bag; rrect(-sw*1.25+bx,shY+1,sw*0.8,torso*0.75,1.5); ctx.fill(); }
+  if(p.pack){ ctx.fillStyle=p.pack; rrect(-sw*1.3+bx,shY+1,sw*0.85,torso*0.85,1.5); ctx.fill(); }
+  // 胴
+  const w=p.wide?sw*1.25:sw;
+  poly([[-w*0.55,hipY],[w*0.55,hipY],[w*0.6+bx,shY+2],[w*0.4+bx,shY],[-w*0.5+bx,shY],[-w*0.65+bx,shY+2]],p.top);
+  poly([[w*0.1,hipY],[w*0.55,hipY],[w*0.6+bx,shY+2],[w*0.4+bx,shY],[w*0.1+bx,shY]],p.top2);
+  if(kind==='worker'){ poly([[bx-1,shY],[bx+2,shY],[bx+0.5,shY+torso*0.6]],'#c9473c'); }
+  // 腕
+  const handX=p.cane?w*0.9+bx:p.stroller?w*1.0+bx:w*0.35, handY=p.cane||p.stroller?hipY+2:hipY+3;
+  line(w*0.45+bx,shY+2,handX,handY,p.top2,sw*0.36);
+  ctx.fillStyle=p.skin; ctx.beginPath(); ctx.arc(handX,handY,sw*0.2,0,7); ctx.fill();
+  if(p.cane) line(handX,handY,handX+3,0,'#6b4a2b',1.4);
+  if(p.case){ ctx.fillStyle='#3a2a1e'; rrect(handX-3,handY,7,6,1); ctx.fill(); }
+  // 頭
+  const hx=bx+(p.bend?2:0), hy=shY-head*1.25;
+  line(hx,shY,hx,shY-head*0.4,p.skin,sw*0.35);
+  ctx.fillStyle=p.skin; ctx.beginPath(); ctx.arc(hx,hy,head*1.05,0,7); ctx.fill();
+  ctx.fillStyle=p.hair; ctx.beginPath(); ctx.arc(hx-head*0.15,hy-head*0.15,head*1.08,Math.PI*0.85,Math.PI*2.05); ctx.closePath(); ctx.fill();
+  if(p.long){ poly([[hx-head*1.1,hy-head*0.2],[hx-head*0.2,hy],[hx-head*0.4,hy+head*1.9],[hx-head*1.3,hy+head*1.7]],p.hair); }
+  if(p.cap){ ctx.fillStyle=p.cap; ctx.beginPath(); ctx.arc(hx,hy-head*0.1,head*1.12,Math.PI,0); ctx.fill(); ctx.fillRect(hx,hy-head*0.25,head*1.7,head*0.35); }
+  ctx.fillStyle='#2a2522'; ctx.beginPath(); ctx.arc(hx+head*0.55,hy-head*0.05,head*0.14,0,7); ctx.fill();
+  // ベビーカー（前 = +x）
+  if(p.stroller){
+    const sx=handX+2, sy=handY;
+    line(sx,sy,sx+5,sy+6,'#3b3b3b',1.3);
+    ctx.fillStyle='#4f7aa6'; rrect(sx+3,sy+3,13,8,2); ctx.fill();
+    ctx.fillStyle='#3e6488'; ctx.beginPath(); ctx.arc(sx+12,sy+5,6,Math.PI,Math.PI*1.75); ctx.lineTo(sx+12,sy+5); ctx.fill();
+    ctx.fillStyle='#2a2724'; ctx.beginPath(); ctx.arc(sx+5,-2,2.2,0,7); ctx.arc(sx+15,-2,2.2,0,7); ctx.fill();
+    line(sx+5,sy+11,sx+5,-2,'#3b3b3b',1); line(sx+15,sy+11,sx+15,-2,'#3b3b3b',1);
+  }
+  ctx.restore();
+}
+function drawHouse(x,y,w,h,wall,roof,two){
+  poly([[x,y],[x+w,y],[x+w,y-h],[x,y-h]],wall);
+  poly([[x+w*0.6,y],[x+w,y],[x+w,y-h],[x+w*0.6,y-h]],shade(wall));
+  poly([[x-5,y-h],[x+w+5,y-h],[x+w*0.5,y-h-h*0.55]],roof);
+  poly([[x+w*0.5,y-h-h*0.55],[x+w+5,y-h],[x+w*0.5,y-h]],shade(roof));
+  ctx.fillStyle='#4a5b66'; ctx.fillRect(x+w*0.14,y-h*0.72,w*0.24,h*0.24); ctx.fillRect(x+w*0.62,y-h*0.72,w*0.24,h*0.24);
+  if(two){ ctx.fillRect(x+w*0.14,y-h*0.35,w*0.24,h*0.2); }
+  ctx.fillStyle='#6a4a32'; ctx.fillRect(x+w*0.56,y-h*0.42,w*0.2,h*0.42);
+}
+function shade(hex){ const n=parseInt(hex.slice(1),16); const f=v=>Math.round(v*0.82); return 'rgb('+f(n>>16)+','+f((n>>8)&255)+','+f(n&255)+')'; }
+function drawCar(x,y,c,tilt){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(tilt||0);
+  poly([[-17,-4],[17,-4],[17,-10],[9,-11],[4,-18],[-9,-18],[-14,-11],[-17,-10]],c);
+  poly([[-7,-16],[2,-16],[6,-11],[-11,-11]],'#9fb4c2');
+  ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(-10,-4,3.6,0,7); ctx.arc(10,-4,3.6,0,7); ctx.fill();
+  ctx.restore();
+}
+
+// ---- 上段: ダムの断面図 ----
+function yEL(e){ return Lo.aBot-6-(e-156)/(205-156)*(Lo.aBot-Lo.aTop-22); }
+function drawDam(t){
+  const top=Lo.aTop, bot=Lo.aBot, D=G.D, j=Math.min(G.j,D.n-1), r=D.R[j]||0;
+  // 空（雨の強さで暗くなる）
+  const dark=Math.min(1,r/40);
+  const sky=ctx.createLinearGradient(0,top,0,bot);
+  sky.addColorStop(0,mix('#b9c6cc','#55606a',dark)); sky.addColorStop(1,mix('#dfe3dc','#7d8786',dark));
+  ctx.fillStyle=sky; ctx.fillRect(0,top,W,bot-top);
+  // 奥の山
+  poly([[0,yEL(196)],[60,yEL(203)],[120,yEL(199)],[200,yEL(205)],[300,yEL(201)],[380,yEL(204)],[420,yEL(200)],[420,bot],[0,bot]],mix('#8fa08f','#56625a',dark));
+  // 貯水池の底（谷）
+  const ground=[[0,yEL(184)],[50,yEL(178)],[110,yEL(168)],[170,yEL(161)],[236,yEL(158)]];
+  // 水
+  const S=G.anim&&G.anim.kind==='dry'?Math.max(-80,G.S-G.anim.t*120):G.S;
+  const wl=yEL(elOf(Math.max(0,S))-(S<0?(-S)/60:0));
+  const wg=ctx.createLinearGradient(0,wl,0,bot); wg.addColorStop(0,'#5b8597'); wg.addColorStop(1,'#2f5262');
+  ctx.fillStyle=wg; ctx.fillRect(0,wl,240,bot-wl);
+  // 水面の波
+  ctx.strokeStyle='rgba(230,240,240,.55)'; ctx.lineWidth=1; ctx.beginPath();
+  for(let x=0;x<=238;x+=6){ const yy=wl+Math.sin(x*0.15+t*3)*(0.6+dark*1.4); x?ctx.lineTo(x,yy):ctx.moveTo(x,yy); } ctx.stroke();
+  // 谷の地面（手前）
+  poly([...ground,[236,bot],[0,bot]],'#6b5a45');
+  // 水が引いて見えている湖底（常時満水位より下・いまの水面より上）は乾いた泥の色、ひびを入れる
+  const wlEL=elOf(Math.max(0,S));
+  if(wlEL<DAM.ELn-0.5){
+    ctx.save(); ctx.beginPath(); ctx.rect(0,yEL(DAM.ELn),240,wl-yEL(DAM.ELn)); ctx.clip();
+    ctx.beginPath(); ctx.moveTo(ground[0][0],ground[0][1]); for(const [x,y] of ground)ctx.lineTo(x,y); ctx.lineTo(236,ground[4][1]+10);
+    for(let i=ground.length-1;i>=0;i--)ctx.lineTo(ground[i][0],ground[i][1]+10); ctx.closePath(); ctx.fillStyle='#a8916c'; ctx.fill();
+    ctx.strokeStyle='rgba(70,52,34,.7)'; ctx.lineWidth=1;
+    for(let i=0;i<22;i++){ const x=6+i*10.5; let k=0; while(k<ground.length-2&&ground[k+1][0]<x)k++;
+      const [xa,ya]=ground[k],[xb,yb]=ground[k+1], y0=ya+(yb-ya)*(x-xa)/(xb-xa);
+      ctx.beginPath(); ctx.moveTo(x,y0+1); ctx.lineTo(x+3,y0+4+(i%3)); ctx.lineTo(x+1,y0+8); ctx.stroke(); }
+    ctx.restore();
+  }
+  // 基準線（洪水時最高水位・常時満水位・最低水位）
+  ctx.setLineDash([5,4]);
+  [[DAM.ELf,'洪水時最高水位','#f2f0e8'],[DAM.ELn,'常時満水位','#f2f0e8'],[DAM.ELmin,'最低水位','#f2f0e8']].forEach(([e,n,c])=>{
+    line(4,yEL(e),236,yEL(e),'rgba(255,255,255,.75)',1);
+  });
+  ctx.setLineDash([]);
+  [[DAM.ELf,'洪水時最高水位'],[DAM.ELn,'常時満水位'],[DAM.ELmin,'最低水位']].forEach(([e,n])=>label(n+' EL'+e.toFixed(1)+'m',6,yEL(e)-7,'#1f2a2e','rgba(243,239,228,.85)',9.5));
+  // 堤体（重力式コンクリートダム）
+  const crest=yEL(DAM.ELtop), heelY=yEL(156);
+  poly([[238,crest],[262,crest],[262,yEL(196)],[326,heelY],[238,heelY]],'#c9c4b6');
+  poly([[262,yEL(196)],[326,heelY],[296,heelY],[262,yEL(186)]],'#b3ad9e');
+  line(238,crest,238,heelY,'#8d8778',1.2);
+  // ゲート巻上機室・ピア
+  ctx.fillStyle='#d9d4c6'; ctx.fillRect(241,crest-10,18,10); ctx.fillStyle='#8d8778'; ctx.fillRect(241,crest-12,18,2);
+  // 放流管（コンジット）の出口: EL175
+  const ox=262+(196-175)/(196-156)*(326-262), oy=yEL(175);
+  ctx.fillStyle='#3b3a36'; ctx.fillRect(ox-4,oy-5,6,10);
+  // 水位の三角マーク
+  const vy=yEL(elOf(Math.max(0,S)));
+  poly([[226,vy-7],[234,vy-7],[230,vy-1]],'#f3efe4');
+  label('EL'+elOf(Math.max(0,G.S)).toFixed(2),224,vy-12,'#f3efe4',null,10,'right');
+  // 下流側の川と管理所
+  poly([[326,heelY],[420,heelY],[420,bot],[300,bot]],'#6b5a45');
+  const rq=G.anim&&G.anim.kind==='flood'?G.anim.Q:G.Q;
+  const rh=Math.min(14,2+rq/90);
+  ctx.fillStyle='#4f7d8c'; ctx.fillRect(300,heelY-rh,120,rh);
+  poly([[340,yEL(198)],[420,yEL(200)],[420,heelY-14],[352,heelY-14]],'#7e8a6e');
+  ctx.fillStyle='#ece7da'; ctx.fillRect(366,yEL(198)-20,40,20); ctx.fillStyle='#5d6e7a'; ctx.fillRect(366,yEL(198)-22,40,3);
+  ctx.fillStyle='#4a5b66'; for(let i=0;i<4;i++)ctx.fillRect(370+i*9,yEL(198)-15,5,6);
+  label('ダム管理所',386,yEL(198)-30,'#22201c','rgba(243,239,228,.85)',9,'center');
+  // 放流の水（放流管からの噴流）
+  if(rq>2){
+    const wq=Math.min(13,1.5+rq/80);
+    ctx.strokeStyle='rgba(225,236,238,.92)'; ctx.lineWidth=wq; ctx.lineCap='butt';
+    ctx.beginPath(); ctx.moveTo(ox,oy); const reach=18+Math.min(60,rq/16);
+    ctx.quadraticCurveTo(ox+reach*0.6,oy-4,ox+reach,heelY-rh); ctx.stroke();
+    for(let i=0;i<6;i++){ const a=t*9+i; ctx.fillStyle='rgba(240,246,246,.7)'; ctx.beginPath(); ctx.arc(ox+reach+Math.sin(a)*6,heelY-rh-2-Math.abs(Math.cos(a*1.3))*wq*0.8,1.5+wq*0.25,0,7); ctx.fill(); }
+  }
+  // 満水: 天端から越流（非常用洪水吐）
+  if(G.emg||(G.anim&&G.anim.emg)){
+    ctx.fillStyle='rgba(225,236,238,.9)';
+    ctx.beginPath(); ctx.moveTo(250,yEL(DAM.ELf)); ctx.lineTo(262,yEL(DAM.ELf)); ctx.lineTo(326,heelY-4); ctx.lineTo(312,heelY-4); ctx.lineTo(258,yEL(194)); ctx.closePath(); ctx.fill();
+  }
+  rainFx(0,top,W,bot-top,r,t);
+}
+function mix(a,b,k){ const A=parseInt(a.slice(1),16),B=parseInt(b.slice(1),16); const c=s=>Math.round(((A>>s)&255)*(1-k)+((B>>s)&255)*k); return 'rgb('+c(16)+','+c(8)+','+c(0)+')'; }
+const DROPS=[...Array(90)].map((_,i)=>({x:(i*97.13)%420,y:(i*53.7)%300,s:0.7+((i*7)%5)/6}));
+function rainFx(x0,y0,w,h,r,t){
+  if(r<=0.4)return;
+  const n=Math.min(DROPS.length,Math.round(8+r*1.6));
+  ctx.strokeStyle='rgba(235,240,245,'+Math.min(0.55,0.2+r/90)+')'; ctx.lineWidth=1; ctx.beginPath();
+  for(let i=0;i<n;i++){ const d=DROPS[i]; const yy=y0+((d.y+t*420*d.s)%h), xx=x0+((d.x-t*60*d.s)%w+w)%w; ctx.moveTo(xx,yy); ctx.lineTo(xx-2.5,yy+9*d.s); }
+  ctx.stroke();
+}
+
+// ---- 中段: 下流の町と水位観測所 ----
+function yB(h){ return Lo.bBot-8-h/9.2*(Lo.bBot-Lo.bTop-16); }
+function drawTown(t){
+  const top=Lo.bTop, bot=Lo.bBot, D=G.D, j=Math.min(G.j,D.n-1), r=D.R[j]||0;
+  const dark=Math.min(1,r/40);
+  ctx.fillStyle=mix('#d6dcd6','#8a9390',dark); ctx.fillRect(0,top,W,bot-top);
+  line(0,top+0.5,W,top+0.5,'#22201c',1);
+  // 遠景の家並み
+  ctx.fillStyle=mix('#b7bdb4','#78807c',dark);
+  for(let i=0;i<9;i++){ const x=210+i*24, hh=10+((i*7)%3)*5; ctx.fillRect(x,yB(LV.land)-hh-8,18,hh+8); }
+  const A=G.anim, fk=A&&A.kind==='flood'?Math.min(1,A.t/0.7):0;
+  // 水位
+  const Qt=A&&A.kind==='flood'?A.Qt:G.Qt;
+  let hw=Math.min(LV.crown+0.4,stageOf(Qt)); if(A&&A.kind!=='flood')hw=Math.max(0.3,hw-A.t*1.2);
+  const crownL=6, crownR=196;
+  // 川の断面（堤防）
+  const sec=[[0,yB(LV.crown)],[crownL,yB(LV.crown)],[40,yB(0)],[160,yB(0)],[crownR,yB(LV.crown)],[214,yB(LV.crown)],[236,yB(LV.land)],[420,yB(LV.land)],[420,bot],[0,bot]];
+  // 水（断面内）
+  ctx.save(); ctx.beginPath(); ctx.moveTo(crownL,yB(LV.crown)); ctx.lineTo(40,yB(0)); ctx.lineTo(160,yB(0)); ctx.lineTo(crownR,yB(LV.crown)); ctx.lineTo(crownR,yB(9.5)); ctx.lineTo(crownL,yB(9.5)); ctx.closePath(); ctx.clip();
+  ctx.fillStyle='#7b6d52'; ctx.fillRect(0,yB(hw),W,bot);
+  ctx.strokeStyle='rgba(230,225,210,.6)'; ctx.beginPath(); for(let x=crownL;x<=crownR;x+=5){ const yy=yB(hw)+Math.sin(x*0.3-t*6)*1.2; x===crownL?ctx.moveTo(x,yy):ctx.lineTo(x,yy);} ctx.stroke();
+  ctx.restore();
+  // 土手と堤内地
+  poly(sec,'#7d8a5a');
+  poly([[0,yB(LV.crown)],[crownL,yB(LV.crown)],[40,yB(0)],[0,yB(0)]],'#6e7a4e');
+  ctx.fillStyle='#8a8478'; ctx.fillRect(crownR,yB(LV.crown)-2,18,2);
+  // 放流警報局（右岸天端）
+  const px=206, py=yB(LV.crown)-2;
+  line(px,py,px,py-38,'#9a9a94',2);
+  ctx.fillStyle='#e9e6dc'; ctx.fillRect(px+3,py-24,22,13); label('放流警報局',px+14,py-17.5,'#22201c',null,5.4,'center');
+  poly([[px,py-38],[px-12,py-43],[px-12,py-33]],'#dcdad2'); poly([[px,py-38],[px+10,py-44],[px+10,py-32]],'#cfccc3');
+  if(G.siren>0){ const k=(t*2.2)%1; ctx.strokeStyle='rgba(250,250,245,'+(0.8-k*0.6)+')'; ctx.lineWidth=1.6;
+    for(let i=0;i<3;i++){ const rr=8+((k+i/3)%1)*30; ctx.beginPath(); ctx.arc(px-12,py-38,rr,Math.PI*0.75,Math.PI*1.25); ctx.stroke(); ctx.beginPath(); ctx.arc(px+10,py-38,rr,-Math.PI*0.25,Math.PI*0.25); ctx.stroke(); } }
+  // 量水標と危険度の線（国交省の水位危険度の色）
+  const gx=100;
+  [[LV.danger,'氾濫危険水位','#aa00aa'],[LV.judge,'避難判断水位','#ff2800'],[LV.caution,'氾濫注意水位','#e6b400'],[LV.wait,'水防団待機水位','#f3efe4']].forEach(([h,n,c])=>{
+    ctx.setLineDash([4,3]); line(12+(LV.crown-h)/LV.crown*28,yB(h),188-(LV.crown-h)/LV.crown*30,yB(h),c,1.4); ctx.setLineDash([]);
+    label(n+' '+h.toFixed(1)+'m',gx+8,yB(h)-5,'#22201c',c==='#f3efe4'?'rgba(243,239,228,.9)':c==='#e6b400'?'#f1d76a':c==='#ff2800'?'#ff9b85':'#e3a6e3',8.4);
+  });
+  ctx.fillStyle='#f3efe4'; ctx.fillRect(gx-3,yB(LV.crown+0.6),6,yB(0)-yB(LV.crown+0.6));
+  for(let h=0;h<=8;h++){ ctx.fillStyle=h%2?'#22201c':'#c8372d'; ctx.fillRect(gx-3,yB(h+1),6,yB(h)-yB(h+1)-0.6); }
+  label('水位観測所 '+hw.toFixed(2)+'m',gx-8,yB(LV.crown+0.9),'#f3efe4','rgba(34,32,28,.75)',10,'right');
+  // 町（堤内地）: 家・車・人
+  const ly=yB(LV.land);
+  drawHouse(248,ly,40,30,'#e6dfcf','#5a4a3e',true);
+  drawHouse(338,ly,46,34,'#d9d2c0','#3f4c5a',true);
+  const flood=fk>0?yB(LV.land+fk*1.3):null;
+  drawCar(276,ly-(fk>0.5?(fk-0.5)*14:0),'#b8bfc4',fk>0.5?Math.sin(t*2)*0.12+0.1:0);
+  const sw=fk>0?Math.sin(t*5)*1.2:0; // 水に浸かると体が揺れる
+  drawPerson(234,ly,'elder',1.2,1);
+  drawPerson(302+sw,ly,'child',1.2,1);
+  drawPerson(320-sw,ly,'worker',1.2,1);
+  drawPerson(384+sw,ly,'mother',1.2,-1);
+  drawPerson(400-sw,ly,'big',1.2,-1);
+  drawPerson(414,ly,'student',1.2,-1);
+  // 氾濫: 堤防を越えた水が町に入る
+  if(fk>0){
+    ctx.fillStyle='rgba(118,100,70,.9)';
+    ctx.beginPath(); ctx.moveTo(crownL,yB(LV.crown+0.25)); ctx.lineTo(crownR+18,yB(LV.crown+0.25));
+    ctx.lineTo(236,flood); ctx.lineTo(420,flood); ctx.lineTo(420,ly+2); ctx.lineTo(236,ly+2); ctx.lineTo(214,yB(LV.crown)); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(235,228,210,.75)'; ctx.lineWidth=1.2; ctx.beginPath(); for(let x=214;x<420;x+=7){ const yy=flood+Math.sin(x*0.25-t*7)*1.4; x===214?ctx.moveTo(x,yy):ctx.lineTo(x,yy);} ctx.stroke();
+  }
+  rainFx(0,top,W,bot-top,r,t+3);
+}
+
+// ---- 下段: 操作盤（予報の流入カーブ・計器・レバー） ----
+function drawPanel(t){
+  const D=G.D, top=Lo.pTop;
+  ctx.fillStyle='#3a403c'; ctx.fillRect(0,top,W,H-top);
+  line(0,top+0.5,W,top+0.5,'#22201c',1);
+  const st=STAGES[G.stage];
+  label('流入量 実績／予報　m³/s',12,top+15,'#e8e4d6',null,11);
+  // グラフ
+  const x0=Lo.cx0,x1=Lo.cx1,y0=Lo.cTop,y1=Lo.cBot;
+  ctx.fillStyle='#262a27'; ctx.fillRect(x0,y0,x1-x0,y1-y0);
+  let maxF=800; for(const v of D.I)maxF=Math.max(maxF,v); maxF=Math.ceil(maxF*1.08/200)*200;
+  const X=j=>x0+(x1-x0)*j/(D.n-1), Y=q=>y1-(y1-y0)*q/maxF;
+  font(9,500); ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let q=0;q<=maxF;q+=200){ line(x0,Y(q),x1,Y(q),'rgba(232,228,214,.12)',1); if(q%400===0){ ctx.fillStyle='#b9b6aa'; ctx.fillText(q,x0-4,Y(q)); } }
+  ctx.textBaseline='alphabetic'; ctx.textAlign='left';
+  // 時刻目盛（6時間ごと）
+  for(let h=Math.ceil(st.from/6)*6;h<=st.to;h+=6){ const xx=x0+(x1-x0)*(h-st.from)/(st.to-st.from); line(xx,y1,xx,y1+4,'#b9b6aa',1); const c=clockAt(st,h);
+    label(c.hm==='00:00'?c.short:c.hm.slice(0,2)+'時',xx,y1+11,'#b9b6aa',null,8.5,'center'); }
+  // 雨（上から棒）
+  const hours=st.to-st.from;
+  for(let h=0;h<hours;h++){ const rr=st.rain[st.from+h]||0; if(!rr)continue; const xx=x0+(x1-x0)*h/hours, bw=(x1-x0)/hours;
+    ctx.fillStyle=st.from+h<st.from+G.j*DT?'rgba(120,170,220,.55)':'rgba(120,170,220,.85)'; ctx.fillRect(xx+0.5,y0,bw-1,(y1-y0)*0.42*Math.min(1,rr/60)); }
+  // 放流の上限（支川の水を引いた、堤防までの余裕）
+  ctx.strokeStyle='#d07ad0'; ctx.lineWidth=1.3; ctx.setLineDash([2,3]); ctx.beginPath();
+  for(let j=0;j<D.n;j+=4){ const v=DAM.Qlev-D.L[j]; j?ctx.lineTo(X(j),Y(v)):ctx.moveTo(X(j),Y(v)); } ctx.stroke(); ctx.setLineDash([]);
+  label('堤防まで',x1-2,Y(DAM.Qlev-D.L[D.n-1])-7,'#d07ad0',null,8.5,'right');
+  // 流入量: 過去=実線、この先=破線（予報）
+  ctx.strokeStyle='#8fc3e6'; ctx.lineWidth=2; ctx.beginPath();
+  for(let j=0;j<=Math.min(G.j,D.n-1);j+=2){ j?ctx.lineTo(X(j),Y(D.I[j])):ctx.moveTo(X(j),Y(D.I[j])); } ctx.stroke();
+  ctx.setLineDash([5,3]); ctx.beginPath();
+  for(let j=Math.min(G.j,D.n-1);j<D.n;j+=2){ j===Math.min(G.j,D.n-1)?ctx.moveTo(X(j),Y(D.I[j])):ctx.lineTo(X(j),Y(D.I[j])); } ctx.stroke(); ctx.setLineDash([]);
+  // 放流量の実績
+  ctx.strokeStyle='#f2c86a'; ctx.lineWidth=2; ctx.beginPath();
+  for(let j=0;j<G.histQ.length;j+=2){ j?ctx.lineTo(X(j),Y(G.histQ[j])):ctx.moveTo(X(j),Y(G.histQ[j])); } ctx.stroke();
+  // いま
+  const nx=X(Math.min(G.j,D.n-1)); line(nx,y0,nx,y1,'#f3efe4',1);
+  // 計器（デジタル表示）
+  const Sx=G.S, rate=Sx/DAM.Sn*100, h=stageOf(G.Qt);
+  const cells=[['流入量',fmt(D.I[Math.min(G.j,D.n-1)]),'m³/s',false],['放流量',fmt(G.Q),'m³/s',false],['雨量',(D.R[Math.min(G.j,D.n-1)]||0).toFixed(1),'mm/h',false],
+    ['貯水率',Math.round(rate),'%',rate<DAM.endRate*100||Sx>SF*0.93],['貯水位',elOf(Sx).toFixed(2),'EL m',false],['下流水位',h.toFixed(2),'m',h>=LV.judge]];
+  const cw=(Lo.cx1-12)/3, chh=Math.min(46,(H-Lo.rTop-14)/2-6);
+  cells.forEach((c,i)=>{
+    const cx=12+(i%3)*cw, cy=Lo.rTop+Math.floor(i/3)*(chh+8);
+    ctx.fillStyle='#1d201e'; ctx.fillRect(cx,cy,cw-6,chh);
+    label(c[0]+'  '+c[2],cx+6,cy+10,i===0?'#8fc3e6':i===1?'#f2c86a':'#b9b6aa',null,9.5);
+    font(Math.min(20,chh*0.45),700); ctx.textAlign='right'; ctx.fillStyle=c[3]&&Math.floor(t*3)%2?'#ff8a6e':'#9fe08a';
+    ctx.fillText(c[1],cx+cw-12,cy+chh-8);
+  });
+  drawLever(t);
+}
+function drawLever(t){
+  const x=Lo.slX, w=Lo.slW, y0=Lo.slTop, y1=Lo.slBot;
+  label('ゲート開度',x+w/2,Lo.pTop+15,'#e8e4d6',null,11,'center');
+  ctx.fillStyle='#262a27'; ctx.fillRect(x,y0-14,w,y1-y0+28);
+  // 目盛
+  for(let p=0;p<=100;p+=10){ const yy=y1-(y1-y0)*p/100; line(x+6,yy,x+(p%50?14:20),yy,'#b9b6aa',1); if(p%50===0) label(p+'',x+w-6,yy,'#b9b6aa',null,9,'right'); }
+  // 溝
+  ctx.fillStyle='#121412'; ctx.fillRect(x+w/2-4,y0,8,y1-y0);
+  ctx.fillStyle='#d9b45a'; ctx.fillRect(x+w/2-4,y1-(y1-y0)*G.g,8,(y1-y0)*G.g);
+  // つまみ（親指で押さえる大きさ）
+  const ky=y1-(y1-y0)*G.g;
+  ctx.fillStyle='#e8e4d6'; rrect(x+4,ky-22,w-8,44,2); ctx.fill();
+  ctx.fillStyle='#c9c4b4'; ctx.fillRect(x+4,ky+4,w-8,18);
+  line(x+14,ky-6,x+w-14,ky-6,'#8d8778',1.2); line(x+14,ky,x+w-14,ky,'#8d8778',1.2);
+  font(15,800); ctx.textAlign='center'; ctx.fillStyle='#22201c'; ctx.fillText(Math.round(G.g*100)+'%',x+w/2,ky+18);
+}
+function drawTelop(){
+  if(!G.telop)return;
+  const y=Lo.aBot-44;
+  ctx.fillStyle='rgba(20,28,48,.9)'; ctx.fillRect(0,y,W,40);
+  ctx.fillStyle='#f3efe4'; font(12,700); ctx.textAlign='left';
+  wrap(G.telop.text,10,y+16,W-20,15);
+}
+function wrap(text,x,y,maxW,lh){
+  let lineS='',yy=y;
+  for(const ch of text){ if(ctx.measureText(lineS+ch).width>maxW){ ctx.fillText(lineS,x,yy); yy+=lh; lineS=ch; } else lineS+=ch; }
+  ctx.fillText(lineS,x,yy);
+}
+function drawGuide(){
+  if(G.guide<=0||G.screen!=='play')return;
+  const a=Math.min(1,G.guide);
+  ctx.globalAlpha=a;
+  const y=Lo.bTop+6, x=W-182;
+  ctx.fillStyle='rgba(243,239,228,.96)'; ctx.fillRect(x,y,178,72);
+  ctx.fillStyle='#22201c'; font(11.5,700); ctx.textAlign='left';
+  wrap('所長「この先の雨は表の破線どおりに来る。右のレバーでゲートを開けて、先に流しておけ」',x+8,y+16,162,14);
+  ctx.globalAlpha=1;
+}
+
+// ---- メインループ ----
+let T0=0;
+function draw(ts){
+  const t=ts/1000;
+  if(!G.D)return;
+  drawDam(t); drawTown(t); drawPanel(t); drawTelop(); drawGuide();
+  if(G.screen==='play'||G.screen==='pause'||G.screen==='anim'){
+    const st=STAGES[G.stage], c=nowClock(), rem=Math.max(0,Math.ceil(st.to-st.from-G.j*DT));
+    UI.hud(st.name,(G.stage+1)+'/'+STAGES.length,c.md+' '+c.hm+'　<small>終了まで '+rem+'時間</small>');
+  }
+}
+function frame(ts){
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.05):0; lastTs=ts;
+  if(G.screen==='play') update(dt);
+  else if(G.screen==='anim'){ G.anim.t+=dt; if(G.telop)G.telop.t-=dt*0.2; if(G.siren>0)G.siren-=dt*0.2; if(G.anim.t>=1.2) failSheet(); }
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle=getComputedStyle(document.body).backgroundColor; ctx.fillRect(0,0,VW,VH);
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR,TY*DPR);
+  draw(ts);
+  requestAnimationFrame(frame);
+}
+window.addEventListener('resize',resize); resize();
+showTitle();
+requestAnimationFrame(frame);
+</script>
 </body>
 </html>
