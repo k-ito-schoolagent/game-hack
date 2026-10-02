@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>満員電車パッキング | GAME HACK</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="満員電車パッキング | GAME HACK">
+<meta property="og:description" content="平日朝の中央線快速。ホームに並んだ会社員・学生・リュックの人・ベビーカーを、つまんで車内の好きな場所へ押し込む。ドアラインからはみ出したら「ドアが閉まりません」。">
+<meta property="og:site_name" content="GAME HACK">
 <meta name="description" content="平日朝の中央線快速。ホームに並んだ会社員・学生・リュックの人・ベビーカーを、つまんで車内の好きな場所へ押し込む。ドアラインからはみ出したら「ドアが閉まりません」。">
 <meta name="theme-color" content="#3A3833">
 <!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
@@ -49,7 +53,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 .btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
 .btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .btn:active{transform:translateY(1px);opacity:.9}
-.sub{display:flex;justify-content:center;gap:4px}
+.sub{display:flex;flex-wrap:wrap;justify-content:center;gap:0 4px}
 .sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
 /* 判子: 結果シートの右上に押される。中身は最大4字 */
 .stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
@@ -149,6 +153,8 @@ const UI={
     if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
     h+='<div class="acts">';
     if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    // 𝕏 の共有ボタンがあれば、その隣に Facebook の共有を足す
+    if(o.subs){ const i=o.subs.findIndex(b=>/𝕏/.test(b[0])); if(i>=0&&!o.subs.some(b=>/Facebook/.test(b[0]))) o.subs=[...o.subs.slice(0,i+1),['Facebookで共有',shareFB],...o.subs.slice(i+1)]; }
     if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
     h+='</div>';
     s.innerHTML=h; s.scrollTop=0;
@@ -164,6 +170,7 @@ const UI={
 };
 // 共有（𝕏）とポータルへ
 function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function shareFB(){ window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href.split('#')[0]),'_blank','noopener'); }
 function toPortal(){ location.href='../../'; }
 // 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
 let pausedFrom=null;

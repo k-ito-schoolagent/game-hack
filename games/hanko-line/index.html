@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>ハンコ決裁ライン | GAME HACK</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="ハンコ決裁ライン | GAME HACK">
+<meta property="og:description" content="中学校の事務室。ベルトで流れてくる本物そっくりの伺い書（物品購入伺・支出伺・出張命令伺）を読み、件名と合わない品物・公費で買えない物・ありえない日付・押印漏れを見抜いて差し戻す。校長印を預かった臨時職員の1週間。監査が入ると付箋まみれ。">
+<meta property="og:site_name" content="GAME HACK">
 <meta name="description" content="中学校の事務室。ベルトで流れてくる本物そっくりの伺い書（物品購入伺・支出伺・出張命令伺）を読み、件名と合わない品物・公費で買えない物・ありえない日付・押印漏れを見抜いて差し戻す。校長印を預かった臨時職員の1週間。監査が入ると付箋まみれ。">
 <meta name="theme-color" content="#F3EFE4">
 <!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
@@ -49,7 +53,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 .btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
 .btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .btn:active{transform:translateY(1px);opacity:.9}
-.sub{display:flex;justify-content:center;gap:4px}
+.sub{display:flex;flex-wrap:wrap;justify-content:center;gap:0 4px}
 .sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
 /* 判子: 結果シートの右上に押される。中身は最大4字 */
 .stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
@@ -149,6 +153,8 @@ const UI={
     if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
     h+='<div class="acts">';
     if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    // 𝕏 の共有ボタンがあれば、その隣に Facebook の共有を足す
+    if(o.subs){ const i=o.subs.findIndex(b=>/𝕏/.test(b[0])); if(i>=0&&!o.subs.some(b=>/Facebook/.test(b[0]))) o.subs=[...o.subs.slice(0,i+1),['Facebookで共有',shareFB],...o.subs.slice(i+1)]; }
     if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
     h+='</div>';
     s.innerHTML=h; s.scrollTop=0;
@@ -164,6 +170,7 @@ const UI={
 };
 // 共有（𝕏）とポータルへ
 function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function shareFB(){ window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href.split('#')[0]),'_blank','noopener'); }
 function toPortal(){ location.href='../../'; }
 // 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
 let pausedFrom=null;
@@ -201,101 +208,155 @@ const okDate=a=>a[0]>=1&&a[0]<=12&&a[1]>=1&&a[1]<=MDAYS[a[0]];
 const dnum=a=>a[0]*100+a[1];
 const fmtD=a=>a[0]+'月'+a[1]+'日';
 const yen=n=>n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
+// 書類の種類ごとの様式
+const FORMOF={consumable:'物品購入伺',equipment:'物品購入伺',repair:'修繕伺',rental:'支出伺',fee:'支出伺',travel:'出張命令伺'};
+const YOSHIKI={'物品購入伺':'様式第3号（第8条関係）','支出伺':'様式第1号（第5条関係）','修繕伺':'様式第4号（第9条関係）','出張命令伺':'様式第7号（第14条関係）'};
+const WHEN={consumable:'納品予定日',equipment:'納品予定日',repair:'施工予定日',rental:'実施日',fee:'実施日',travel:'期間'};
+// rows は [品名,数量,単位,単価]。金額・合計・伺額は計算して入れる（不備の書類は want と書き換えを持つ）
+let NO=400;
 function mk(o){
-  const r={form:'物品購入伺',yoshiki:'様式第3号（第8条関係）',to:SCHOOL,...o};
+  const form=o.form||FORMOF[o.cat];
+  const r={yoshiki:YOSHIKI[form],to:SCHOOL,...o,form,no:'R8-0'+(++NO)};
+  r.rows=o.rows.map(x=>x.length>4?x:[x[0],x[1],x[2],x[3],x[1]*x[3]]);
+  r.total=o.total!=null?o.total:r.rows.reduce((a,x)=>a+x[4],0);
+  r.amount=o.amount!=null?o.amount:r.total;
+  if(Array.isArray(o.when)) r.when={l:WHEN[o.cat],a:o.when[0],b:o.when[1]};
   r.seals={kocho:null,kyoto:'渡辺',jimu:'小林',shunin:CHIEF[o.dept],kian:o.who.split(' ')[0],...(o.seals||{})};
   return r;
 }
-// 正しい書類（基本形）
-const B={
-  rika:mk({no:'R8-0412',kian:[10,1],dept:'第2学年',who:'山田 花子',subj:'理科実験用消耗品の購入について',amount:12000,
-    rows:[['ビーカー 200mL',10,'個',450,4500],['試験管',30,'本',120,3600],['ろ紙',5,'箱',780,3900]],total:12000,cat:'consumable',when:{l:'納品予定日',a:[10,14]}}),
-  tai:mk({no:'R8-0415',kian:[10,2],dept:'第1学年',who:'佐野 健',subj:'体育用品の購入について',amount:21600,
-    rows:[['ソフトバレーボール',6,'個',2500,15000],['ラインテープ',4,'巻',1650,6600]],total:21600,cat:'consumable',when:{l:'納品予定日',a:[10,16]}}),
-  yoshi:mk({no:'R8-0409',kian:[10,1],dept:'事務室',who:'森 健太',subj:'印刷用紙の購入について',amount:32800,
-    rows:[['PPC用紙 A4',10,'箱',3280,32800]],total:32800,cat:'consumable',when:{l:'納品予定日',a:[10,8]}}),
-  hoken:mk({no:'R8-0416',kian:[10,2],dept:'保健室',who:'松本 由紀',subj:'保健室衛生材料の購入について',amount:18560,
-    rows:[['絆創膏',10,'箱',680,6800],['冷却シート',12,'箱',390,4680],['消毒用アルコール',6,'本',1180,7080]],total:18560,cat:'consumable',when:{l:'納品予定日',a:[10,13]}}),
-  cam:mk({no:'R8-0421',kian:[10,5],dept:'第3学年',who:'井上 美咲',subj:'書画カメラの購入について',amount:68000,
-    rows:[['書画カメラ',1,'台',68000,68000]],total:68000,cat:'equipment',when:{l:'納品予定日',a:[10,20]}}),
-  bus:mk({form:'支出伺',yoshiki:'様式第1号（第5条関係）',no:'R8-0403',kian:[10,1],dept:'第3学年',who:'井上 美咲',subj:'校外学習のバス借上げについて',amount:264000,
-    rows:[['大型バス借上げ',2,'台',132000,264000]],total:264000,cat:'rental',when:{l:'実施日',a:[10,23]}}),
-  shutcho:mk({form:'出張命令伺',yoshiki:'様式第7号（第14条関係）',no:'R8-0418',kian:[10,2],dept:'第2学年',who:'山田 花子',subj:'理科教育研究大会への出張について',amount:38300,
-    rows:[['交通費（往復）',1,'式',23000,23000],['宿泊料',1,'泊',10900,10900],['日当',2,'日',2200,4400]],total:38300,cat:'travel',when:{l:'期間',a:[10,22],b:[10,23]}}),
-  shuzen:mk({form:'修繕伺',yoshiki:'様式第4号（第9条関係）',no:'R8-0422',kian:[10,5],dept:'事務室',who:'森 健太',subj:'体育館照明の修繕について',amount:96000,
-    rows:[['照明器具交換',4,'灯',18500,74000],['高所作業車',1,'式',22000,22000]],total:96000,cat:'repair',when:{l:'施工予定日',a:[10,17]}}),
-  shara:mk({form:'支出伺',yoshiki:'様式第1号（第5条関係）',no:'R8-0425',kian:[10,6],dept:'第3学年',who:'石川 直人',subj:'進路講演会の講師謝礼について',amount:30000,
-    rows:[['講師謝礼',1,'回',30000,30000]],total:30000,cat:'fee',when:{l:'実施日',a:[10,27]}}),
-  toner:mk({no:'R8-0426',kian:[10,6],dept:'事務室',who:'森 健太',subj:'複合機トナーの購入について',amount:85700,
-    rows:[['トナー 黒',2,'本',14800,29600],['トナー カラー',3,'本',18700,56100]],total:85700,cat:'consumable',when:{l:'納品予定日',a:[10,12]}}),
+// 全49枚。曜日をまたいで同じ書類は出ない（題材・起案者・品目・金額の組み合わせはすべて別）
+const ALL={
+  // ---- 月 ----
+  yoshi:mk({dept:'事務室',who:'森 健太',subj:'印刷用紙の購入について',cat:'consumable',kian:[10,1],when:[[10,8]],
+    rows:[['PPC用紙 A4',10,'箱',3280]]}),
+  tai:mk({dept:'第1学年',who:'佐野 健',subj:'体育用品の購入について',cat:'consumable',kian:[10,2],when:[[10,16]],
+    rows:[['ソフトバレーボール',6,'個',2500],['ラインテープ',4,'巻',1650]]}),
+  wagyu:mk({want:'shibutsu',dept:'事務室',who:'高橋 恵',subj:'来客用茶菓の購入について',cat:'consumable',kian:[10,2],when:[[10,9]],
+    rows:[['緑茶ティーバッグ',4,'箱',580],['黒毛和牛 5kg',1,'箱',54000]]}),
+  hoken:mk({dept:'保健室',who:'松本 由紀',subj:'保健室衛生材料の購入について',cat:'consumable',kian:[10,2],when:[[10,13]],
+    rows:[['絆創膏',10,'箱',680],['冷却シート',12,'箱',390],['消毒用アルコール',6,'本',1180]]}),
+  noseal1:mk({want:'noseal',dept:'第3学年',who:'井上 美咲',subj:'校外学習のバス借上げについて',cat:'rental',kian:[10,1],when:[[10,23]],
+    rows:[['大型バス借上げ',2,'台',132000]],seals:{kian:null}}),
+  cam:mk({dept:'第1学年',who:'小川 真理',subj:'書画カメラの購入について',cat:'equipment',kian:[10,2],when:[[10,20]],
+    rows:[['書画カメラ',1,'台',68000]]}),
+  done1:mk({want:'done',dept:'第2学年',who:'山田 花子',subj:'理科教育研究大会への出張について',cat:'travel',kian:[10,2],when:[[10,22],[10,23]],
+    rows:[['交通費（往復）',1,'式',23000],['宿泊料',1,'泊',10900],['日当',2,'日',2200]],seals:{kocho:'大森'}}),
+  // ---- 火 ----
+  rika:mk({dept:'第2学年',who:'西村 翔',subj:'理科実験用消耗品の購入について',cat:'consumable',kian:[10,1],when:[[10,14]],
+    rows:[['ビーカー 200mL',10,'個',450],['試験管',30,'本',120],['ろ紙',5,'箱',780]]}),
+  subj1:mk({want:'subj',dept:'事務室',who:'高橋 恵',subj:'封筒の購入について',cat:'consumable',kian:[10,5],when:[[10,13]],
+    rows:[['長3封筒 1000枚',2,'箱',2400],['カラープリンター',1,'台',32800]]}),
+  shara:mk({dept:'第3学年',who:'石川 直人',subj:'進路講演会の講師謝礼について',cat:'fee',kian:[10,6],when:[[10,27]],
+    rows:[['講師謝礼',1,'回',30000]]}),
+  bad2:mk({want:'baddate',dept:'第1学年',who:'佐野 健',subj:'学年掲示用マグネットの購入について',cat:'consumable',kian:[9,31],when:[[10,15]],
+    rows:[['マグネットシート',10,'枚',380],['カラーマグネット',6,'箱',450]]}),
+  taifix:mk({dept:'保健室',who:'松本 由紀',subj:'保健室用体温計の購入について',cat:'consumable',kian:[10,2],when:[[10,16]],fix:{old:14,seal:'松本'},
+    rows:[['非接触体温計',2,'台',4980],['予備電池',4,'個',220]]}),
+  teisei1:mk({want:'teisei',dept:'事務室',who:'森 健太',subj:'清掃用品の購入について',cat:'consumable',kian:[10,5],when:[[10,15]],fix:{old:14,seal:null},
+    rows:[['ゴミ袋 45L',10,'袋',398],['トイレ用洗剤',6,'本',298],['モップ替え糸',4,'枚',880]]}),
+  toner:mk({dept:'事務室',who:'高橋 恵',subj:'複合機トナーの購入について',cat:'consumable',kian:[10,6],when:[[10,12]],
+    rows:[['トナー 黒',2,'本',14800],['トナー カラー',3,'本',18700]]}),
+  done2:mk({want:'done',dept:'事務室',who:'森 健太',subj:'体育館照明の修繕について',cat:'repair',kian:[10,5],when:[[10,17]],
+    rows:[['照明器具交換',4,'灯',18500],['高所作業車',1,'式',22000]],seals:{kocho:'大森'}}),
+  mic:mk({dept:'第2学年',who:'西村 翔',subj:'学年集会用マイクの購入について',cat:'equipment',kian:[10,5],when:[[10,19]],
+    rows:[['ワイヤレスマイク',1,'台',39800]]}),
+  // ---- 水 ----
+  skip1:mk({want:'skip',dept:'第3学年',who:'石川 直人',subj:'進路資料ファイルの購入について',cat:'consumable',kian:[10,5],when:[[10,14]],
+    rows:[['クリアファイル A4',20,'冊',165],['フラットファイル',30,'冊',88]],seals:{kyoto:null}}),
+  shosha:mk({dept:'第1学年',who:'小川 真理',subj:'書写用品の購入について',cat:'consumable',kian:[10,6],when:[[10,15]],
+    rows:[['半紙 1000枚',3,'束',1280],['墨汁 500mL',6,'本',540]]}),
+  addr1:mk({want:'addr',dept:'保健室',who:'松本 由紀',subj:'AED用パッドの購入について',cat:'consumable',kian:[10,6],when:[[10,13]],
+    rows:[['AED 成人用パッド',2,'組',12800]],to:'みなと市立青葉小学校長'}),
+  shred:mk({dept:'事務室',who:'高橋 恵',subj:'シュレッダーの購入について',cat:'equipment',kian:[10,5],when:[[10,21]],
+    rows:[['業務用シュレッダー',1,'台',59800]]}),
+  mitsu1:mk({want:'mitsu',dept:'第2学年',who:'西村 翔',subj:'大型提示用モニターの購入について',cat:'equipment',kian:[10,6],when:[[10,26]],
+    rows:[['65型モニター',1,'台',148000]],att:{chk:false,n:0}}),
+  mozo:mk({dept:'第3学年',who:'井上 美咲',subj:'模造紙の購入について',cat:'consumable',kian:[10,7],when:[[10,14]],
+    rows:[['模造紙 50枚',3,'束',1980],['水性マーカー 8色',10,'組',620]]}),
+  grade1:mk({want:'grade',dept:'第4学年',who:'石川 直人',subj:'職場体験礼状用はがきの購入について',cat:'consumable',kian:[10,6],when:[[10,9]],
+    rows:[['郵便はがき',120,'枚',85]]}),
+  bus:mk({dept:'第1学年',who:'佐野 健',subj:'芸術鑑賞会のバス借上げについて',cat:'rental',kian:[10,2],when:[[10,30]],
+    rows:[['中型バス借上げ',3,'台',98000]]}),
+  game1:mk({want:'shibutsu',dept:'第1学年',who:'小川 真理',subj:'学級レクリエーション用品の購入について',cat:'consumable',kian:[10,6],when:[[10,16]],
+    rows:[['ドッジボール',2,'個',1980],['家庭用ゲーム機',1,'台',49980]]}),
+  hoshu:mk({dept:'保健室',who:'松本 由紀',subj:'学校保健研修会への出張について',cat:'travel',kian:[10,5],when:[[10,20]],
+    rows:[['交通費（往復）',1,'式',1840],['日当',1,'日',2200]]}),
+  // ---- 木 ----
+  mask:mk({dept:'保健室',who:'松本 由紀',subj:'感染症対策用品の購入について',cat:'consumable',kian:[10,7],when:[[10,14]],
+    rows:[['使い捨てマスク',20,'箱',498],['ハンドソープ詰替',12,'個',360]]}),
+  bud1:mk({want:'budget',dept:'第2学年',who:'山田 花子',subj:'電子黒板の購入について',cat:'equipment',kian:[10,6],when:[[10,28]],
+    rows:[['電子黒板',1,'台',248000]],budget:BUDGET.consumable}),
+  wood:mk({dept:'第1学年',who:'佐野 健',subj:'技術科木材の購入について',cat:'consumable',kian:[10,7],when:[[10,15]],
+    rows:[['杉板 1820mm',30,'枚',680],['木工用ボンド',6,'本',450]]}),
+  form1:mk({want:'form',dept:'第3学年',who:'井上 美咲',subj:'進路指導研究協議会への出張について',cat:'travel',form:'物品購入伺',kian:[10,7],when:[[10,27]],
+    rows:[['交通費（往復）',1,'式',3360],['日当',1,'日',2200]]}),
+  sign:mk({dept:'事務室',who:'森 健太',subj:'校内案内表示板の修繕について',cat:'repair',kian:[10,7],when:[[10,20]],
+    rows:[['表示板 塗装補修',3,'枚',12000],['取付金具交換',3,'式',4500]]}),
+  massage1:mk({want:'shibutsu',dept:'保健室',who:'松本 由紀',subj:'保健室ベッド用品の購入について',cat:'consumable',kian:[10,7],when:[[10,19]],
+    rows:[['ベッド用シーツ',4,'枚',1980],['マッサージチェア',1,'台',298000]]}),
+  shara2:mk({dept:'第2学年',who:'西村 翔',subj:'職業講話の講師謝礼について',cat:'fee',kian:[10,5],when:[[10,29]],
+    rows:[['講師謝礼',1,'回',20000]]}),
+  aimitsu1:mk({want:'aimitsu',dept:'事務室',who:'高橋 恵',subj:'プール循環ポンプの修繕について',cat:'repair',kian:[10,6],when:[[10,22]],
+    rows:[['循環ポンプ分解整備',1,'式',128000]],att:{chk:true,n:1}}),
+  yoshifix:mk({dept:'第1学年',who:'小川 真理',subj:'学年通信用紙の購入について',cat:'consumable',kian:[10,2],when:[[10,9]],fix:{old:8,seal:'小川'},
+    rows:[['色上質紙 A4',5,'冊',780]]}),
+  ord1:mk({want:'order',dept:'第2学年',who:'山田 花子',subj:'社会科見学の入館料について',cat:'rental',kian:[10,5],when:[[10,1]],
+    rows:[['入館料（団体）',118,'人',300]]}),
+  piano:mk({dept:'第3学年',who:'井上 美咲',subj:'音楽室ピアノの調律について',cat:'repair',kian:[10,6],when:[[10,21]],
+    rows:[['ピアノ調律',2,'台',16500]]}),
+  // ---- 金 ----
+  digit1:mk({want:'digit',dept:'事務室',who:'森 健太',subj:'来客用スリッパの購入について',cat:'consumable',kian:[10,8],when:[[10,16]],
+    rows:[['来客用スリッパ',20,'足',820]],amount:1640000}),
+  shika:mk({dept:'保健室',who:'松本 由紀',subj:'歯科検診用品の購入について',cat:'consumable',kian:[10,7],when:[[10,15]],
+    rows:[['デンタルミラー',30,'本',240],['紙コップ',10,'袋',198]]}),
+  name1:mk({want:'sealname',dept:'第1学年',who:'佐野 健',subj:'体操マットの購入について',cat:'equipment',kian:[10,7],when:[[10,23]],
+    rows:[['体操マット',2,'枚',38500]],seals:{kian:'佐藤'}}),
+  flower:mk({dept:'第3学年',who:'岡本 優',subj:'卒業式用鉢花の購入について',cat:'consumable',kian:[10,8],when:[[10,30]],
+    rows:[['シクラメン鉢',8,'鉢',2800]]}),
+  subj2:mk({want:'subj',dept:'第2学年',who:'藤田 大輔',subj:'理科観察用ルーペの購入について',cat:'consumable',kian:[10,8],when:[[10,16]],
+    rows:[['ルーペ',20,'個',380],['サッカーボール',1,'個',3900]]}),
+  pot:mk({dept:'事務室',who:'高橋 恵',subj:'職員室用電気ポットの購入について',cat:'equipment',kian:[10,8],when:[[10,14]],
+    rows:[['電気ポット 3L',1,'台',12800]]}),
+  onsen1:mk({want:'shibutsu',dept:'第3学年',who:'石川 直人',subj:'全国進路指導研究大会への出張について',cat:'travel',kian:[10,8],when:[[10,29],[10,30]],
+    rows:[['交通費（往復）',1,'式',27400],['宿泊料',1,'泊',10900],['日当',2,'日',2200],['温泉旅館 延泊',1,'泊',18000]]}),
+  shinsa:mk({dept:'第2学年',who:'山田 花子',subj:'英語暗唱大会の審査謝礼について',cat:'fee',kian:[10,7],when:[[11,6]],
+    rows:[['審査謝礼',3,'人',5000]]}),
+  addr2:mk({want:'addr',dept:'第1学年',who:'林 さくら',subj:'運動会用テントの修繕について',cat:'repair',kian:[10,8],when:[[10,21]],
+    rows:[['テント幕 張替え',2,'張',23000]],to:'みなと市立緑ヶ丘中学校長'}),
+  gate:mk({dept:'事務室',who:'森 健太',subj:'正門門扉の修繕について',cat:'repair',kian:[10,9],when:[[10,24]],
+    rows:[['門扉 戸車交換',2,'個',14500],['溶接補修',1,'式',38000]]}),
+  gakufu:mk({dept:'第2学年',who:'藤田 大輔',subj:'吹奏楽部楽譜の購入について',cat:'consumable',kian:[10,9],when:[[10,20]],
+    rows:[['吹奏楽譜',4,'冊',3960]]}),
+  flag:mk({dept:'第1学年',who:'林 さくら',subj:'学級旗用布の購入について',cat:'consumable',kian:[10,8],when:[[10,19]],
+    rows:[['フェルト 赤',10,'枚',220],['フェルト 白',10,'枚',220],['布用接着剤',4,'本',580]]}),
 };
-// 訂正印つきで日付を直した、正しい書類（直した跡があるだけでは差し戻さない）
-B.taifix={...B.tai,fix:{old:14,seal:'佐野'}};
-B.yoshifix={...B.yoshi,when:{l:'納品予定日',a:[10,9]},fix:{old:8,seal:'森'}};
-// 明細の品物 → それが載るべき件名（正しい書類から自動で作る）＋よその件名の品物
-const ITEM={};
-Object.values(B).forEach(d=>d.rows.forEach(r=>{ ITEM[r[0]]=d.subj; }));
-Object.assign(ITEM,{'カラープリンター':'プリンターの購入について','サッカーボール':'体育用品の購入について'});
+const B={}, X={};
+for(const [k,d] of Object.entries(ALL)) (d.want?X:B)[k]=d;
+// 別の件名に属する品物（紛れ込み）
+const OFF={'カラープリンター':'プリンターの購入について','サッカーボール':'体育用品の購入について'};
 // 公費では買えない物（指摘は事務長の言葉）
 const PRIV={
-  '黒毛和牛 5kg':'和牛は教材ではありません',
-  '家庭用ゲーム機':'ゲーム機は体育用品ではありません',
-  'マッサージチェア':'マッサージチェアは衛生材料ではありません。校長室にも置きません',
-  '温泉旅館 延泊':'大会は23日で終わりです。温泉の延泊は出張ではありません',
+  '黒毛和牛 5kg':'和牛は茶菓ではありません',
+  '家庭用ゲーム機':'レクリエーションでも、ゲーム機は公費で買えません',
+  'マッサージチェア':'マッサージチェアはベッド用品ではありません。校長室にも置きません',
+  '温泉旅館 延泊':'大会は30日で終わりです。温泉の延泊は出張ではありません',
 };
-// 書類の種類ごとの様式
-const FORMOF={consumable:'物品購入伺',equipment:'物品購入伺',repair:'修繕伺',rental:'支出伺',fee:'支出伺',travel:'出張命令伺'};
 // 5万円を超える購入・修繕・借上げは見積書2社を添付
 const needAtt=d=>d.amount>50000&&d.cat!=='travel'&&d.cat!=='fee';
 const ATT=d=>d.att||{chk:true,n:2};
-// 不備のある書類 = 基本形を1か所だけ書き換えたもの（want は検証用の意図）
-function V(base,want,patch){
-  const r={...B[base],...patch,want};
-  r.seals={...B[base].seals,...(patch.seals||{})};
-  return r;
-}
-const X={
-  // 月: 見れば分かる（品物・押印）
-  wagyu:V('yoshi','shibutsu',{rows:[['PPC用紙 A4',5,'箱',3280,16400],['黒毛和牛 5kg',1,'箱',54000,54000]],amount:70400,total:70400}),
-  noseal1:V('bus','noseal',{seals:{kian:null}}),
-  done1:V('shutcho','done',{seals:{kocho:'大森'}}),
-  // 火: 件名と明細・訂正印・日付
-  subj1:V('yoshi','subj',{rows:[['カラープリンター',1,'台',32800,32800]]}),
-  bad2:V('cam','baddate',{kian:[9,31]}),
-  teisei1:V('rika','teisei',{when:{l:'納品予定日',a:[10,15]},fix:{old:14,seal:null}}),
-  done2:V('shuzen','done',{seals:{kocho:'大森'}}),
-  // 水: 決裁欄・宛先・所属・見積書
-  skip1:V('toner','skip',{seals:{kyoto:null}}),
-  addr1:V('rika','addr',{to:'みなと市立青葉小学校長'}),
-  mitsu1:V('toner','mitsu',{att:{chk:false,n:0}}),
-  grade1:V('shara','grade',{dept:'第4学年'}),
-  game1:V('tai','shibutsu',{rows:[['ソフトバレーボール',6,'個',2500,15000],['家庭用ゲーム機',1,'台',49980,49980]],amount:64980,total:64980}),
-  // 木: 予算科目・様式・相見積・日付の前後
-  bud1:V('cam','budget',{budget:BUDGET.consumable}),
-  form1:V('shutcho','form',{form:'物品購入伺',yoshiki:'様式第3号（第8条関係）'}),
-  massage1:V('hoken','shibutsu',{rows:[['絆創膏',10,'箱',680,6800],['マッサージチェア',1,'台',298000,298000]],amount:304800,total:304800,att:{chk:true,n:2}}),
-  aimitsu1:V('shuzen','aimitsu',{att:{chk:true,n:1}}),
-  ord1:V('shutcho','order',{when:{l:'期間',a:[10,22],b:[10,21]}}),
-  // 金: 印の名前・紛れた品物・桁
-  digit1:V('yoshi','digit',{amount:3280000}),
-  name1:V('hoken','sealname',{seals:{kian:'松田'}}),
-  subj2:V('rika','subj',{rows:[['ビーカー 200mL',10,'個',450,4500],['試験管',30,'本',120,3600],['サッカーボール',1,'個',3900,3900]]}),
-  onsen1:V('shutcho','shibutsu',{rows:[['交通費（往復）',1,'式',23000,23000],['宿泊料',1,'泊',10900,10900],['日当',2,'日',2200,4400],['温泉旅館 延泊',1,'泊',18000,18000]],amount:56300,total:56300}),
-  addr2:V('tai','addr',{to:'みなと市立緑ヶ丘中学校長'}),
-};
-const DOC=k=>B[k]||X[k];
-// 面 = 曜日。並びは固定。iv = 書類が1枚流れてくる間隔（秒）
+const DOC=k=>ALL[k];
+// 面 = 曜日。並びは固定。iv = 書類が流れてくる間隔（秒）、vis = 狭い画面でも書類全体が見えている最短時間（秒）。曜日ごとに速くなる
 const DAYS=[
-  {name:'月曜日',md:[10,5],iv:12.0,note:'事務長「校長印は左下です。不備のある書類は、書類ごと右の差戻箱へ。品物もよく見てくださいね」',
+  {name:'月曜日',md:[10,5],iv:12.0,vis:4.2,note:'事務長「校長印は左下です。不備のある書類は、書類ごと右の差戻箱へ。品物もよく見てくださいね」',
     docs:['yoshi','tai','wagyu','hoken','noseal1','cam','done1']},
-  {name:'火曜日',md:[10,6],iv:10.5,note:'事務長「件名と明細の品物は合っていますか。直した跡には訂正印があるかも」',
-    docs:['rika','subj1','bus','bad2','taifix','teisei1','shara','done2','toner']},
-  {name:'水曜日',md:[10,7],iv:9.6,note:'事務長「決裁欄の印がそろっているか。5万円を超える物は見積書の添付も見てください」',
-    docs:['shutcho','skip1','tai','addr1','cam','mitsu1','yoshi','grade1','bus','game1']},
-  {name:'木曜日',md:[10,8],iv:8.8,note:'事務長「予算科目と様式は中身に合っていますか。見積は2社からです。日付の前後も」',
-    docs:['hoken','bud1','rika','form1','toner','massage1','shara','aimitsu1','yoshifix','ord1','shuzen']},
-  {name:'金曜日',md:[10,9],iv:8.0,note:'事務長「金曜は起案者の印の名前まで。監査は来週です」',
-    docs:['toner','digit1','bus','name1','shara','subj2','taifix','onsen1','cam','addr2','shuzen','hoken']},
+  {name:'火曜日',md:[10,6],iv:10.4,vis:3.7,note:'事務長「今日は少し多めで、流れも速めます。件名と品物、直した跡の訂正印も」',
+    docs:['rika','subj1','shara','bad2','taifix','teisei1','toner','done2','mic']},
+  {name:'水曜日',md:[10,7],iv:9.0,vis:3.3,note:'事務長「週の真ん中で書類が増えます。5万円を超える物は見積書の添付も見てください」',
+    docs:['skip1','shosha','addr1','shred','mitsu1','mozo','grade1','bus','game1','hoshu']},
+  {name:'木曜日',md:[10,8],iv:7.9,vis:2.9,note:'事務長「締め前でラインを上げます。予算科目と様式、見積は2社、日付の前後も」',
+    docs:['mask','bud1','wood','form1','sign','massage1','shara2','aimitsu1','yoshifix','ord1','piano']},
+  {name:'金曜日',md:[10,9],iv:7.0,vis:2.6,note:'事務長「金曜は今週いちばん多くて速いです。起案者の印の名前まで。監査は来週です」',
+    docs:['digit1','shika','name1','flower','subj2','pot','onsen1','shinsa','addr2','gate','gakufu','flag']},
 ];
 const KIND={sum:'合計違い',mult:'計算違い',digit:'桁違い',baddate:'ありえない日付',order:'日付の前後',noseal:'起案者印なし',sealname:'印の名前違い',skip:'順番飛ばし',done:'押印済み',addr:'宛先違い',grade:'所属違い',budget:'予算科目違い',
   subj:'件名と明細違い',shibutsu:'公費で買えない物',teisei:'訂正印なし',mitsu:'見積書なし',aimitsu:'相見積なし',form:'様式違い'};
@@ -318,7 +379,7 @@ function audit(d){
   let s=0;
   for(const r of d.rows){ s+=r[4];
     if(PRIV[r[0]]) add('shibutsu',PRIV[r[0]]);
-    else if(ITEM[r[0]]!==d.subj) add('subj','件名は「'+d.subj+'」なのに、明細に「'+r[0]+'」があります');
+    else if(OFF[r[0]]&&OFF[r[0]]!==d.subj) add('subj','件名は「'+d.subj+'」なのに、明細に「'+r[0]+'」があります');
     if(r[2]&&r[3]*r[1]!==r[4]) add('mult',r[0]+' '+yen(r[3])+'円×'+r[1]+'は ¥'+yen(r[3]*r[1])+'。¥'+yen(r[4])+'と書かれています'); }
   if(s!==d.total) add('sum','合計 ¥'+yen(d.total)+'が明細の和 ¥'+yen(s)+'と合いません');
   if(d.amount!==d.total) add('digit','伺額が金'+yen(d.amount)+'円。明細の合計は ¥'+yen(d.total)+'です。桁が違います');
@@ -340,7 +401,7 @@ function DS(){ return Math.max(0.78,Math.min(1,(BE()-topY()-150)/DH)); }
 function DX(){ return (W-DW*DS())/2; }
 function SP(){ return (DH+40)*DS(); }
 function restPos(){ return {x:62,y:BE()+146}; }   // 印面の位置（柄はここから上に伸びる）
-function beltV(D){ return Math.min(SP()/D.iv,(BE()-DH*DS()-topY())/4.2); }
+function beltV(D){ return Math.min(SP()/D.iv,(BE()-DH*DS()-topY())/D.vis); }
 function stampOverDoc(){
   const st=G.stamp; if(!st||!st.held)return false;
   return G.docs.some(o=>{ if(o.st!=='belt')return false; const q=docPos(o); return st.x>=q.x&&st.x<=q.x+DW*DS()&&st.y>=q.y&&st.y<=q.y+DH*DS(); });
@@ -592,7 +653,7 @@ function labeled(lab,val,y,size,wt,x1){
   ftxt(lab,16,120,y,12.5,{c:'#5E584D'}); ctx.font='500 12.5px '+FF;
   const x=16+ctx.measureText(lab).width+10; ftxt(val,x,x1||344,y,size,{w:wt}); return x;
 }
-// 日付の訂正: 旧い日を二重線で消し、新しい日を続けて書く。訂正印はその右
+// 日付の訂正: 旧い日を二重線で消し、新しい日を続けて書く。訂正印は二重線の上に重ねて押す（実務の作法）
 function fixedDate(d,y){
   const x=labeled(d.when.l,'',y,13.5,600), a=d.when.a, F='600 13.5px '+FF;
   const pre='令和8年'+a[0]+'月', old=String(d.fix.old);
@@ -602,7 +663,7 @@ function fixedDate(d,y){
   for(const dy of [-6.5,-3.5]){ ctx.moveTo(x+w0,y+dy); ctx.lineTo(x+w0+4+w1,y+dy); } ctx.stroke();
   const nw=a[1]+'日'; ctx.font=F; const w2=ctx.measureText(nw).width, x2=x+w0+w1+8;
   ftxt(nw,x2,x2+w2,y,13.5,{w:600});
-  if(d.fix.seal) seal(x2+w2+18,y-4,13.5,d.fix.seal,0.86,0.08);
+  if(d.fix.seal) seal(x+w0+2+w1/2,y-5,11.5,d.fix.seal,0.78,0.08);
 }
 function drawDoc(o,x,y,rot){
   const d=o.d,s=DS();
