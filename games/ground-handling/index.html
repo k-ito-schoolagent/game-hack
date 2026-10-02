@@ -2,40 +2,1104 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>グランドハンドリング（仕様書公開中） | GAME HACK</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>グランドハンドリング | GAME HACK</title>
+<meta name="description" content="伊丹空港の地上係員。着陸した機体からスポットまで指でなぞれば、機体はその線どおりに誘導路を走る。重い機体は止まりにくく、誘導路で鉢合わせすれば全機停止。">
+<meta name="theme-color" content="#111214">
+<!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>誘</text></svg>">
 <style>
-  body{margin:0;background:#0d1526;color:#eaf3fc;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.8}
-  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
-  .badge{display:inline-block;font-size:12px;font-weight:700;border:1px solid #ffb300;color:#ffb300;border-radius:6px;padding:2px 10px;margin-bottom:14px}
-  h1{font-size:26px;margin:0 0 14px}
-  p,li{font-size:14.5px;color:#c9dcf2}
-  a{color:#ffb300}
-  .box{background:#16233c;border-radius:12px;padding:14px 16px;margin:14px 0}
-  .box b{color:#ffb300}
+/* ================================================================
+ * GAME HACK 共通UI（ここから）— 全ゲームで同じものをコピーして使う
+ * 世界観: 業務帳票。紙 × 墨 × 朱（ハンコの赤）。
+ * - 朱は「判子」と「失敗」にだけ使う。ボタンや装飾には使わない
+ * - 角丸は 2px まで。影・グラデーション・絵文字は使わない
+ * ================================================================ */
+:root{
+  --paper:#F3EFE4; --paper2:#E8E1CF; --ink:#22201C; --ink2:#5E584D; --rule:#CDC3AC; --shu:#C8372D;
+  --font:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--scene,#2b2a27);font-family:var(--font);color:var(--ink);-webkit-text-size-adjust:100%}
+#wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+canvas{display:block;width:100%;height:100%}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+/* HUD: 帳票の見出し帯。左=どこ / 中=いまの数値 / 右=一時停止 */
+#hud{position:absolute;left:0;right:0;top:0;padding-top:var(--safe-t);background:var(--paper);border-bottom:1px solid var(--ink);display:none;grid-template-columns:1fr auto 52px;align-items:center;height:calc(48px + var(--safe-t));box-sizing:border-box;font-feature-settings:"tnum";z-index:5}
+#hud.on{display:grid}
+#hudL{padding-left:14px;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hudL small{font-weight:500;color:var(--ink2);font-size:12px;margin-left:6px}
+#hudC{padding:0 12px;font-size:15px;font-weight:700;text-align:right;white-space:nowrap}
+#hudC .warn{color:var(--shu)}
+#pauseBtn{width:52px;height:48px;border:0;border-left:1px solid var(--rule);background:transparent;display:grid;place-items:center}
+#pauseBtn i{display:block;width:12px;height:14px;border-left:4px solid var(--ink);border-right:4px solid var(--ink);box-sizing:border-box}
+/* シート: 下から出る帳票。親指で押せる位置にボタンを置く */
+#sheetBg{position:absolute;inset:0;background:rgba(34,32,28,.5);display:none;z-index:10}
+#sheetBg.on{display:block}
+#sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
+#sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
+#sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
+#sheet dt{color:var(--ink2)}
+#sheet dd{margin:0;font-weight:600;font-feature-settings:"tnum"}
+#sheet .acts{display:grid;gap:8px}
+.btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
+.btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn:active{transform:translateY(1px);opacity:.9}
+.sub{display:flex;justify-content:center;gap:4px}
+.sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
+/* 判子: 結果シートの右上に押される。中身は最大4字 */
+.stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
+.stamp.round{border-radius:50%}
+.stamp span{display:block}
+@keyframes stampIn{from{transform:rotate(-8deg) scale(1.9);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:.92}}
+@media (prefers-reduced-motion:reduce){#sheet,.stamp{animation:none}}
+/* ===== GAME HACK 共通UI（ここまで）===== */
+/* ---- ゲーム固有の見た目: 空港の運航状況表示（フラップ式）と管制の交信記録 ---- */
+:root{--paper:#17191b;--paper2:#202326;--ink:#f1eee5;--ink2:#a6a297;--rule:#34383c;--shu:#ff5a4c;--flap:#f4c64a;--ok:#5fd18b;--tile:#222528}
+body{--scene:#5f6b4a}
+#hud{background:#111214;border-bottom:2px solid #000;color:var(--ink)}
+#hudL{color:var(--ink)}
+#hudL small{color:var(--ink2)}
+#hudC{color:var(--flap)}
+#pauseBtn{border-left:1px solid #2c2f33}
+#sheetBg{background:rgba(8,9,10,.55)}
+#sheet{background:var(--paper);border-top:3px solid #000;color:var(--ink)}
+#sheet .no{margin:-22px -20px 16px;padding:9px 20px;background:#0c0d0e;color:var(--flap);font-weight:700;letter-spacing:.18em;border-bottom:1px solid #000}
+#sheet h1{color:#fff;font-weight:800}
+#sheet .lead{background:#0e0f11;border:1px solid #2a2d31;padding:10px 12px;color:#dcd8cd;font-size:14.5px}
+#sheet dl{border-top:2px solid #000}
+#sheet dl div{border-bottom:1px solid #000;padding:6px 0;align-items:center}
+#sheet dt{color:var(--ink2);font-size:13px}
+#sheet dd{color:var(--flap);font-weight:700;line-height:1.6;background-color:var(--tile);background-image:linear-gradient(transparent calc(50% - .5px),rgba(0,0,0,.8) calc(50% - .5px),rgba(0,0,0,.8) calc(50% + .5px),transparent calc(50% + .5px));padding:5px 8px;border-radius:2px;min-width:0;overflow-wrap:anywhere}
+.btn{background:var(--flap);color:#141414}
+.sub button{color:var(--ink)}
+.btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline-color:var(--flap)}
+/* 判子 → 運航状況表示の状態タイル（失敗は赤、定時は緑）。めくれて出る */
+.stamp{border:3px solid var(--shu);border-radius:2px;background-color:#0e0f11;background-image:linear-gradient(transparent calc(50% - .75px),#000 calc(50% - .75px),#000 calc(50% + .75px),transparent calc(50% + .75px));color:var(--shu);box-shadow:none;transform:none;opacity:1;animation:flapIn .42s steps(5) .12s both}
+.stamp.round{border-radius:2px;border-color:var(--ok);color:var(--ok)}
+@keyframes flapIn{0%{transform:scaleY(0)}60%{transform:scaleY(-.6)}100%{transform:scaleY(1)}}
+#sheet .no:first-child+h1{padding-right:0;letter-spacing:0}
+#sheet dd.multi{background-image:none}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <span class="badge">仕様書公開中・制作者募集</span>
-  <h1>グランドハンドリング</h1>
-  <p>実ダイヤで到着する機体を誘導所へ。誘導ルート設計と同時進行を捌く技術。失敗＝滑走路上のニアミスで「運航停止」。</p>
-  <div class="box">
-    <b>発想の型</b>
-    <ul>
-      <li>題材: 空港地上係員の同時進行オペレーション</li>
-      <li>物理化: 機体＝慣性のある車両（曲がりにくい・止まりにくい）。誘導路＝グラフ。到着便＝実ダイヤ固定</li>
-      <li>技術: 実ダイヤは固定＝到着順を暗記し、誘導ルートを先に引く計画技術。同時進行の捌き</li>
-      <li>失敗の見せ場: 滑走路上のニアミスで「運航停止」、誘導ミスで「スポット渋滞」</li>
-      <li>データ: 空港ダイヤ（公開時刻表）の簡略化版</li>
-      <li>操作: 機体をタップ→行先スポットをタップで誘導線を引く</li>
-    </ul>
-  </div>
-  <p>つくってみたい人は <a href="https://github.com/k-ito-schoolagent/game-hack/issues">issue</a> で宣言してください。
-  詳しい設計書は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/games/ground-handling/SPEC.md">SPEC.md</a>。
-  はじめてのプルリクエスト歓迎です（<a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">参加のしかた</a>）。</p>
-  <p><a href="../../">← GAME HACK ポータルへ</a></p>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <!-- 共通UI: ここから -->
+  <div id="hud"><div id="hudL"></div><div id="hudC"></div><button id="pauseBtn" aria-label="一時停止"><i></i></button></div>
+  <div id="sheetBg"><div id="sheet" role="dialog" aria-modal="true"></div></div>
+  <!-- 共通UI: ここまで -->
 </div>
+<script>
+'use strict';
+/* ============================================================
+ * グランドハンドリング（GAME HACK No.10）
+ * 型: 題材(空港の地上誘導) × 物理化(機体=慣性のある車両・誘導路=グラフ・スポット=大きさの枠)
+ *     × 権限(管制塔から指でなぞった線どおりに機体が走る) × 技術(固定ダイヤの先読み・逆走回避) × 見せ場(誘導路での鉢合わせ→停止)
+ * 約束: 乱数で勝敗を決めない（固定ダイヤ・固定ステップ）。失敗は誘導線の引き方に帰因する
+ * ============================================================ */
+
+// ================================================================
+// GAME HACK 共通UI（ここから）— 書き換えずにコピーする
+// ================================================================
+// 論理座標: 横幅 W=420 固定。高さ H は端末の縦横比に合わせて 700〜920 で伸びる（上下の黒帯を出さない）
+// 描画は H を見てレイアウトする（上端=HUD 下、下端=親指ゾーン）
+const W=420; let H=760;
+const HUD_H=48;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0,SAFE_T=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=window.innerWidth; VH=window.innerHeight;
+  cv.width=Math.round(VW*DPR); cv.height=Math.round(VH*DPR);
+  H=Math.max(700,Math.min(920,Math.round(W*VH/VW)));
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+  SAFE_T=(parseFloat(getComputedStyle($('hud')).paddingTop)||0)/SC;
+  if(typeof onResize==='function')onResize();
+}
+// 画面座標 → 論理座標
+function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
+// DOM 要素の中心 → 論理座標（下部ボタンとの距離判定などに使う）
+function elCenter(el){ const r=el.getBoundingClientRect(); return toGame({clientX:r.left+r.width/2,clientY:r.top+r.height/2}); }
+// HUD の下端（論理座標）。ゲームの描画はここから下に置く
+function topY(){ return HUD_H+SAFE_T; }
+// 振動（対応端末のみ）
+function buzz(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(_){} }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const UI={
+  hud(l,lSmall,c){ $('hud').classList.add('on'); $('hudL').innerHTML=esc(l)+(lSmall?'<small>'+esc(lSmall)+'</small>':''); $('hudC').innerHTML=c||''; },
+  hideHud(){ $('hud').classList.remove('on'); },
+  /* シートを開く
+   * o = { no:'No.01 · 乗務報告', title, lead, rows:[[ラベル,値],...], stamp:'不可'|'発車'(最大4字), round:true(丸印),
+   *       main:[ラベル,fn], subs:[[ラベル,fn],...] } */
+  sheet(o){
+    const s=$('sheet');
+    let h='';
+    if(o.stamp){ const t=[...o.stamp]; const lines=t.length===4?[t.slice(0,2).join(''),t.slice(2).join('')]:t.length===3?[t.join('')]:[t.join('')];
+      const fs=t.length<=2?27:t.length===3?20:22;
+      h+='<div class="stamp'+(o.round?' round':'')+'" style="font-size:'+fs+'px">'+lines.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'; }
+    if(o.no)h+='<p class="no">'+esc(o.no)+'</p>';
+    h+='<h1>'+esc(o.title)+'</h1>';
+    if(o.lead)h+='<p class="lead">'+esc(o.lead)+'</p>';
+    if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
+    h+='<div class="acts">';
+    if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
+    h+='</div>';
+    s.innerHTML=h; s.scrollTop=0;
+    s.querySelectorAll('button').forEach(b=>{
+      const k=b.dataset.k, fn=k==='main'?o.main[1]:o.subs[+k.slice(1)][1];
+      b.addEventListener('click',e=>{ e.stopPropagation(); fn(); });
+    });
+    $('sheetBg').classList.add('on');
+    const m=s.querySelector('.btn'); if(m)setTimeout(()=>m.focus({preventScroll:true}),50);
+  },
+  close(){ $('sheetBg').classList.remove('on'); },
+  open(){ return $('sheetBg').classList.contains('on'); },
+};
+// 共有（𝕏）とポータルへ
+function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function toPortal(){ location.href='../../'; }
+// 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
+let pausedFrom=null;
+function pause(){
+  if(G.screen!=='play')return;
+  pausedFrom='play'; G.screen='pause';
+  UI.sheet({no:GAME_NO+' · 一時停止中',title:'一時停止',main:['再開する',resume],subs:[['この面をやり直す',()=>{UI.close();restart();}],['一覧へ戻る',toPortal]]});
+}
+function resume(){ if(G.screen!=='pause')return; UI.close(); G.screen='play'; lastTs=0; }
+$('pauseBtn').addEventListener('click',e=>{ e.stopPropagation(); G.screen==='pause'?resume():pause(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden)pause(); });
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ G.screen==='pause'?resume():pause(); } });
+// ===== GAME HACK 共通UI（ここまで）=====
+
+
+// ---- ゲーム固有 ----------------------------------------------
+const GAME_NO='No.10';
+const TAG='グランドハンドリング';
+const FONT=getComputedStyle(document.body).fontFamily;
+const STEP=1/60;
+const PXM=0.75;            // 1m = 0.75px（概略縮尺）
+const HOLD_MAX=3;          // 上空待機はここまで。4機目で代替空港へ
+const LAND_GAP=4.5;        // 着陸間隔（秒）
+
+// 機種（寸法はメーカー公表値の概略）。L=大型 M=中型 S=小型
+const TYPES={
+  B772:{name:'B777-200',cat:'L',wake:'H',span:60.9,len:63.7,fw:6.2,wing:.43,sweep:31,rc:12,tc:3.4,tail:21.5,tailc:5.5,eng:3.4,engX:.31,tip:'plain',vmax:34,acc:9,dec:14,aLat:11,R:30},
+  B788:{name:'B787-8',cat:'L',wake:'H',span:60.1,len:56.7,fw:5.8,wing:.42,sweep:32,rc:10.5,tc:2.4,tail:19.4,tailc:5,eng:2.9,engX:.29,tip:'raked',vmax:35,acc:11,dec:16,aLat:12,R:28},
+  A321:{name:'A321',cat:'M',wake:'M',span:35.8,len:44.5,fw:4,wing:.44,sweep:25,rc:6.3,tc:1.6,tail:12.5,tailc:3.4,eng:2.1,engX:.33,tip:'sharklet',vmax:40,acc:16,dec:22,aLat:15,R:22},
+  A320:{name:'A320',cat:'M',wake:'M',span:35.8,len:37.6,fw:4,wing:.41,sweep:25,rc:6.3,tc:1.6,tail:12.5,tailc:3.4,eng:2.1,engX:.33,tip:'sharklet',vmax:40,acc:16,dec:22,aLat:15,R:22},
+  B738:{name:'B737-800',cat:'M',wake:'M',span:35.8,len:39.5,fw:3.8,wing:.42,sweep:25,rc:6.6,tc:1.4,tail:14.4,tailc:3.2,eng:1.7,engX:.28,tip:'winglet',vmax:40,acc:16,dec:22,aLat:15,R:22},
+  AT46:{name:'ATR42-600',cat:'S',wake:'M',span:24.6,len:22.7,fw:2.6,wing:.40,sweep:0,rc:2.3,tc:1.5,tail:7.3,tailc:1.4,eng:3.9,engX:.33,tip:'plain',prop:true,vmax:44,acc:22,dec:30,aLat:19,R:18},
+};
+for(const k in TYPES){ const T=TYPES[k]; T.id=k; T.S=T.span*PXM; T.L=T.len*PXM; T.r=Math.max(T.S,T.L)/2; }
+const CAT_OK={L:'LMS',M:'MS',S:'S'};
+const CAT_J={L:'大型',M:'中型',S:'小型'};
+const AIRLINE={ANA:'#1d4f9f',JAL:'#cf2131',JAC:'#cf2131'};
+const ORIGIN={RJTT:'羽田',RJCC:'新千歳',RJFF:'福岡',RJFK:'鹿児島',ROAH:'那覇',RJBT:'但馬',RJSS:'仙台',RJFT:'熊本',RJSN:'新潟',RJFM:'宮崎',RJFU:'長崎'};
+
+// 空港（大阪国際空港 B滑走路 32L 側を簡略化。スポット番号・誘導路名は簡略化した架空の割り当て）
+const SPOTS=[{no:11,x:52,cat:'L'},{no:12,x:112,cat:'L'},{no:13,x:172,cat:'L'},{no:14,x:226,cat:'M'},{no:15,x:266,cat:'M'},{no:16,x:306,cat:'M'},{no:17,x:350,cat:'S'},{no:18,x:384,cat:'S'}];
+const CONN=[{n:'A1',x:20},{n:'A2',x:82},{n:'A3',x:200},{n:'A4',x:328}];
+const EXITS=[{n:'W1',xr:190},{n:'W2',xr:300},{n:'W3',xr:420}];
+const EXIT_PREF={S:[2,1,0],M:[2,1,0],L:[1,0]};
+
+/* 面＝時間帯。到着ダイヤは伊丹の便構成（羽田・新千歳・福岡便など）を模した架空の固定ダイヤ。
+ * 便名・時刻は架空（実在便とは一致しない）。[到着(秒), 便名, 機種, 出発地]
+ * pre: 面の開始時に駐機中の機体 [スポット, 便名, 機種, 出発(秒)] */
+const STAGES=[
+  {name:'07時台',sub:'一番機',hour:7,turn:40,
+   flights:[[3,'ANA15','B772','RJTT'],[13,'JAL2002','B738','RJCC'],[23,'ANA1602','A321','RJFF'],[33,'JAL103','B788','RJTT']],pre:[]},
+  {name:'08時台',sub:'朝ラッシュ',hour:8,turn:34,
+   flights:[[3,'ANA17','B788','RJTT'],[10,'JAC2322','AT46','RJBT'],[17,'JAL105','B772','RJTT'],[24,'ANA772','A320','RJFK'],[31,'JAL2004','B738','RJCC'],[38,'ANA1604','A321','RJFF']],
+   pre:[[13,'ANA1801','A321',12]]},
+  {name:'12時台',sub:'昼の便',hour:12,turn:30,
+   flights:[[3,'JAL2006','B738','RJCC'],[9,'ANA25','B772','RJTT'],[15,'ANA1608','A321','RJFF'],[22,'JAL111','B788','RJTT'],[28,'ANA776','A320','RJFK'],[35,'JAL2084','B738','ROAH'],[42,'ANA27','B788','RJTT']],
+   pre:[[11,'ANA1714','A321',8],[15,'JAL2241','B738',16],[17,'JAC2323','AT46',22]]},
+  {name:'17時台',sub:'夕方ラッシュ',hour:17,turn:28,
+   flights:[[3,'ANA35','B772','RJTT'],[8,'JAC2324','AT46','RJBT'],[14,'JAL2010','B738','RJCC'],[20,'ANA1614','A321','RJFF'],[26,'JAL121','B788','RJTT'],[32,'ANA782','A320','RJFK'],[38,'JAL2092','B738','ROAH'],[44,'ANA37','B788','RJTT'],[50,'ANA1616','A321','RJFF']],
+   pre:[[12,'JAL119','B788',6],[14,'ANA1612','A321',11],[16,'JAL2008','B738',18]]},
+  {name:'20時台',sub:'最終便',hour:20,turn:26,
+   flights:[[3,'JAL2014','B738','RJCC'],[8,'ANA43','B772','RJTT'],[13,'ANA1620','A321','RJFF'],[18,'JAC2326','AT46','RJBT'],[23,'JAL131','B788','RJTT'],[28,'ANA788','A320','RJFK'],[33,'JAL2096','B738','ROAH'],[42,'ANA45','B772','RJTT'],[47,'ANA1622','A321','RJFF'],[56,'JAL133','B788','RJTT']],
+   pre:[[11,'ANA41','B788',5],[13,'JAL2012','B738',10],[16,'ANA1618','A321',21]]},
+];
+
+const G={screen:'title',stage:0,t:0,planes:[],air:[],flights:[],telops:[],fx:null,maxHold:0,total:{flights:0,hold:0}};
+let lastTs=0,simAcc=0,NID=1;
+const PRIO=new Map(); // 交差の優先順位（組ごと）
+let L={}; // レイアウト
+let NODES={},ADJ={};
+
+function clockStr(t){ const st=STAGES[G.stage]; const m=Math.floor(t/4); return String(st.hour).padStart(2,'0')+':'+String(m).padStart(2,'0'); }
+function clockHHMM(t){ return clockStr(t).replace(':',''); }
+
+// ---- レイアウトと誘導路グラフ ----
+function layout(){
+  const tY=topY();
+  L.tY=tY; L.boardY=tY+6; L.boardH=104;
+  L.yR=H-96; L.yP=L.yR-100;
+  L.yL=L.yP-Math.max(96,Math.min(150,96+(H-700)*0.4));
+  L.yF=L.yL-100; L.bTop=L.yF-Math.max(54,Math.min(150,L.yF-(L.boardY+L.boardH)-120));
+  L.landTop=L.boardY+L.boardH;
+  NODES={}; ADJ={};
+  const add=(id,x,y,kind)=>{ NODES[id]={id,x,y,kind}; ADJ[id]=ADJ[id]||[]; };
+  const link=(a,b,one)=>{ ADJ[a].push(b); if(!one)ADJ[b].push(a); };
+  const laneX=new Set(), parX=new Set();
+  CONN.forEach(c=>{ laneX.add(c.x); parX.add(c.x); });
+  SPOTS.forEach(s=>laneX.add(s.x));
+  EXITS.forEach(e=>{ e.X=e.xr-60; parX.add(e.X); e.bx=e.xr-30; e.by=L.yR-50; });
+  [...laneX].sort((a,b)=>a-b).forEach(x=>add('L'+x,x,L.yL,'lane'));
+  [...parX].sort((a,b)=>a-b).forEach(x=>add('P'+x,x,L.yP,'par'));
+  const lx=[...laneX].sort((a,b)=>a-b), px=[...parX].sort((a,b)=>a-b);
+  for(let i=1;i<lx.length;i++)link('L'+lx[i-1],'L'+lx[i]);
+  for(let i=1;i<px.length;i++)link('P'+px[i-1],'P'+px[i]);
+  add('PW',-110,L.yP,'dep'); link('PW','P'+px[0]);
+  CONN.forEach(c=>link('L'+c.x,'P'+c.x));
+  SPOTS.forEach(s=>{ add('S'+s.no,s.x,L.yF+30,'spot'); link('L'+s.x,'S'+s.no); s.node='S'+s.no; });
+  EXITS.forEach((e,i)=>{ add('B'+i,e.bx,e.by,'bay'); link('B'+i,'P'+e.X,true); e.node='B'+i; });
+}
+function turnOK(a,b,c){ // a→b→c の曲がり角が 100° 以内
+  const ux=b.x-a.x,uy=b.y-a.y,vx=c.x-b.x,vy=c.y-b.y;
+  const d=(ux*vx+uy*vy)/(Math.hypot(ux,uy)*Math.hypot(vx,vy)||1);
+  return d>Math.cos(100*Math.PI/180);
+}
+// 曲がれる角だけを使う最短経路（状態=ノード+直前ノード）
+function shortest(from,prev,to,allowEnd){
+  const key=(n,p)=>n+'|'+(p||'');
+  const dist={},back={},open=[[0,from,prev]];
+  dist[key(from,prev)]=0;
+  while(open.length){
+    open.sort((a,b)=>a[0]-b[0]);
+    const [d,n,p]=open.shift();
+    if(n===to)return rebuild(back,key(n,p));
+    if(d>dist[key(n,p)])continue;
+    for(const m of ADJ[n]){
+      const k=NODES[m].kind;
+      if((k==='spot'||k==='bay'||k==='dep')&&m!==to)continue;
+      if(m===p)continue;
+      if(p&&!turnOK(NODES[p],NODES[n],NODES[m]))continue;
+      const nd=d+Math.hypot(NODES[m].x-NODES[n].x,NODES[m].y-NODES[n].y), km=key(m,n);
+      if(dist[km]===undefined||nd<dist[km]){ dist[km]=nd; back[km]=key(n,p); open.push([nd,m,n]); }
+    }
+  }
+  return null;
+  function rebuild(bk,k){ const out=[]; while(k){ out.unshift(k.split('|')[0]); k=bk[k]; } return out; }
+}
+// 指でなぞった軌跡 → ノード列（機体の出口ノードから目的スポットまで）
+function routeFromTrail(p,trail,spot){
+  const seq=[p.bayNode];
+  for(const q of trail){
+    let best=null,bd=20;
+    for(const id in NODES){ const n=NODES[id]; if(n.kind!=='lane'&&n.kind!=='par')continue;
+      const d=Math.hypot(n.x-q.x,n.y-q.y); if(d<bd){bd=d;best=id;} }
+    if(best&&best!==seq[seq.length-1])seq.push(best);
+  }
+  seq.push(spot.node);
+  let route=[seq[0]];
+  for(let i=1;i<seq.length;i++){
+    const cur=route[route.length-1]; if(cur===seq[i])continue;
+    const prev=route.length>1?route[route.length-2]:null;
+    const seg=shortest(cur,prev,seq[i]);
+    if(!seg)continue; // その順では曲がれない点は飛ばす
+    for(let j=1;j<seg.length;j++){
+      const k=route.indexOf(seg[j]);
+      if(k>=0)route=route.slice(0,k+1); else route.push(seg[j]);
+    }
+  }
+  if(route[route.length-1]!==spot.node)return null;
+  for(let i=2;i<route.length;i++) if(!turnOK(NODES[route[i-2]],NODES[route[i-1]],NODES[route[i]]))return null;
+  return route;
+}
+
+// ---- 経路（なめらかな曲線＋速度プロファイル） ----
+function buildPath(pts,R,P,endStop){
+  const out=[pts[0]];
+  for(let i=1;i<pts.length-1;i++){
+    const a=pts[i-1],b=pts[i],c=pts[i+1];
+    const d1=Math.hypot(b.x-a.x,b.y-a.y),d2=Math.hypot(c.x-b.x,c.y-b.y);
+    const u={x:(b.x-a.x)/d1,y:(b.y-a.y)/d1},v={x:(c.x-b.x)/d2,y:(c.y-b.y)/d2};
+    const th=Math.acos(Math.max(-1,Math.min(1,u.x*v.x+u.y*v.y)));
+    if(th<0.02){out.push(b);continue;}
+    const t=Math.min(R*Math.tan(th/2),d1*0.48,d2*0.48);
+    const p0={x:b.x-u.x*t,y:b.y-u.y*t},p1={x:b.x+v.x*t,y:b.y+v.y*t};
+    for(let k=0;k<=10;k++){ const s=k/10,m=1-s; out.push({x:m*m*p0.x+2*m*s*b.x+s*s*p1.x,y:m*m*p0.y+2*m*s*b.y+s*s*p1.y}); }
+  }
+  out.push(pts[pts.length-1]);
+  // 2px 間隔で再標本化
+  const xs=[out[0].x],ys=[out[0].y]; let carry=0;
+  for(let i=1;i<out.length;i++){
+    const a=out[i-1],b=out[i]; const d=Math.hypot(b.x-a.x,b.y-a.y); if(d<1e-6)continue;
+    let s=2-carry;
+    while(s<=d){ xs.push(a.x+(b.x-a.x)*s/d); ys.push(a.y+(b.y-a.y)*s/d); s+=2; }
+    carry=d-(s-2);
+  }
+  const last=out[out.length-1]; xs.push(last.x); ys.push(last.y);
+  const n=xs.length, hs=new Float32Array(n), vl=new Float32Array(n), pr=new Float32Array(n);
+  for(let i=0;i<n;i++){ const a=Math.max(0,i-1),b=Math.min(n-1,i+1); hs[i]=Math.atan2(ys[b]-ys[a],xs[b]-xs[a]); }
+  for(let i=0;i<n;i++){
+    const a=Math.max(0,i-2),b=Math.min(n-1,i+2);
+    let dh=Math.abs(hs[b]-hs[a]); if(dh>Math.PI)dh=2*Math.PI-dh;
+    const k=dh/Math.max(2,(b-a)*2);
+    vl[i]=k>1e-4?Math.min(P.vmax,Math.sqrt(P.aLat/k)):P.vmax;
+  }
+  pr[n-1]=endStop?0:P.vmax;
+  for(let i=n-2;i>=0;i--) pr[i]=Math.min(vl[i],Math.sqrt(pr[i+1]*pr[i+1]+2*P.dec*2));
+  return {xs:Float32Array.from(xs),ys:Float32Array.from(ys),hs,pr,n,len:(n-1)*2};
+}
+function pathAt(path,s){ const f=Math.max(0,Math.min(path.n-1,s/2)); const i=Math.floor(f),j=Math.min(path.n-1,i+1),t=f-i;
+  return {x:path.xs[i]+(path.xs[j]-path.xs[i])*t,y:path.ys[i]+(path.ys[j]-path.ys[i])*t,h:path.hs[i]}; }
+
+// ---- 面の開始 ----
+function startStage(i){
+  G.stage=i; layout();
+  const st=STAGES[i];
+  G.t=0; NID=1; PRIO.clear(); G.towBack=[]; G.planes=[]; G.air=[]; G.telops=[]; G.fx=null; G.maxHold=0; G.lastLand=-99; G.runway=null; G.done=0; G.lastBlock=0; simAcc=0; drag=null;
+  SPOTS.forEach(s=>{s.plane=null;s.res=null;s.reject=0;s.pushing=null;});
+  EXITS.forEach(e=>{e.plane=null;});
+  G.flights=st.flights.map(f=>({eta:f[0],cs:f[1],T:TYPES[f[2]],org:f[3],al:f[1].slice(0,3),state:'sched'}));
+  for(const pr of st.pre){
+    const s=SPOTS.find(x=>x.no===pr[0]);
+    const p=mkPlane({cs:pr[1],T:TYPES[pr[2]],al:pr[1].slice(0,3),org:''});
+    p.state='park'; p.spot=s; s.plane=p; p.x=s.x; p.y=parkY(p.T); p.hd=-Math.PI/2; p.depAt=pr[3]; p.bridge=1; p.pre=true;
+  }
+  G.screen='play'; UI.close(); lastTs=0;
+  telop('TOWER: 着陸機から空いたスポットまで、指でなぞって誘導',W/2,L.yR+40,4.5,true);
+}
+function restart(){ startStage(G.stage); }
+function mkPlane(f){ const p={id:NID++,cs:f.cs,T:f.T,al:f.al,f,x:0,y:0,hd:Math.PI,v:0,s:0,path:null,state:'',blockedBy:null,bridge:0,tow:null,stuck:0,alt:0}; G.planes.push(p); return p; }
+function parkY(T){ return L.yF+9+T.L/2; }
+function telop(text,x,y,dur,guide){ G.telops.push({text,x,y,t0:G.t,dur,guide}); }
+
+// ---- シミュレーション（固定ステップ） ----
+function update(dt){
+  simAcc+=dt;
+  while(simAcc>=STEP && G.screen==='play'){ step(STEP); simAcc-=STEP; }
+  UI.hud('伊丹 '+STAGES[G.stage].name,(G.stage+1)+'/'+STAGES.length,hudC());
+}
+function hudC(){ const h=G.air.length; return clockStr(G.t)+'　着 '+G.done+'/'+G.flights.length+'　上空 '+(h>=2?'<span class="warn">'+h+'</span>':h); }
+
+function step(h){
+  G.t+=h;
+  // 到着予定時刻 → 進入（上空の待機列）
+  for(const f of G.flights) if(f.state==='sched'&&G.t>=f.eta){ f.state='air'; f.airT=G.t; G.air.push(f); }
+  // 着陸（先頭から順番）
+  if(G.air.length&&!G.runway&&G.t-G.lastLand>=LAND_GAP){
+    const f=G.air[0];
+    const ex=EXIT_PREF[f.T.cat].map(i=>EXITS[i]).find(e=>!e.plane);
+    if(ex){ G.air.shift(); land(f,ex); }
+  }
+  G.maxHold=Math.max(G.maxHold,G.air.length);
+  if(G.air.length>HOLD_MAX) return failHold();
+  // 駐機・出発
+  for(const p of G.planes){
+    if(p.state==='park'){
+      if(p.bridge<1&&p.bridgeT!==undefined)p.bridge=Math.min(1,(G.t-p.bridgeT)/2);
+      if(G.t>=p.depAt&&!p.tow&&pushClear(p)){ p.tow={t0:G.t,phase:'come'}; }
+      if(p.tow&&p.tow.phase==='come'){ p.bridge=Math.max(0,1-(G.t-p.tow.t0)/1.2); if(G.t-p.tow.t0>1.6){ if(pushClear(p))startPush(p); else p.tow.t0=G.t-1.0; } }
+    }
+  }
+  // 動く機体の速度決定
+  const movers=G.planes.filter(p=>p.state==='taxi'||p.state==='dep');
+  const yields=pairYields(movers);
+  for(const p of G.planes){
+    if(p.state==='roll'){
+      const vT=p.path.pr[Math.min(p.path.n-1,Math.round(p.s/2))];
+      p.v=p.v>vT?Math.max(vT,p.v-55*h):Math.min(vT,p.v+20*h);
+      p.v=Math.max(p.v,p.s<p.path.len-4?6:0);
+      moveOn(p,h);
+      p.alt=Math.max(0,p.alt-h*1.6);
+      if(p.s>=p.path.len-0.5){ p.state='bay'; p.v=0; G.runway=null; }
+      else if(p.s>p.path.len-40&&G.runway===p) G.runway=null;
+    } else if(p.state==='taxi'||p.state==='dep'){
+      const T=p.T;
+      let dObs=p.path.len-p.s, by=null;
+      const o=obstacleAhead(p); if(o&&o.d<dObs){dObs=o.d;by=o.b;}
+      const y=yields.get(p); if(y&&y.d<dObs){dObs=y.d;by=y.b;}
+      const vProf=p.path.pr[Math.min(p.path.n-1,Math.floor(p.s/2))];
+      const vT=Math.min(vProf,Math.sqrt(2*T.dec*Math.max(0,dObs)));
+      p.v=p.v>vT?Math.max(vT,p.v-T.dec*h):Math.min(vT,p.v+T.acc*h);
+      p.blockedBy=(by&&p.v<0.5)?by:null;
+      moveOn(p,h);
+      if(p.state==='taxi'&&p.s>=p.path.len-0.3&&p.v<0.5) blockIn(p);
+      if(p.state==='dep'&&p.x<-60){ p.state='gone'; }
+    } else if(p.state==='push'){
+      const vT=Math.min(15,p.path.pr[Math.min(p.path.n-1,Math.floor(p.s/2))]);
+      p.v=p.v>vT?Math.max(vT,p.v-12*h):Math.min(vT,p.v+8*h);
+      moveOn(p,h,true);
+      if(p.s>=p.path.len-0.3){ if(!p.tow.off)p.tow.off=G.t; if(G.t-p.tow.off>0.8)startDep(p); }
+    }
+  }
+  G.planes=G.planes.filter(p=>p.state!=='gone');
+  // 接触・鉢合わせ
+  if(checkConflicts())return;
+  if(G.done===G.flights.length && G.t-G.lastBlock>1.6) return clear();
+}
+function moveOn(p,h,rev){
+  p.s=Math.min(p.path.len,p.s+p.v*h);
+  const q=pathAt(p.path,p.s); p.x=q.x; p.y=q.y; p.hd=rev?q.h+Math.PI:q.h;
+}
+function land(f,ex){
+  const p=mkPlane(f); f.state='land'; f.plane=p;
+  p.state='roll'; p.alt=1; ex.plane=p; p.exit=ex; p.bayNode=ex.node;
+  const P={vmax:150,aLat:40,dec:50};
+  p.path=buildPath([{x:W+260,y:L.yR},{x:ex.xr,y:L.yR},{x:ex.bx,y:ex.by}],60,P,true);
+  p.v=Math.min(150,p.path.pr[0]+30); p.s=0; moveOn(p,0);
+  G.runway=p; G.lastLand=G.t;
+}
+function assign(p,spot,route){
+  const pts=route.map(id=>({x:NODES[id].x,y:NODES[id].y}));
+  pts[pts.length-1]={x:spot.x,y:parkY(p.T)};
+  pts[0]={x:p.x,y:p.y};
+  p.path=buildPath(pts,p.T.R,p.T,true); p.s=0; p.v=0;
+  p.state='taxi'; p.spot=spot; spot.res=p; p.exit.plane=null; p.exit=null; p.route=route;
+  p.f.state='taxi';
+}
+function blockIn(p){
+  p.state='park'; p.v=0; p.spot.plane=p; p.spot.res=null; p.bridgeT=G.t+0.6; p.blockT=G.t;
+  p.depAt=G.t+STAGES[G.stage].turn; p.f.state='in'; p.f.blockT=G.t;
+  G.done++; G.lastBlock=G.t;
+}
+const PUSH_R=26;
+function pushEnd(p){ return {x:p.spot.x+PUSH_R+2,y:L.yL}; }
+function pushClear(p){
+  const e=pushEnd(p);
+  for(const q of G.planes){
+    if(q===p||q.state==='park'||q.state==='bay'||q.state==='roll')continue;
+    if(Math.hypot(q.x-e.x,q.y-e.y)<110)return false;
+    if(q.path&&(q.state==='taxi'||q.state==='dep')){
+      const i0=Math.floor(q.s/2),i1=Math.min(q.path.n-1,i0+110);
+      for(let i=i0;i<=i1;i+=2) if(Math.hypot(q.path.xs[i]-e.x,q.path.ys[i]-e.y)<(q.T.r+p.T.r)*0.95) return false;
+    }
+  }
+  return true;
+}
+function startPush(p){
+  p.tow.phase='push'; p.state='push'; p.spot.plane=null; p.spot.pushing=p;
+  p.path=buildPath([{x:p.x,y:p.y},{x:p.spot.x,y:L.yL},{x:p.spot.x+PUSH_R+2,y:L.yL}],PUSH_R,{vmax:15,aLat:6,dec:10},true);
+  p.s=0; p.v=0; p.bridge=0;
+}
+function startDep(p){
+  p.spot.pushing=null; p.state='dep'; p.tow.phase='back'; p.tow.back=G.t; p.retTow={x:p.x-p.T.L*0.5,y:p.y,t0:G.t,spot:p.spot};
+  G.towBack=G.towBack||[]; G.towBack.push({spot:p.spot,from:{x:p.x-p.T.L/2-4,y:p.y},t0:G.t});
+  const lx=Object.values(NODES).filter(n=>n.kind==='lane'&&n.x<p.x).sort((a,b)=>b.x-a.x);
+  const pts=[{x:p.x,y:p.y},...lx.map(n=>({x:n.x,y:n.y})),{x:NODES['P'+CONN[0].x].x,y:L.yP},{x:NODES.PW.x,y:L.yP}];
+  p.path=buildPath(pts,p.T.R,p.T,false); p.s=0; p.v=0; p.tow=null; p.departing=true;
+}
+// 前方の機体（自分の経路上にいる）
+function obstacleAhead(p){
+  const T=p.T; let best=null;
+  const i0=Math.floor(p.s/2), i1=Math.min(p.path.n-1,i0+75);
+  const ch=Math.cos(p.hd),sh=Math.sin(p.hd);
+  for(const b of G.planes){
+    if(b===p||b.state==='roll'||b.state==='gone')continue;
+    if(b.state==='push'){ // 押し出し中: これから通る場所も含めて避ける
+      const ep=pushEnd(b), pts=[{x:b.x,y:b.y},{x:b.spot.x,y:(b.y+L.yL)/2},{x:b.spot.x+PUSH_R*0.4,y:L.yL-PUSH_R*0.3},ep];
+      const thr=(T.r+b.T.r)*0.85, thr2=thr*thr;
+      for(let i=i0;i<=i1;i++){ let hit=false;
+        for(const q of pts){ const dx=p.path.xs[i]-q.x,dy=p.path.ys[i]-q.y; if(dx*dx+dy*dy<thr2){hit=true;break;} }
+        if(hit){ const d=i*2-p.s-1; if(d>-1&&(!best||d<best.d))best={d:Math.max(0,d),b}; break; } }
+      continue;
+    }
+    if((b.x-p.x)*ch+(b.y-p.y)*sh<=0)continue;
+    const facing=Math.cos(b.hd-p.hd)<-0.5;
+    const thr=facing?(T.L+b.T.L)/2+13:(T.r+b.T.r)*0.85, thr2=thr*thr; // 向かい合うときは機首の間を残して止まる
+    const d0=(p.x-b.x)**2+(p.y-b.y)**2;
+    for(let i=i0;i<=i1;i++){
+      const dx=p.path.xs[i]-b.x,dy=p.path.ys[i]-b.y, dd=dx*dx+dy*dy;
+      if(dd<thr2&&dd<d0-1){ let d=i*2-p.s-1; if(facing&&b.v>0)d-=b.v*b.v/(2*b.T.dec)+2; // 向かってくる相手の制動距離ぶん手前で
+        if(!best||d<best.d)best={d,b}; break; }
+    }
+  }
+  return best;
+}
+// 合流・交差: 先に着くほうを優先、もう一方が手前で待つ（組ごとに1回だけ判定して食い違いを防ぐ）
+function pairYields(ms){
+  const res=new Map(), seen=new Set();
+  const put=(p,d,b)=>{ const c=res.get(p); if(!c||d<c.d)res.set(p,{d,b}); };
+  for(let a=0;a<ms.length;a++)for(let c=a+1;c<ms.length;c++){
+    const A=ms[a],B=ms[c];
+    const thr=(A.T.r+B.T.r)*0.85, thr2=thr*thr;
+    const ia=Math.floor(A.s/2), ib=Math.floor(B.s/2);
+    const ea=Math.min(A.path.n-1,ia+70), eb=Math.min(B.path.n-1,ib+70);
+    // それぞれの経路で、相手の経路に最初に近づく点
+    const first=(P,i0,i1,Q,j0,j1)=>{ for(let i=i0;i<=i1;i+=2){ for(let j=j0;j<=j1;j+=2){ const dx=P.path.xs[i]-Q.path.xs[j],dy=P.path.ys[i]-Q.path.ys[j]; if(dx*dx+dy*dy<thr2)return i; } } return -1; };
+    const hi=first(A,ia,ea,B,ib,eb); if(hi<0)continue;
+    const hj=first(B,ib,eb,A,ia,ea);
+    const sA=hi*2-A.s, sB=hj*2-B.s;
+    const tA=sA/Math.max(A.v,6), tB=sB/Math.max(B.v,6);
+    const key=A.id+'-'+B.id; seen.add(key);
+    const stopA=A.v*A.v/(2*A.T.dec)<=sA-3, stopB=B.v*B.v/(2*B.T.dec)<=sB-3;
+    let yA;
+    if(sB<2&&sA>=2) yA=true; else if(sA<2&&sB>=2) yA=false;   // すでに交点に入っている側が優先
+    else if(stopA&&!stopB) yA=true; else if(!stopA&&stopB) yA=false; // 止まりきれない側が優先（慣性）
+    else if(PRIO.has(key)) yA=PRIO.get(key)===A.id;                  // 一度決めた順番は変えない
+    else if(Math.abs(tA-tB)<0.05) yA=A.id>B.id; else yA=tA>tB;
+    PRIO.set(key,yA?A.id:B.id);
+    if(yA){ if(sA>=2)put(A,Math.max(0,sA-4),B); } else { if(sB>=2)put(B,Math.max(0,sB-4),A); }
+  }
+  for(const k of [...PRIO.keys()]) if(!seen.has(k))PRIO.delete(k);
+  return res;
+}
+function checkConflicts(){
+  const ps=G.planes.filter(p=>p.state!=='roll');
+  for(let a=0;a<ps.length;a++)for(let c=a+1;c<ps.length;c++){
+    const A=ps[a],B=ps[c];
+    if(A.v<0.5&&B.v<0.5)continue;
+    const d=Math.hypot(A.x-B.x,A.y-B.y);
+    if(d<(A.T.r+B.T.r)*0.55){ failNear(A.v>=B.v?A:B,A.v>=B.v?B:A,'contact'); return true; }
+  }
+  for(const p of G.planes){
+    if(p.blockedBy){ p.stuck+=STEP; } else p.stuck=0;
+    if(p.blockedBy&&p.blockedBy.blockedBy===p&&p.stuck>0.25){ failNear(p,p.blockedBy,'headon'); return true; }
+    if(p.stuck>2.5){ // 3機以上の環
+      let q=p.blockedBy,n=0; while(q&&q!==p&&n<10){ q=q.blockedBy; n++; }
+      if(q===p){ failNear(p,p.blockedBy,'headon'); return true; }
+    }
+  }
+  return false;
+}
+
+// ---- 失敗とクリア ----
+function whereOf(x,y){
+  if(Math.abs(y-L.yL)<22)return{en:'APRON TAXILANE',ja:'エプロン誘導路'};
+  if(Math.abs(y-L.yP)<22)return{en:'TAXIWAY A',ja:'誘導路A'};
+  if(y>L.yP){ let e=EXITS.reduce((m,e)=>Math.abs(e.bx-x)<Math.abs(m.bx-x)?e:m); return{en:'TAXIWAY '+e.n,ja:'高速脱出誘導路'+e.n}; }
+  if(y>L.yL){ const c=CONN.reduce((m,c)=>Math.abs(c.x-x)<Math.abs(m.x-x)?c:m); return{en:'TAXIWAY '+c.n,ja:'誘導路'+c.n}; }
+  return{en:'APRON',ja:'エプロン'};
+}
+function failNear(a,b,kind){
+  G.screen='fx'; buzz([40,60,90]);
+  const mx=(a.x+b.x)/2,my=(a.y+b.y)/2, w=whereOf(mx,my);
+  const gapM=Math.max(1,Math.round((Math.hypot(a.x-b.x,a.y-b.y)-(kind==='headon'?(a.T.L+b.T.L)/2:(a.T.S+b.T.S)/2*0.75))/PXM));
+  G.fx={t:0,kind,a,b,x:mx,y:my,where:w,gap:gapM,
+    lines:kind==='headon'?['TOWER: '+a.cs+', '+b.cs+', STOP IMMEDIATELY.',w.en+' BLOCKED.']:['TOWER: '+a.cs+' STOP! STOP!','TRAFFIC '+b.cs+' AHEAD.'],
+    stamp:'停止',done:()=>showFailSheet()};
+}
+function failHold(){
+  G.screen='fx'; buzz([40,60,90]);
+  const f=G.air[G.air.length-1];
+  G.fx={t:0,kind:'hold',f,x:W/2,y:(L.landTop+L.bTop)/2,lines:['APPROACH: '+f.cs+', NO FURTHER HOLDING.','PROCEED TO KANSAI.'],stamp:'待機超過',done:()=>showFailSheet()};
+}
+function bayCause(){
+  const waits=EXITS.filter(e=>e.plane&&e.plane.state==='bay').map(e=>e.plane);
+  const lines=[];
+  if(waits.length) lines.push(waits.map(p=>p.cs+'（'+p.exit.n+'）').join('、')+'に誘導線を引かないうちに出口がふさがり、次の便が降りられなくなりました。');
+  for(const p of waits){
+    const fit=SPOTS.filter(s=>CAT_OK[s.cat].includes(p.T.cat));
+    if(fit.every(s=>s.plane||s.res||s.pushing)){
+      const big=fit.filter(s=>s.plane&&s.plane.T.cat!==p.T.cat&&s.cat===p.T.cat);
+      if(big.length){ lines.push(CAT_J[p.T.cat]+'スポット'+big.map(s=>s.no).join('・')+'に'+big.map(s=>s.plane.T.name).join('と')+'を入れていたため、'+p.T.name+'の入れる場所がありませんでした。'); break; }
+    }
+  }
+  if(!lines.length) lines.push('3本の高速脱出誘導路がすべてふさがり、着陸できる出口がありませんでした。');
+  return lines.join('\n');
+}
+function showFailSheet(){
+  const st=STAGES[G.stage], fx=G.fx;
+  let title,lead;
+  if(fx.kind==='hold'){
+    title='上空待機があふれた';
+    lead='進入管制「'+fx.f.cs+'、これ以上の待機はできません。関西空港へ向かってください。」\n上空の待機が'+(HOLD_MAX+1)+'機目に達しました。'+bayCause();
+  } else {
+    const a=fx.a,b=fx.b;
+    const dep=a.departing?a:b.departing?b:null, arr=dep===a?b:a;
+    title=fx.kind==='headon'?fx.where.ja+'で鉢合わせ':fx.where.ja+'で接触寸前';
+    if(fx.kind==='headon'){
+      lead='管制塔「'+a.cs+'、'+b.cs+'、その場で停止。」\n'+fx.where.ja+'で'+a.T.name+'と'+b.T.name+'が向かい合って止まりました。機首の間は約'+fx.gap+'m。'
+        +(dep?'出発機'+dep.cs+'が西へ向かう誘導路に、'+arr.cs+'を逆向きの誘導線で入れていました。':a.cs+'と'+b.cs+'の誘導線が、同じ誘導路を逆向きに通っていました。');
+    } else {
+      lead='管制塔「'+a.cs+'、止まれ。」\n'+fx.where.ja+'で'+a.T.name+'の翼端が'+b.cs+'まで約'+fx.gap+'m。'+a.T.name+'は重く、すぐには止まれません。'+b.cs+'がすぐ先を横切る時に誘導線を引いていました。';
+    }
+  }
+  G.screen='result';
+  const stamp=fx.stamp;
+  UI.sheet({no:GAME_NO+' · RJOO 到着便 運航状況',title,lead,stamp,
+    rows:[['時間帯',st.name+'（'+st.sub+'）'],['発生時刻',clockStr(G.t)],['ブロックイン',G.done+' / '+G.flights.length+' 便'],['最大上空待機',G.maxHold+' 機']],
+    main:['この時間帯をやり直す',restart],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】伊丹 '+st.name+' '+clockStr(G.t)+'「'+title+'」 ブロックイン '+G.done+'/'+G.flights.length+'便 #'+stamp,TAG)],['一覧へ',toPortal]]});
+}
+function clear(){
+  G.screen='fx';
+  G.fx={t:0,kind:'clear',x:W/2,y:(L.yL+L.yP)/2,lines:['TOWER: ALL STATIONS, '+STAGES[G.stage].name.replace('時台',':00')+' BANK COMPLETE.'],stamp:'定時',round:true,done:()=>showClearSheet()};
+}
+function showClearSheet(){
+  const st=STAGES[G.stage], last=G.stage>=STAGES.length-1;
+  G.total.flights+=G.flights.length; G.total.hold=Math.max(G.total.hold,G.maxHold);
+  G.screen='result';
+  const rows=[['時間帯',st.name+'（'+st.sub+'）'],['ブロックイン',G.done+' / '+G.flights.length+' 便'],['最終到着',clockStr(G.lastBlock)],['最大上空待機',G.maxHold+' 機']];
+  if(last)rows.push(['本日の到着',G.total.flights+' 便']);
+  UI.sheet({no:GAME_NO+' · RJOO 到着便 運航状況',title:last?'最終便までブロックイン':st.name+' 全便ブロックイン',
+    lead:last?'運航管理「本日の到着便、すべてスポットに着きました。お疲れさまでした。」':'運航管理「'+st.name+'の到着便、すべてスポットに入りました。次の時間帯に入ります。」',
+    stamp:'定時',round:true,rows,
+    main:[last?'07時台からもう一度':'次の時間帯へ',()=>{ if(last){G.total={flights:0,hold:0};startStage(0);} else startStage(G.stage+1); }],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】伊丹 '+st.name+' 到着'+G.done+'便すべてブロックイン（上空待機 最大'+G.maxHold+'機） #定時',TAG)],['一覧へ',toPortal]]});
+}
+function showTitle(){
+  G.screen='title'; UI.hideHud(); layout();
+  UI.sheet({no:GAME_NO+' · 業務内容',title:'グランドハンドリング',
+    lead:'大阪国際空港（伊丹）。B滑走路32Lに降りた到着便を、誘導路からスポットまで捌く。大型機は大型スポットにしか入らない。',
+    rows:[['あなたの権限','管制塔から指でなぞった線どおりに、機体が誘導路を走る'],['操作','着陸して出口で止まった機体から、空いたスポットまで指でなぞる'],['失敗','誘導路で2機が鉢合わせ／スポットが埋まり上空待機が4機目'],
+      ['出典','国土交通省（滑走路）・豊岡市（ATR42-600 伊丹＝但馬線）／ダイヤ・便名・スポット番号・誘導路名は架空、機体寸法は概略']],
+    main:['07時台からはじめる',()=>{G.total={flights:0,hold:0};startStage(0);}],subs:[['一覧へ',toPortal]]});
+}
+
+// フラップの割れ目線は1行の値だけ（複数行の値には出さない）
+new MutationObserver(()=>{ $('sheet').querySelectorAll('dd').forEach(d=>{ const lh=parseFloat(getComputedStyle(d).lineHeight)||22; d.classList.toggle('multi',d.clientHeight>lh*1.5+12); }); }).observe($('sheet'),{childList:true});
+
+// ---- 入力: 機体から指でなぞる ----
+let drag=null;
+function bayPlaneAt(q){
+  let best=null,bd=40;
+  for(const p of G.planes){ if(p.state!=='bay')continue; const d=Math.hypot(p.x-q.x,p.y-q.y); if(d<bd){bd=d;best=p;} }
+  return best;
+}
+function spotAt(q){
+  for(const s of SPOTS){ const hw=(s.cat==='L'?30:s.cat==='M'?20:17); if(Math.abs(q.x-s.x)<hw&&q.y>L.yF-6&&q.y<L.yL-14)return s; }
+  return null;
+}
+function evalDrag(){
+  if(!drag)return;
+  const end=drag.trail[drag.trail.length-1];
+  const s=spotAt(end); drag.spot=s; drag.route=null; drag.err=null;
+  if(!s)return;
+  if(!CAT_OK[s.cat].includes(drag.p.T.cat)){ drag.err='size'; return; }
+  if(s.plane||s.res||s.pushing){ drag.err='busy'; return; }
+  const r=routeFromTrail(drag.p,drag.trail,s);
+  if(!r){ drag.err='turn'; return; }
+  drag.route=r;
+}
+$('wrap').addEventListener('pointerdown',e=>{
+  if(G.screen!=='play')return;
+  const q=toGame(e); const p=bayPlaneAt(q);
+  if(!p)return;
+  drag={p,trail:[{x:p.x,y:p.y},q],id:e.pointerId}; e.preventDefault();
+});
+$('wrap').addEventListener('pointermove',e=>{
+  if(!drag||e.pointerId!==drag.id)return;
+  const q=toGame(e); const lt=drag.trail[drag.trail.length-1];
+  if(Math.hypot(q.x-lt.x,q.y-lt.y)>3){ drag.trail.push(q); evalDrag(); }
+});
+function endDrag(){
+  if(!drag)return;
+  evalDrag();
+  const d=drag; drag=null;
+  if(G.screen!=='play'||d.p.state!=='bay')return;
+  if(d.route){ assign(d.p,d.spot,d.route); buzz(12); return; }
+  if(!d.spot)return;
+  const s=d.spot; s.reject=G.t;
+  const ty=d.p.T.id;
+  const msg=d.err==='size'?d.p.cs+', UNABLE SPOT '+s.no+'. '+ty+' TOO LARGE.':d.err==='busy'?d.p.cs+', SPOT '+s.no+' OCCUPIED.':d.p.cs+', UNABLE. CANNOT MAKE THAT TURN.';
+  telop(msg,Math.max(120,Math.min(W-120,s.x)),L.yL+30,2.2);
+}
+$('wrap').addEventListener('pointerup',e=>{ if(drag&&e.pointerId===drag.id)endDrag(); });
+$('wrap').addEventListener('pointercancel',()=>{ drag=null; });
+function onResize(){ if(G.screen==='title')layout(); }
+
+// ---- 描画 ----
+const C={grass:'#7a8b55',grass2:'#71824e',asph:'#56585a',rwy:'#3f4143',apron:'#bdb9ae',apronJ:'#aeaa9f',yellow:'#f2c230',white:'#f1f0ea',bld:'#cfcac0',roof2:'#bdb7ab',glass:'#5d7480',land:'#a9a59b',road:'#4b4d4f'};
+function draw(){
+  if(!L.yR)layout();
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,H); ctx.clip();
+  drawGround();
+  drawRoutes();
+  drawPlanes();
+  drawCrew();
+  drawDrag();
+  drawBoard();
+  drawTelops();
+  if(G.fx)drawFx();
+  ctx.restore();
+  if(G.screen==='play'||G.screen==='pause'||G.screen==='fx') UI.hud('伊丹 '+STAGES[G.stage].name,(G.stage+1)+'/'+STAGES.length,hudC());
+}
+function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function drawGround(){
+  const t=performance.now()/1000;
+  // 空港側（ランドサイド）: 道路・モノレール・管制塔
+  ctx.fillStyle=C.land; ctx.fillRect(0,0,W,L.bTop);
+  const ly0=L.landTop, ly1=L.bTop, lh=ly1-ly0;
+  // ターミナル前の道路
+  const ry=ly1-30; ctx.fillStyle=C.road; ctx.fillRect(0,ry,W,24);
+  ctx.strokeStyle='rgba(240,240,230,.7)'; ctx.lineWidth=1; ctx.setLineDash([8,8]); ctx.beginPath(); ctx.moveTo(0,ry+12); ctx.lineTo(W,ry+12); ctx.stroke(); ctx.setLineDash([]);
+  // 車（タクシー・バス）
+  const cars=[[0,'#e9e4d6',0],[1,'#2f5a8a',1],[2,'#f0c64a',0],[3,'#e9e4d6',1],[4,'#7d1f22',0]];
+  cars.forEach(([i,col,dir])=>{ const sp=dir?-24:18; let x=((i*97+t*sp)%(W+60)+W+60)%(W+60)-30; const y=ry+(dir?6:18); drawCar(x,y,dir?Math.PI:0,col,i===1); });
+  // モノレール（大阪空港駅）
+  if(lh>80){
+    const my=ly0+Math.max(24,(lh-30)*0.42);
+    ctx.fillStyle='#8e8a80'; ctx.fillRect(0,my-7,W,14);
+    ctx.fillStyle='#9d9990'; ctx.fillRect(0,my-5,W,3); ctx.fillRect(0,my+2,W,3);
+    ctx.fillStyle='#b4b0a6'; ctx.fillRect(40,my-20,150,40);
+    ctx.fillStyle='#8f8b81'; for(let x=46;x<186;x+=12)ctx.fillRect(x,my-18,6,36);
+    const mx=((t*30)%(W+260))-130;
+    ctx.fillStyle='#e8e6df'; rr(mx,my-5,96,10,4); ctx.fill();
+    ctx.fillStyle='#2f6f9e'; ctx.fillRect(mx+4,my-1,88,2);
+    ctx.fillStyle='#3a3f44'; for(let k=0;k<4;k++)ctx.fillRect(mx+4+k*24,my-5,1,10);
+    ctx.fillStyle='rgba(34,32,28,.75)'; ctx.font='600 10px '+FONT; ctx.textAlign='left'; ctx.fillText('大阪空港駅',196,my+4);
+  }
+  // 管制塔
+  const tx=W-40, ty=ly0+Math.max(24,(lh-30)*0.42);
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.arc(tx+5,ty+6,17,0,7); ctx.fill();
+  ctx.fillStyle='#d8d4ca'; ctx.beginPath(); ctx.arc(tx,ty,17,0,7); ctx.fill();
+  ctx.fillStyle='#2f4048'; ctx.beginPath(); for(let k=0;k<8;k++){const a=k*Math.PI/4+Math.PI/8; ctx.lineTo(tx+Math.cos(a)*13,ty+Math.sin(a)*13);} ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#c9c4b9'; ctx.beginPath(); ctx.arc(tx,ty,7,0,7); ctx.fill();
+  ctx.strokeStyle='#8c877d'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(tx,ty-7); ctx.lineTo(tx,ty-11); ctx.stroke();
+  // ターミナルビル（屋上は展望デッキ）
+  const bh=L.yF-L.bTop;
+  ctx.fillStyle=C.bld; ctx.fillRect(0,L.bTop,W,bh);
+  ctx.fillStyle=C.roof2; for(let x=8;x<W;x+=34)ctx.fillRect(x,L.bTop+8,22,Math.max(10,bh-(bh>=90?46:22)));
+  ctx.fillStyle='#e2ded5'; ctx.fillRect(0,L.bTop+bh*0.42,W,3);
+  // 空調機
+  for(let x=170;x<W;x+=80){ const y=L.bTop+12; ctx.fillStyle='#a9a396'; ctx.fillRect(x,y,22,12); ctx.fillStyle='#7f7a70'; ctx.beginPath(); ctx.arc(x+6,y+6,4,0,7); ctx.arc(x+16,y+6,4,0,7); ctx.fill(); }
+  ctx.fillStyle='rgba(34,32,28,.7)'; ctx.font='700 10px '+FONT; ctx.textAlign='left'; ctx.fillText('大阪国際空港 ターミナル',8,L.bTop+bh*0.42-4);
+  if(bh>=90){
+    const dy=L.yF-30;
+    ctx.fillStyle='#b8a07a'; ctx.fillRect(0,dy,W,22);
+    ctx.fillStyle='#a88f69'; for(let x=0;x<W;x+=6)ctx.fillRect(x,dy,1,22);
+    ctx.fillStyle='#8a8478'; ctx.fillRect(0,dy+21,W,1.5);
+    ctx.fillStyle='rgba(34,32,28,.65)'; ctx.font='600 8px '+FONT; ctx.fillText('展望デッキ',W-58,dy-3);
+    // デッキの見物客（真上から: 頭・肩・持ち物）
+    const ppl=[[30,0,'#4a5d7a',1],[38,1,'#c96b4b',.7],[92,0,'#3d3d3d',1],[150,0,'#6c7f4f',1.1],[157,1,'#e0b13a',.65],[214,0,'#8a5a8f',1],[262,0,'#3f6f8f',1],[268,1,'#d8d0c0',.95],[330,0,'#5a4a3a',1.1],[388,0,'#7a3b3b',1]];
+    ppl.forEach(([x,row,col,k])=>{ const y=dy+7+row*8; ctx.save(); ctx.translate(x,y); ctx.scale(k,k);
+      ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(0,1,4.2,2.6,0,0,7); ctx.fill();
+      ctx.fillStyle='#2b241f'; ctx.beginPath(); ctx.arc(0,0.4,1.9,0,7); ctx.fill(); ctx.restore(); });
+  }
+  ctx.fillStyle=C.glass; ctx.fillRect(0,L.yF-6,W,6);
+  // 上空待機（ランドサイド上空を旋回）
+  const hc={x:W/2-20,y:ly0+lh*0.5}, rx=Math.min(130,W/2-50), ryy=Math.max(16,Math.min(42,lh*0.32));
+  G.air.forEach((f,k)=>{
+    const a=t*0.5+k*2*Math.PI/Math.max(3,G.air.length);
+    const x=hc.x+Math.cos(a)*rx, y=hc.y+Math.sin(a)*ryy, hd=a+Math.PI/2;
+    drawPlane(f.T,f.al,x+18,y+22,hd,{shadow:true,scale:0.5});
+    drawPlane(f.T,f.al,x,y,hd,{scale:0.55});
+  });
+  // エプロン
+  ctx.fillStyle=C.apron; ctx.fillRect(0,L.yF,W,L.yL+26-L.yF);
+  ctx.strokeStyle=C.apronJ; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=28){ ctx.beginPath(); ctx.moveTo(x,L.yF); ctx.lineTo(x,L.yL+26); ctx.stroke(); }
+  for(let y=L.yF+28;y<L.yL+26;y+=28){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  // 芝生
+  ctx.fillStyle=C.grass; ctx.fillRect(0,L.yL+26,W,H-(L.yL+26));
+  ctx.fillStyle=C.grass2; for(let y=L.yL+40;y<H;y+=22)ctx.fillRect(0,y,W,9);
+  // 誘導路（連絡誘導路・平行誘導路・高速脱出）
+  ctx.lineCap='butt';
+  const band=(pts,w,col)=>{ ctx.strokeStyle=col; ctx.lineWidth=w; ctx.lineJoin='round'; ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.stroke(); };
+  CONN.forEach(c=>{ band([{x:c.x,y:L.yL+20},{x:c.x,y:L.yP}],24,'#6c6e70'); band([{x:c.x,y:L.yL+20},{x:c.x,y:L.yP}],18,C.asph); });
+  band([{x:-10,y:L.yP},{x:W+10,y:L.yP}],24,'#6c6e70'); band([{x:-10,y:L.yP},{x:W+10,y:L.yP}],18,C.asph);
+  EXITS.forEach(e=>{ band([{x:e.xr+40,y:L.yR},{x:e.xr,y:L.yR-4},{x:e.X,y:L.yP}],18,C.asph); });
+  // 滑走路 32L
+  const rh=45;
+  ctx.fillStyle=C.rwy; ctx.fillRect(-10,L.yR-rh/2,W+20,rh);
+  ctx.fillStyle=C.white; ctx.fillRect(-10,L.yR-rh/2+2,W+20,1.5); ctx.fillRect(-10,L.yR+rh/2-3.5,W+20,1.5);
+  for(let x=-20;x<W-70;x+=36)ctx.fillRect(x,L.yR-1,22,2);
+  // 末端（スレッショルド）と滑走路番号
+  for(let k=0;k<6;k++){ ctx.fillRect(W-22,L.yR-rh/2+5+k*6.4,18,3.2); }
+  ctx.save(); ctx.translate(W-46,L.yR); ctx.rotate(-Math.PI/2); ctx.font='800 17px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('32L',0,0); ctx.restore();
+  ctx.fillRect(W-82,L.yR-13,14,3); ctx.fillRect(W-82,L.yR+10,14,3);
+  // 誘導路の黄色いセンターライン
+  ctx.strokeStyle=C.yellow; ctx.lineWidth=1.4;
+  const cl=(pts)=>{ ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.stroke(); };
+  cl([{x:-10,y:L.yL},{x:W+10,y:L.yL}]); cl([{x:-10,y:L.yP},{x:W+10,y:L.yP}]);
+  CONN.forEach(c=>cl([{x:c.x,y:L.yL},{x:c.x,y:L.yP}]));
+  EXITS.forEach(e=>{ ctx.beginPath(); ctx.moveTo(e.xr+40,L.yR); ctx.quadraticCurveTo(e.xr,L.yR,e.bx,e.by); ctx.lineTo(e.X,L.yP); ctx.stroke();
+    // 停止線（ホールディングポジション）
+    const hx=e.xr-17,hy=L.yR-28; ctx.save(); ctx.translate(hx,hy); ctx.rotate(Math.atan2(-100,-60)+Math.PI/2);
+    ctx.fillStyle=C.yellow; ctx.fillRect(-9,-1,18,1.2); ctx.fillRect(-9,1.5,18,1.2); for(let k=-9;k<9;k+=4){ctx.fillRect(k,4,2,1.2);ctx.fillRect(k,6.5,2,1.2);} ctx.restore(); });
+  // スポット: 進入線・停止線・番号
+  SPOTS.forEach(s=>{
+    ctx.strokeStyle=C.yellow; ctx.lineWidth=1.4; cl([{x:s.x,y:L.yL},{x:s.x,y:L.yF+8}]);
+    ctx.fillStyle=C.yellow;
+    const stops=s.cat==='L'?[['772',TYPES.B772],['788',TYPES.B788]]:s.cat==='M'?[['321',TYPES.A321],['320',TYPES.A320]]:[['AT4',TYPES.AT46]];
+    ctx.font='600 7px '+FONT; ctx.textAlign='left';
+    stops.forEach(([lb,T],k)=>{ const y=L.yF+9+3; ctx.fillRect(s.x-6-k*0,y+k*5,12,1.2); });
+    // 区画線
+    const hw=s.cat==='L'?30:s.cat==='M'?20:17;
+    ctx.strokeStyle='rgba(242,194,48,.55)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(s.x-hw,L.yF+4); ctx.lineTo(s.x-hw,L.yL-18); ctx.moveTo(s.x+hw,L.yF+4); ctx.lineTo(s.x+hw,L.yL-18); ctx.stroke(); ctx.setLineDash([]);
+    // 番号（黒地に黄）
+    ctx.fillStyle='#262626'; ctx.fillRect(s.x-9,L.yL-17,18,12);
+    ctx.fillStyle=C.yellow; ctx.font='800 10px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(s.no,s.x,L.yL-10.5); ctx.textBaseline='alphabetic';
+    // 大きさ表示
+    ctx.fillStyle='rgba(60,52,20,.75)'; ctx.font='700 7.5px '+FONT; ctx.fillText(s.cat==='L'?'777':s.cat==='M'?'A321':'ATR',s.x,L.yL-21);
+    // 駐機誘導表示（VDGS）
+    const vy=L.yF-17; ctx.fillStyle='#1e2224'; ctx.fillRect(s.x-12,vy,24,10);
+    ctx.fillStyle='#f2a93a'; ctx.font='700 7px '+FONT;
+    const pl=s.plane, rs=s.res;
+    let vt='----';
+    if(rs)vt=rs.T.id; else if(s.pushing)vt='PUSH'; else if(pl){ const r=Math.ceil(pl.depAt-G.t); vt=pl.tow?'PUSH':r>0?'D'+String(r).padStart(2,'0'):'PUSH'; }
+    ctx.fillText(vt,s.x,vy+8);
+    // 搭乗橋（大型・中型）
+    if(s.cat!=='S'){ s.rot={x:s.x-(s.cat==='L'?22:15),y:L.yF+8}; ctx.fillStyle='#9a958a'; ctx.beginPath(); ctx.arc(s.rot.x,s.rot.y,4.5,0,7); ctx.fill(); }
+  });
+  // 誘導路標識（黒地に黄の位置標識）
+  const sign=(x,y,txt)=>{ ctx.font='800 9px '+FONT; const w=ctx.measureText(txt).width+8; ctx.fillStyle='#202020'; ctx.fillRect(x-w/2,y-6,w,12); ctx.strokeStyle=C.yellow; ctx.lineWidth=1; ctx.strokeRect(x-w/2+1.5,y-4.5,w-3,9); ctx.fillStyle=C.yellow; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(txt,x,y+0.5); ctx.textBaseline='alphabetic'; };
+  CONN.forEach(c=>sign(c.x+(c.x<40?18:-18),L.yP-24,c.n));
+  EXITS.forEach(e=>sign(e.X+28,L.yP+20,e.n));
+  sign(W-24,L.yP-24,'A');
+}
+function drawCar(x,y,hd,col,bus,k){
+  k=k||1; ctx.save(); ctx.translate(x,y); ctx.rotate(hd); ctx.scale(k,k);
+  const l=bus?22:12,w=bus?7:6;
+  ctx.fillStyle='rgba(0,0,0,.2)'; rr(-l/2+1,-w/2+1.5,l,w,2); ctx.fill();
+  ctx.fillStyle=col; rr(-l/2,-w/2,l,w,2); ctx.fill();
+  ctx.fillStyle='rgba(30,40,48,.75)';
+  if(bus){ ctx.fillRect(l/2-3,-w/2+1,2,w-2); } else { ctx.fillRect(1.5,-w/2+1,2.5,w-2); ctx.fillRect(-4.5,-w/2+1,1.8,w-2); }
+  ctx.restore();
+}
+// 機体（真上から）。単位はm、機首が上
+function drawPlane(T,al,x,y,hd,o){
+  o=o||{}; const sc=(o.scale||1)*PXM;
+  ctx.save(); ctx.translate(x,y); ctx.rotate(hd+Math.PI/2); ctx.scale(sc,sc);
+  const Lh=T.len/2, fw=T.fw, sh=o.shadow;
+  const body=sh?'rgba(20,24,20,.22)':'#f3f3ef', wingC=sh?'rgba(20,24,20,.22)':'#c8ccce', engC=sh?'rgba(20,24,20,.22)':'#8b9298';
+  const yle=-Lh+T.wing*T.len, tn=Math.tan(T.sweep*Math.PI/180), hs=T.span/2;
+  // 主翼
+  ctx.fillStyle=wingC;
+  for(const s of [-1,1]){
+    ctx.beginPath(); ctx.moveTo(s*fw/2,yle);
+    const tipLE=yle+(hs-fw/2)*tn;
+    if(T.tip==='raked'){ ctx.lineTo(s*hs*0.86,tipLE-(hs*0.14)*tn); ctx.quadraticCurveTo(s*hs,tipLE+0.2,s*hs,tipLE+T.tc); }
+    else { ctx.lineTo(s*hs,tipLE); ctx.lineTo(s*hs,tipLE+T.tc); }
+    if(T.sweep>0){ ctx.lineTo(s*hs*0.36,yle+(hs*0.36)*tn+T.rc*0.62); ctx.lineTo(s*fw/2,yle+T.rc); }
+    else ctx.lineTo(s*fw/2,yle+T.rc);
+    ctx.closePath(); ctx.fill();
+    if(!sh&&(T.tip==='sharklet'||T.tip==='winglet')){ ctx.fillStyle='#9aa1a6'; ctx.fillRect(s*hs-(s>0?0.9:0),tipLE-0.3,0.9,T.tc+0.4); ctx.fillStyle=wingC; }
+  }
+  // エンジン／プロペラ
+  for(const s of [-1,1]){
+    const ex=s*hs*T.engX*(T.prop?1.3:1), ey=yle+Math.abs(ex)*tn;
+    ctx.fillStyle=engC;
+    if(T.prop){ rr(ex-0.8,ey-2.2,1.6,5.5,0.6); ctx.fill();
+      if(!sh){ ctx.strokeStyle='rgba(40,40,40,.45)'; ctx.lineWidth=0.5; const a=(performance.now()/40)%Math.PI; ctx.beginPath(); ctx.moveTo(ex-Math.cos(a)*T.eng/2,ey-2.4); ctx.lineTo(ex+Math.cos(a)*T.eng/2,ey-2.4); ctx.stroke();
+        ctx.fillStyle='rgba(80,80,80,.18)'; ctx.fillRect(ex-T.eng/2,ey-2.7,T.eng,0.6); }
+    } else { rr(ex-T.eng/2,ey-T.eng*1.25,T.eng,T.eng*2.3,T.eng*0.4); ctx.fill(); }
+  }
+  // 水平尾翼
+  ctx.fillStyle=wingC;
+  const yt=Lh-T.tailc*(T.prop?1.2:1.9), tt=T.prop?0:Math.tan(32*Math.PI/180);
+  for(const s of [-1,1]){ ctx.beginPath(); ctx.moveTo(s*fw*0.25,yt); ctx.lineTo(s*T.tail/2,yt+(T.tail/2)*tt); ctx.lineTo(s*T.tail/2,yt+(T.tail/2)*tt+T.tailc*0.45); ctx.lineTo(s*fw*0.2,yt+T.tailc); ctx.closePath(); ctx.fill(); }
+  // 胴体
+  ctx.fillStyle=body; ctx.beginPath();
+  ctx.moveTo(0,-Lh); ctx.quadraticCurveTo(fw/2,-Lh+0.2,fw/2,-Lh+fw*1.5);
+  ctx.lineTo(fw/2,Lh-T.len*0.24); ctx.lineTo(fw*0.16,Lh); ctx.lineTo(-fw*0.16,Lh); ctx.lineTo(-fw/2,Lh-T.len*0.24);
+  ctx.lineTo(-fw/2,-Lh+fw*1.5); ctx.quadraticCurveTo(-fw/2,-Lh+0.2,0,-Lh); ctx.fill();
+  if(!sh){
+    // 陰影（右半分）
+    ctx.fillStyle='rgba(120,120,110,.16)'; ctx.beginPath(); ctx.moveTo(0,-Lh); ctx.quadraticCurveTo(fw/2,-Lh+0.2,fw/2,-Lh+fw*1.5); ctx.lineTo(fw/2,Lh-T.len*0.24); ctx.lineTo(fw*0.16,Lh); ctx.lineTo(0,Lh); ctx.closePath(); ctx.fill();
+    // 操縦席の窓
+    ctx.fillStyle='#2b3338'; ctx.beginPath(); ctx.moveTo(-fw*0.32,-Lh+fw*0.95); ctx.quadraticCurveTo(0,-Lh+fw*0.55,fw*0.32,-Lh+fw*0.95); ctx.lineTo(fw*0.3,-Lh+fw*1.15); ctx.quadraticCurveTo(0,-Lh+fw*0.8,-fw*0.3,-Lh+fw*1.15); ctx.closePath(); ctx.fill();
+    // 垂直尾翼（上から見ると線）
+    ctx.fillStyle=AIRLINE[al]||'#555'; ctx.fillRect(-fw*0.17,Lh-T.len*(T.prop?0.2:0.17),fw*0.34,T.len*(T.prop?0.2:0.17));
+    if(al==='ANA'){ ctx.fillRect(-fw/2,-Lh+fw*2.2,fw,0.5); }
+  }
+  ctx.restore();
+}
+function drawRoutes(){
+  // 割り当て済みの経路はグリーンのセンターライン灯で示す
+  const t=performance.now()/1000;
+  for(const p of G.planes){
+    if(p.state!=='taxi')continue;
+    const i0=Math.floor(p.s/2)+4;
+    for(let i=i0;i<p.path.n;i+=5){
+      const on=((i-Math.floor(t*12))%15+15)%15<11;
+      ctx.fillStyle=on?'#7ef0a0':'rgba(126,240,160,.35)'; ctx.beginPath(); ctx.arc(p.path.xs[i],p.path.ys[i],1.5,0,7); ctx.fill();
+    }
+  }
+}
+function drawPlanes(){
+  const list=G.planes.slice().sort((a,b)=>(a.state==='roll')-(b.state==='roll'));
+  for(const p of list){
+    const off=p.state==='roll'?2.5+p.alt*14:2.5;
+    drawPlane(p.T,p.al,p.x+off,p.y+off*1.3,p.hd,{shadow:true});
+  }
+  for(const p of list){
+    drawPlane(p.T,p.al,p.x,p.y,p.hd);
+    // 待機中の機体: 押せることを示す輪
+    if(p.state==='bay'&&(!drag||drag.p!==p)){
+      const k=(performance.now()/900)%1;
+      ctx.strokeStyle='rgba(255,255,255,'+(0.85-k*0.8)+')'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(p.x,p.y,p.T.r+4+k*10,0,7); ctx.stroke();
+      ctx.fillStyle='#262626'; ctx.font='700 9px '+FONT; const w=ctx.measureText(p.cs).width+6; ctx.fillRect(p.x-w/2,p.y+p.T.r+4,w,12); ctx.fillStyle='#f1f0ea'; ctx.textAlign='center'; ctx.fillText(p.cs,p.x,p.y+p.T.r+13);
+    }
+    if((p.state==='taxi'||p.state==='dep')&&p.y>L.yL-12){
+      ctx.fillStyle='rgba(38,38,38,.82)'; ctx.font='700 8px '+FONT; const w=ctx.measureText(p.cs).width+6; ctx.fillRect(p.x-w/2,p.y-p.T.r-12,w,10); ctx.fillStyle='#f1f0ea'; ctx.textAlign='center'; ctx.fillText(p.cs,p.x,p.y-p.T.r-4);
+    }
+  }
+  // 搭乗橋（機体の左前ドアへ）
+  for(const s of SPOTS){
+    if(!s.rot)continue;
+    const p=s.plane; let tx,ty;
+    const ext=p?p.bridge:0;
+    const homeX=s.rot.x-6, homeY=s.rot.y+16;
+    if(p){ const dx=p.x-p.T.fw*PXM/2-1, dy=p.y-p.T.L/2+p.T.L*0.17; tx=homeX+(dx-homeX)*ext; ty=homeY+(dy-homeY)*ext; } else { tx=homeX; ty=homeY; }
+    ctx.strokeStyle='#8f8a7f'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(s.rot.x,s.rot.y); ctx.lineTo(tx,ty); ctx.stroke();
+    ctx.strokeStyle='#b9b4a8'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(s.rot.x,s.rot.y); ctx.lineTo(tx,ty); ctx.stroke(); ctx.lineCap='butt';
+    ctx.fillStyle='#6f6a60'; ctx.fillRect(tx-2.5,ty-2.5,5,5);
+  }
+}
+function drawCrew(){
+  const t=performance.now()/1000;
+  for(const s of SPOTS){
+    const p=s.res||s.plane;
+    const rej=G.t-(s.reject||-9)<2.2;
+    // マーシャラー: 機体が向かってくるスポットの前に立つ
+    if(s.res||rej||(s.plane&&G.t-(s.plane.blockT||-9)<3)){
+      const pose=rej?'x':s.res?'come':'stop';
+      // 停止位置の左わき（機首の横）に立つ
+      drawMarshal(s.x-(s.cat==='L'?28:s.cat==='M'?19:13),L.yF+30,pose,t);
+    }
+    // 小型機は搭乗スロープ
+    if(s.cat==='S'&&s.plane&&s.plane.state==='park'){ const pl=s.plane; ctx.fillStyle='#d6d1c4'; ctx.fillRect(pl.x-pl.T.fw*PXM/2-9,pl.y+pl.T.L*0.2,8,3); ctx.fillStyle='#9f9a8f'; ctx.fillRect(pl.x-pl.T.fw*PXM/2-9,pl.y+pl.T.L*0.2+3,8,1); }
+  }
+  // トーイングカー
+  for(const p of G.planes){
+    if(!p.tow)continue;
+    const nose={x:p.x+Math.cos(p.hd)*p.T.L/2,y:p.y+Math.sin(p.hd)*p.T.L/2};
+    let x=nose.x+Math.cos(p.hd)*9,y=nose.y+Math.sin(p.hd)*9,h=p.hd+Math.PI;
+    if(p.tow.phase==='come'){ const k=Math.min(1,(G.t-p.tow.t0)/2); const sx=p.spot.x+30,sy=L.yF+14; x=sx+(x-sx)*k; y=sy+(y-sy)*k; }
+    if(p.tow.phase!=='come'||G.t-p.tow.t0>1.6){ ctx.strokeStyle='#3a3a3a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(nose.x,nose.y); ctx.lineTo(x,y); ctx.stroke(); }
+    drawTug(x,y,h);
+    // 押し出し中は翼端監視の係員
+    if(p.state==='push'){ const wx=p.x+Math.cos(p.hd+Math.PI/2)*(p.T.S/2+6), wy=p.y+Math.sin(p.hd+Math.PI/2)*(p.T.S/2+6); drawMarshal(wx,wy+6,'idle',t,0.8); }
+  }
+  // 押し出し後に戻るトーイングカー
+  if(G.towBack){ G.towBack=G.towBack.filter(b=>G.t-b.t0<3); for(const b of G.towBack){ const k=Math.min(1,(G.t-b.t0)/2.6); const tx=b.spot.x+30,ty=L.yF+14; const x=b.from.x+(tx-b.from.x)*k,y=b.from.y+(ty-b.from.y)*k; drawTug(x,y,Math.atan2(ty-b.from.y,tx-b.from.x)); } }
+  // 待機中のトーイングカー（ビル際）
+  for(const s of SPOTS){ const busy=G.planes.some(p=>p.tow&&p.spot===s)||(G.towBack||[]).some(b=>b.spot===s); if(!busy&&s.plane&&s.plane.state==='park') drawTug(s.x+(s.cat==='L'?26:18),L.yF+12,Math.PI/2); }
+}
+function drawTug(x,y,h){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(h);
+  ctx.fillStyle='rgba(0,0,0,.22)'; rr(-6,-3.2,13,7.4,1.5); ctx.fill();
+  ctx.fillStyle='#e0b028'; rr(-7,-4,13,8,1.5); ctx.fill();
+  ctx.fillStyle='#2c3236'; ctx.fillRect(-5.5,-3,4,6);
+  ctx.fillStyle='#1d1d1d'; ctx.fillRect(-6,-4.8,3,1.2); ctx.fillRect(2,-4.8,3,1.2); ctx.fillRect(-6,3.6,3,1.2); ctx.fillRect(2,3.6,3,1.2);
+  ctx.restore();
+}
+// マーシャラー（がっしりした体格。ヘルメット・イヤーマフ・反射ベスト・誘導灯）
+function drawMarshal(x,y,pose,t,k){
+  k=k||1; ctx.save(); ctx.translate(x,y); ctx.scale(k,k);
+  ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(2,1,6,2.2,0,0,7); ctx.fill();
+  // 脚
+  ctx.fillStyle='#283447'; ctx.fillRect(-4,-9,3.4,9); ctx.fillRect(0.6,-9,3.4,9);
+  ctx.fillStyle='#151515'; ctx.fillRect(-4.4,-1.4,4,1.8); ctx.fillRect(0.4,-1.4,4,1.8);
+  // 胴（肩幅広め）
+  ctx.fillStyle='#283447'; ctx.beginPath(); ctx.moveTo(-6,-19); ctx.lineTo(6,-19); ctx.lineTo(5,-8.5); ctx.lineTo(-5,-8.5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#cfe03c'; ctx.beginPath(); ctx.moveTo(-5.6,-18.6); ctx.lineTo(5.6,-18.6); ctx.lineTo(4.7,-9.2); ctx.lineTo(-4.7,-9.2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#e8ebe8'; ctx.fillRect(-5.2,-14.5,10.4,1.2); ctx.fillRect(-5,-11.8,10,1.2);
+  // 腕と誘導灯
+  let a1,a2;
+  if(pose==='come'){ const w=Math.sin(t*6)*0.45; a1=-2.6+w; a2=-0.55-w; }
+  else if(pose==='x'){ a1=-2.2; a2=-0.95; }
+  else if(pose==='stop'){ a1=-2.25; a2=-0.9; }
+  else { a1=2.2; a2=0.9; }
+  const arm=(sx,a,cross)=>{ const ex=sx+Math.cos(a)*6, ey=-18+Math.sin(a)*6;
+    ctx.strokeStyle='#283447'; ctx.lineWidth=2.6; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(sx,-18); ctx.lineTo(ex,ey); ctx.stroke();
+    const wa=cross?a+(sx<0?0.9:-0.9):a; ctx.strokeStyle='#ff7a1a'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ex+Math.cos(wa)*6,ey+Math.sin(wa)*6); ctx.stroke(); ctx.lineCap='butt'; };
+  arm(-5.5,a1,pose==='x'); arm(5.5,a2,pose==='x');
+  // 頭
+  ctx.fillStyle='#c99a74'; ctx.beginPath(); ctx.arc(0,-22,3.2,0,7); ctx.fill();
+  ctx.fillStyle='#f1f0ea'; ctx.beginPath(); ctx.arc(0,-22.6,3.4,Math.PI,0); ctx.fill();
+  ctx.fillStyle='#2a2a2a'; ctx.fillRect(-4,-23,1.6,2.6); ctx.fillRect(2.4,-23,1.6,2.6);
+  ctx.restore();
+}
+function drawDrag(){
+  if(!drag)return;
+  const d=drag;
+  ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.beginPath(); d.trail.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)); ctx.stroke();
+  if(d.route){
+    const pts=d.route.map(id=>NODES[id]);
+    ctx.strokeStyle='#ffe066'; ctx.lineWidth=4; ctx.setLineDash([8,5]); ctx.beginPath();
+    ctx.moveTo(d.p.x,d.p.y); pts.slice(1).forEach(n=>ctx.lineTo(n.x,n.kind==='spot'?parkY(d.p.T):n.y)); ctx.stroke(); ctx.setLineDash([]);
+  }
+  if(d.spot){ const s=d.spot, hw=s.cat==='L'?30:s.cat==='M'?20:17; ctx.strokeStyle=d.route?'#ffe066':'rgba(255,255,255,.8)'; ctx.lineWidth=2; ctx.strokeRect(s.x-hw,L.yF+3,hw*2,L.yL-L.yF-20); }
+}
+function drawBoard(){
+  // 到着のフライトストリップ盤
+  const x0=6,y0=L.boardY,w=W-12,h=L.boardH;
+  ctx.fillStyle='#39433c'; ctx.fillRect(x0,y0,w,h);
+  ctx.fillStyle='#d7d2c2'; ctx.font='700 9px '+FONT; ctx.textAlign='left'; ctx.fillText('ARR RJOO 32L',x0+6,y0+11);
+  const sw=w-112;
+  const list=G.flights.filter(f=>f.state!=='in').slice(0,4);
+  list.forEach((f,k)=>{
+    const y=y0+16+k*21;
+    ctx.fillStyle=f.state==='air'?'#f4e3b4':'#efe9d6'; ctx.fillRect(x0+4,y,sw,19);
+    ctx.fillStyle='#8b8574'; [70,128,186,226].forEach(dx=>ctx.fillRect(x0+4+dx,y,1,19));
+    ctx.fillStyle='#22201c'; ctx.font='800 11px '+FONT; ctx.fillText(f.cs,x0+8,y+13.5);
+    ctx.font='600 9px '+FONT; ctx.fillText(f.T.id+'/'+f.T.wake,x0+78,y+13); ctx.fillText(f.org+' '+ORIGIN[f.org],x0+134,y+13);
+    ctx.font='700 10px '+FONT; ctx.fillText(clockHHMM(f.eta),x0+192,y+13.5);
+    const st=f.state==='air'?'HOLD':f.state==='land'?(f.plane&&f.plane.state==='bay'?f.plane.exit.n:'LDG'):f.state==='taxi'?'TAXI':'';
+    if(st){ ctx.fillStyle=f.state==='air'?'#22201c':'#5e584d'; ctx.font='800 9px '+FONT; ctx.fillText(st,x0+234,y+13); }
+  });
+  // 上空待機の枠
+  const hx=x0+sw+10;
+  ctx.fillStyle='#d7d2c2'; ctx.font='700 9px '+FONT; ctx.fillText('HOLDING '+G.air.length+'/'+HOLD_MAX,hx,y0+11);
+  for(let k=0;k<HOLD_MAX;k++){
+    const y=y0+16+k*21, f=G.air[k];
+    ctx.strokeStyle='#8f9a90'; ctx.lineWidth=1; ctx.strokeRect(hx+0.5,y+0.5,92,18);
+    if(f){ ctx.fillStyle='#f4e3b4'; ctx.fillRect(hx+1,y+1,91,17); ctx.fillStyle='#22201c'; ctx.font='800 10px '+FONT; ctx.fillText(f.cs,hx+5,y+13); ctx.font='600 8px '+FONT; ctx.fillText(f.T.id,hx+62,y+13); }
+  }
+  if(G.air.length>HOLD_MAX){ ctx.fillStyle='#ff5a4c'; ctx.font='800 10px '+FONT; ctx.fillText(G.air[HOLD_MAX].cs+' 待機不可',hx,y0+16+3*21+12); }
+}
+function drawTelops(){
+  G.telops=G.telops.filter(o=>G.t-o.t0<o.dur);
+  for(const o of G.telops){
+    const a=Math.min(1,(o.dur-(G.t-o.t0))*3);
+    ctx.globalAlpha=a; ctx.font='700 11px '+FONT; const w=Math.min(W-16,ctx.measureText(o.text).width+16);
+    const x=Math.max(8+w/2,Math.min(W-8-w/2,o.x));
+    ctx.fillStyle='rgba(28,30,30,.88)'; ctx.fillRect(x-w/2,o.y-11,w,22);
+    ctx.fillStyle='#f1f0ea'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(o.text,x,o.y+0.5); ctx.textBaseline='alphabetic';
+    ctx.globalAlpha=1;
+  }
+}
+function drawFx(){
+  const f=G.fx;
+  if(f.kind!=='clear'){
+    ctx.fillStyle='rgba(20,18,16,'+Math.min(0.45,f.t)+')'; ctx.fillRect(0,0,W,H);
+    if(f.a){ for(const p of [f.a,f.b]){ drawPlane(p.T,p.al,p.x,p.y,p.hd); }
+      const r=Math.max(f.a.T.r,f.b.T.r)+18+Math.sin(f.t*14)*3;
+      ctx.strokeStyle='#ff5a4c'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(f.x,f.y,r,0,7); ctx.stroke(); }
+  }
+  // 管制の交信テロップ
+  const ty=L.landTop+30;
+  ctx.fillStyle='rgba(18,20,20,.92)'; ctx.fillRect(0,ty-18,W,18*f.lines.length+18);
+  ctx.fillStyle='#f1f0ea'; ctx.font='800 13px '+FONT; ctx.textAlign='left';
+  const shown=Math.floor(f.t*40);
+  let used=0; f.lines.forEach((ln,i)=>{ const n=Math.max(0,Math.min(ln.length,shown-used)); used+=ln.length; ctx.fillText(ln.slice(0,n),12,ty+i*18+2); });
+  // 状態タイル（運航状況表示のフラップ）がめくれて出る
+  if(f.t>0.6){
+    const k=Math.min(1,(f.t-0.6)/0.25), fl=Math.cos((1-k)*Math.PI);
+    const col=f.round?'#5fd18b':'#ff5a4c';
+    const cy=f.kind==='hold'||f.kind==='clear'?(L.yL+L.yP)/2:Math.min(H-90,f.y+90);
+    ctx.save(); ctx.translate(W/2,cy); ctx.scale(1,Math.max(0.02,Math.abs(fl)));
+    const ch=[...f.stamp], tw=ch.length===4?150:118, th=ch.length===4?112:84;
+    ctx.fillStyle='#0e0f11'; ctx.fillRect(-tw/2,-th/2,tw,th);
+    ctx.strokeStyle=col; ctx.lineWidth=4; ctx.strokeRect(-tw/2+2,-th/2+2,tw-4,th-4);
+    ctx.fillStyle=col; ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(ch.length===4){ ctx.font='900 34px '+FONT; ctx.fillText(ch[0]+ch[1],0,-24); ctx.fillText(ch[2]+ch[3],0,24); }
+    else { ctx.font='900 44px '+FONT; ctx.fillText(f.stamp,0,2); }
+    ctx.fillStyle='#000'; ctx.fillRect(-tw/2+4,-1,tw-8,2);
+    ctx.restore(); ctx.textBaseline='alphabetic';
+  }
+}
+
+// ---- メインループ ----
+function frame(ts){
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.05):0; lastTs=ts;
+  if(G.screen==='play') update(dt);
+  else if(G.screen==='fx'){ G.fx.t+=dt; if(G.fx.t>1.5){ const d=G.fx.done; d(); } }
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle=getComputedStyle(document.body).backgroundColor; ctx.fillRect(0,0,VW,VH);
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR,TY*DPR);
+  draw();
+  requestAnimationFrame(frame);
+}
+window.addEventListener('resize',resize); resize();
+showTitle();
+requestAnimationFrame(frame);
+</script>
 </body>
 </html>
