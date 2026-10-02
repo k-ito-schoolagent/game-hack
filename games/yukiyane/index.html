@@ -307,11 +307,14 @@ for(const [i,st] of STAGES.entries()){
 const G={screen:'title',stage:0,T:0,chunks:[],cap:null,anim:null,fail:null,failT:0,drag:null,me:0,swipes:0,piles:[],landed:null,doneT:-1,total:[],hit:null,shake:0};
 let lastTs=0;
 // 画面: 隣家の壁〜道路（右の軒から4.75m）までが横幅いっぱい。屋根の雪が横幅の約75%を占める
-// 縦横等倍（屋根の勾配は物理と同じに見せる）。地面は画面の約84%。地面より下の帯は置き場と流雪溝の断面
+// 縦は描画だけ KY 倍（物理は等倍）。横幅で縮尺が決まるぶん、H に応じて縦を 1.3〜1.6 倍に伸ばし、屋根の雪を大きく見せる。
+// 地面より下の帯（100px 以上）は置き場と流雪溝の断面
 const VIEW_L=-(6.5+1.5+0.7), VIEW_R=6.5+4.75;
-const S=W/(VIEW_R-VIEW_L); const SY=S; let X0=-VIEW_L*S, GY=600;
+const S=W/(VIEW_R-VIEW_L); let KY=1.3, SY=S*KY, X0=-VIEW_L*S, GY=600;
 function snowTop(st){ const gm=geom(st); return Math.max(...makeChunks(st).map(c=>roofPt(gm,c.s).y+c.d)); }
-function layoutY(){ GY=Math.round(H*0.84); }
+// 屋根の雪の上下の中心が画面の 66% の高さに来るよう、面ごとに地面の位置を決める（地面の下は 100px 以上残す）
+function layoutY(){ const st=STAGES[G.stage]||STAGES[0]; KY=1.3+0.3*Math.max(0,Math.min(1,(H-700)/220)); SY=S*KY;
+  const mid=(SIM.eaveH+snowTop(st))/2; GY=Math.min(H-100,Math.round(H*0.66+mid*SY)); }
 function onResize(){ if(typeof G!=='undefined') layoutY(); }
 const wx=x=>X0+x*S, wy=y=>GY-y*SY;
 const fmt=n=>Math.round(n).toLocaleString('ja-JP');
@@ -347,7 +350,7 @@ function pickChunk(p){
 }
 function dragInfo(d){
   const st=cur(), gm=geom(st), c=G.chunks.find(c=>c.id===d.id); if(!c)return null;
-  const sd=c.s>=0?1:-1, ux=sd*gm.cos, uy=gm.sin;   // 画面上の「軒へ」の向き（y は下向き）
+  const sd=c.s>=0?1:-1, k=Math.hypot(gm.cos,gm.sin*KY), ux=sd*gm.cos/k, uy=gm.sin*KY/k;   // 画面上の「軒へ」の向き（y は下向き）
   const dx=d.x-d.x0, dy=d.y-d.y0, len=Math.hypot(dx,dy);
   if(len<18) return {c,ok:false};
   const dir=(dx*ux+dy*uy)>=0?1:-1, lv=len<75?0:len<150?1:2;
@@ -476,6 +479,10 @@ function drawSky(){
     const b=GY-58; rr(x,b-h,w,h,'#9FA8AE'); fillPoly([[x-4,b-h],[x+w/2,b-h-rf],[x+w+4,b-h]],'#7E8A92');
     fillPoly([[x-6,b-h+1],[x-2,b-h-6],[x+w/2,b-h-rf-8],[x+w+2,b-h-6],[x+w+6,b-h+1]],'#EEF2F4');
     rr(x+w*0.25,b-h+12,10,8,'#C9D2D8'); rr(x+w*0.62,b-h+12,10,8,'#C9D2D8'); }
+  // 電柱と電線（家の向こうの通り）
+  const px=W-46, pt=GY-170; rr(px,pt,4,170-58,'#6F767B'); rr(px-14,pt+8,32,3,'#6F767B'); rr(px-10,pt+22,24,3,'#6F767B');
+  ctx.strokeStyle='rgba(60,68,74,.55)'; ctx.lineWidth=1;
+  for(const [dx,dy,sag] of [[-12,8,26],[14,8,30],[-8,22,22]]){ ctx.beginPath(); ctx.moveTo(px+2+dx,pt+dy); ctx.quadraticCurveTo((px+dx)/2,pt+dy+sag*2,-10,pt+dy+18); ctx.stroke(); }
 }
 function drawFlakes(dt){
   ctx.fillStyle='rgba(255,255,255,.9)';
@@ -507,6 +514,58 @@ function drawSnowWall(st){
   fillPoly([[x0-4,GY],[x0,GY-h+4],[x0+6,GY-h],[x1,GY-h+3],[x1+3,GY]],'#F1F4F6');
   ctx.strokeStyle='#CED7DE'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x0,GY-h+4); ctx.lineTo(x0+6,GY-h); ctx.lineTo(x1,GY-h+3); ctx.stroke();
 }
+// 地面より下の帯: 置き場の断面（残りの容量が高さで分かる）と流雪溝の断面
+function bandLayout(st){
+  const y0=GY+8, top=y0+18, bot=H-8;
+  const L={x:6,w:wx(-5.75)-10}, R={x:wx(5.75)+2,w:wx(SIM.half+st.ditch[0])-3-(wx(5.75)+2)};
+  const lim=st.gapCap<1e8, gl=G.landed?G.landed.gap:0, yl=G.landed?G.landed.yard:0;
+  const half=roofTotal(st)/2;
+  const tl=lim?'隣との間 残り '+fmt(Math.max(0,G.cap.gap))+'kg':'隣との間 '+fmt(gl)+'kg';
+  const tr=lim?'庭 残り '+fmt(Math.max(0,G.cap.yard))+'kg':'庭 '+fmt(yl)+'kg';
+  return {y0,top,bot,L,R,lim,fl:Math.min(1,gl/(lim?st.gapCap:half)),fr:Math.min(1,yl/(lim?st.yardCap:half)),tl,tr,
+    wl:lim&&G.cap.gap<1500, wr:lim&&G.cap.yard<1500};
+}
+function drawPit(b,f,lim){
+  const h=b.bot-b.top, fh=h*f;
+  rr(b.x,b.top,b.w,h,'#C9D3DA');
+  if(fh>0){ rr(b.x,b.bot-fh,b.w,fh,'#F5F7F9'); ctx.fillStyle='rgba(140,160,180,.25)'; for(let y=b.bot-6;y>b.bot-fh;y-=7) ctx.fillRect(b.x+2,y,b.w-4,1); }
+  ctx.strokeStyle='#7F8C95'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(b.x,b.top); ctx.lineTo(b.x,b.bot); ctx.lineTo(b.x+b.w,b.bot); ctx.lineTo(b.x+b.w,b.top); ctx.stroke();
+  if(lim){ ctx.setLineDash([4,3]); ctx.strokeStyle='#1F2F3F'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(b.x,b.top); ctx.lineTo(b.x+b.w,b.top); ctx.stroke(); ctx.setLineDash([]); }
+}
+function drawBand(st){
+  const B=bandLayout(st);
+  // 断面の地層（踏み固めた根雪）
+  rr(0,GY+3,wx(SIM.half+st.ditch[1]),H-GY-3,'#E3E8EC');
+  ctx.fillStyle='rgba(150,165,178,.18)'; for(let y=GY+14;y<H;y+=11) ctx.fillRect(0,y,wx(SIM.half+st.ditch[1]),1);
+  B.L.top=B.top; B.L.bot=B.bot; B.R.top=B.top; B.R.bot=B.bot;
+  drawPit(B.L,B.fl,B.lim); drawPit(B.R,B.fr,B.lim);
+  // 流雪溝の断面: コンクリートのU字溝と流れる水
+  const d0=wx(SIM.half+st.ditch[0]), d1=wx(SIM.half+st.ditch[1]), db=Math.min(B.bot,GY+60);
+  rr(d0-2,GY,d1-d0+4,db-GY+3,'#8C9399'); rr(d0+2,GY+3,d1-d0-4,db-GY-3,'#3F5B6A');
+  ctx.fillStyle='rgba(225,236,242,.85)'; for(let i=0;i<3;i++){ const yy=GY+10+((G.T*14+i*17)%(db-GY-18)); ctx.fillRect(d0+4,yy,d1-d0-8,3); }
+}
+// 帯の文字（置き場の名前と残り）は降る雪より手前に描く
+function drawBandText(st){
+  const B=bandLayout(st);
+  ctx.textBaseline='alphabetic'; ctx.font='700 11px '+FONT; ctx.lineJoin='round';
+  for(const [t,x,al,w] of [[B.tl,B.L.x,'left',B.wl],[B.tr,B.R.x+B.R.w,'right',B.wr]]){
+    ctx.textAlign=al; ctx.strokeStyle='rgba(227,232,236,.95)'; ctx.lineWidth=3; ctx.strokeText(t,x,B.y0+10); ctx.fillStyle=w?'#C8372D':'#1F2F3F'; ctx.fillText(t,x,B.y0+10);
+  }
+  ctx.textAlign='left';
+}
+// 雪尺（スノーポール）: 隣家との間の手前に立つ（家より手前に描く）。目盛りは1mごと、その日の積雪深に印
+function drawSnowPole(st){
+  const x=10, hT=6*SY, y=GY;
+  for(let i=0;i<12;i++) rr(x-2,y-(i+1)*SY/2,4,SY/2,i%2?'#F4F4F0':'#C23A2E');
+  rr(x-2,y-hT-2,4,2,'#555');
+  const dy=y-st.depth/100*SY;
+  ctx.font='600 10px '+FONT; ctx.textAlign='left'; ctx.lineJoin='round';
+  for(let m=1;m<=6;m++){ const ty=y-m*SY; rr(x+2,ty,4,1,'#333'); if(Math.abs(ty-dy)<14) continue;
+    ctx.strokeStyle='rgba(243,245,247,.9)'; ctx.lineWidth=3; ctx.strokeText(m+'m',x+7,ty+4); ctx.fillStyle='#33404A'; ctx.fillText(m+'m',x+7,ty+4); }
+  rr(x-5,dy-1,14,2,'#1F2F3F');
+  ctx.font='800 11px '+FONT; ctx.strokeStyle='rgba(243,245,247,.95)'; ctx.lineWidth=3.5; ctx.strokeText(st.depth+'cm',x+11,dy+4); ctx.fillStyle='#1F2F3F'; ctx.fillText(st.depth+'cm',x+11,dy+4);
+}
+function poleRect(st){ ctx.font='800 11px '+FONT; return {x:6,y:GY-6*SY-4,w:20+ctx.measureText(st.depth+'cm').width,h:6*SY+4}; }
 function drawNeighbor(st){
   const ex=wx(-SIM.half-st.gap), ey=wy(4.2);
   // 壁
@@ -610,8 +669,8 @@ function drawChunk(st,c,s,hl){
 // 2段ずつ上げ、それでも収まらなければ縮める（下限10px）
 const rectHit=(a,b)=>a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h;
 const guideAlpha=()=>G.screen==='play'&&G.swipes===0?Math.max(0,Math.min(1,(5-G.T)/0.8)):0;
-// 上の帯（気象庁テロップ・ゆるみの注意・はじめの手引き）の下端
-function telopBottom(st){ return topY()+12+52+(st.slip[0]||st.slip[1]?28:0)+(guideAlpha()>0?56:0)+4; }
+// 上の帯（気象庁テロップ・ゆるみの注意）の下端
+function telopBottom(st){ return topY()+12+52+(st.slip[0]||st.slip[1]?28:0)+4; }
 function labelBase(st){ const gm=geom(st); return Math.min(...makeChunks(st).map(c=>wy(roofPt(gm,c.s).y+c.d)))-6; }
 function labelRects(st){
   const a=G.anim, list=a?a.src:G.chunks, gm=geom(st), items=[];
@@ -622,6 +681,7 @@ function labelRects(st){
   });
   const me=G.screen!=='title'?mePos(st):null, obst=[];
   if(me&&!me.buried) obst.push({x:me.x-13,y:me.y-41,w:26,h:42});
+  obst.push(poleRect(st));
   const top=telopBottom(st), base=labelBase(st);
   items.sort((p,q)=>p.row-q.row||p.x0-q.x0);
   const placed=[];
@@ -671,6 +731,10 @@ function __telopCheck(){ const bad=[];
     if(st.slip[0]||st.slip[1]){ ctx.font='600 12px '+FONT; if(20+ctx.measureText('日中 気温+2℃　'+(st.slip[0]?'左（南向き）':'右')+'の屋根の雪がゆるんでいます').width>W-20) bad.push('slip '+st.place); }
   }
   return bad; }
+// 検証用: 帯の文字（置き場の残り）が枠内に収まり、左右で重ならないか
+function __bandCheck(){ const st=cur(), B=bandLayout(st); ctx.font='700 11px '+FONT; const wl=ctx.measureText(B.tl).width, wr=ctx.measureText(B.tr).width, bad=[];
+  if(B.L.x+wl>B.R.x+B.R.w-wr-8) bad.push('band overlap'); if(B.L.x<0||B.R.x+B.R.w>W) bad.push('band out'); if(B.bot-B.top<30) bad.push('pit too short');
+  const pr=poleRect(st); if(pr.y<telopBottom(st)) bad.push('pole under telop'); return bad; }
 // 検証用: kg 表示どうし・人物・帯との重なりと画面はみ出しを数える
 function __labelCheck(){
   const st=cur(), {placed,obst,top}=labelRects(st), bad=[];
@@ -784,7 +848,7 @@ function drawPeds(behind){
   const T=G.fail?G.T-G.failT:G.T, st=cur();
   for(const p of peds(T)){
     if(!!p.behind!==behind)continue;
-    const x=wx(SIM.half+p.d), fade=behind?Math.min(1,(p.d-PED_FROM)/0.3):1;
+    const x=Math.min(wx(SIM.half+p.d),W-14), fade=behind?Math.min(1,(p.d-PED_FROM)/0.3):1;
     let y=GY+(behind?-4:6), hop=0;
     const hit=G.fail&&G.fail.type==='ped'&&G.fail.who===p.kind;
     if(hit){ hop=-Math.max(0,Math.sin(Math.min(1,G.failT*3)*Math.PI))*8; }
@@ -807,17 +871,18 @@ function drawTelop(st){
     ctx.fillStyle='#22201C'; ctx.textAlign='left'; ctx.font='600 12px '+FONT;
     ctx.fillText('日中 気温+2℃　'+(st.slip[0]?'左（南向き）':'右')+'の屋根の雪がゆるんでいます', 20, ny+16); ny+=28;
   }
-  // はじめの数秒だけの手引き
+  // はじめの数秒だけの手引き（地面の下の帯。置き場はまだ空で、道路にはかからない）
   const g=guideAlpha();
-  if(g>0){ ctx.globalAlpha=g; ctx.fillStyle='rgba(243,239,228,.94)'; ctx.fillRect(40,ny+8,W-80,48);
-    ctx.fillStyle='#22201C'; ctx.textAlign='center'; ctx.font='700 14px '+FONT; ctx.fillText('雪のかたまりを、落としたい向きへはらう',W/2,ny+28);
-    ctx.font='500 12px '+FONT; ctx.fillText('長くはらうほど強く押す（弱・中・強）',W/2,ny+46); ctx.globalAlpha=1; }
+  if(g>0){ const gw=Math.min(W-60,wx(SIM.half+st.ditch[0])-16), gy=Math.round(GY+26+(H-GY-26-48)/2); ctx.globalAlpha=g; ctx.fillStyle='rgba(243,239,228,.96)'; ctx.fillRect(8,gy,gw,48);
+    ctx.strokeStyle='#22201C'; ctx.lineWidth=1; ctx.strokeRect(8.5,gy+.5,gw-1,47);
+    ctx.fillStyle='#22201C'; ctx.textAlign='center'; ctx.font='700 14px '+FONT; ctx.fillText('雪のかたまりを、落としたい向きへはらう',8+gw/2,gy+20);
+    ctx.font='500 12px '+FONT; ctx.fillText('長くはらうほど強く押す（弱・中・強）',8+gw/2,gy+38); ctx.globalAlpha=1; }
 }
 function drawDrag(st){
   if(!G.drag)return; const inf=dragInfo(G.drag); if(!inf)return;
   const c=inf.c, q=chunkCenter(st,c,c.s), gm=geom(st), sd=c.s>=0?1:-1;
   if(!inf.ok){ return; }
-  const ux=sd*gm.cos*inf.dir, uy=gm.sin*inf.dir, Lp=34+inf.lv*24;
+  const k=Math.hypot(gm.cos,gm.sin*KY), ux=sd*gm.cos/k*inf.dir, uy=gm.sin*KY/k*inf.dir, Lp=34+inf.lv*24;
   const x1=q.x+ux*Lp, y1=q.y+uy*Lp-(inf.dir<0?6:0);
   ctx.strokeStyle='#22201C'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(q.x,q.y); ctx.lineTo(x1,y1); ctx.stroke();
   for(let i=0;i<=inf.lv;i++){ const k=1-i*0.32, cx=q.x+ux*Lp*k, cy=q.y+uy*Lp*k-(inf.dir<0?6:0)*k, nx=-uy, ny=ux;
@@ -835,11 +900,11 @@ function draw(){
   const st=cur(), dt=Math.min(0.05,(performance.now()-prevTs)/1000||0); prevTs=performance.now();
   ctx.save();
   if(G.shake>0){ const k=G.shake*10; ctx.translate(Math.sin(G.T*90)*k,Math.cos(G.T*70)*k*.5); }
-  drawSky(); drawGround(st); drawPeds(true); drawSnowWall(st); drawNeighbor(st); drawCarport(st); drawHouse(st); drawPiles(st);
-  drawRoofSnow(st); drawFailOverlay(st); drawLeaders(st);
+  drawSky(); drawGround(st); drawBand(st); drawPeds(true); drawSnowWall(st); drawNeighbor(st); drawCarport(st); drawHouse(st); drawPiles(st);
+  drawRoofSnow(st); drawSnowPole(st); drawFailOverlay(st); drawLeaders(st);
   if(G.screen!=='title') drawMe(st);
   drawPeds(false); drawLabels(st);
-  drawFlakes(dt);
+  drawFlakes(dt); drawBandText(st);
   ctx.restore();
   drawTelop(st); drawDrag(st);
   if(G.screen==='play'||G.screen==='pause'){
