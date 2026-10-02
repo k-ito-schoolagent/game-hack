@@ -2,40 +2,867 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>屋根雪おろし（仕様書公開中） | GAME HACK</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>屋根雪おろし | GAME HACK</title>
+<meta name="description" content="気象庁の積雪深で積もった屋根の雪を、かたまりの重さ（kg）を見ながら下ろす。向きと順番を誤ると、隣家・カーポート・通学路へ崩落。">
+<meta name="theme-color" content="#F2F0E8">
+<!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>雪</text></svg>">
 <style>
-  body{margin:0;background:#0d1526;color:#eaf3fc;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.8}
-  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
-  .badge{display:inline-block;font-size:12px;font-weight:700;border:1px solid #ffb300;color:#ffb300;border-radius:6px;padding:2px 10px;margin-bottom:14px}
-  h1{font-size:26px;margin:0 0 14px}
-  p,li{font-size:14.5px;color:#c9dcf2}
-  a{color:#ffb300}
-  .box{background:#16233c;border-radius:12px;padding:14px 16px;margin:14px 0}
-  .box b{color:#ffb300}
+/* ================================================================
+ * GAME HACK 共通UI（ここから）— 全ゲームで同じものをコピーして使う
+ * 世界観: 業務帳票。紙 × 墨 × 朱（ハンコの赤）。
+ * - 朱は「判子」と「失敗」にだけ使う。ボタンや装飾には使わない
+ * - 角丸は 2px まで。影・グラデーション・絵文字は使わない
+ * ================================================================ */
+:root{
+  --paper:#F3EFE4; --paper2:#E8E1CF; --ink:#22201C; --ink2:#5E584D; --rule:#CDC3AC; --shu:#C8372D;
+  --font:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--scene,#2b2a27);font-family:var(--font);color:var(--ink);-webkit-text-size-adjust:100%}
+#wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+canvas{display:block;width:100%;height:100%}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+/* HUD: 帳票の見出し帯。左=どこ / 中=いまの数値 / 右=一時停止 */
+#hud{position:absolute;left:0;right:0;top:0;padding-top:var(--safe-t);background:var(--paper);border-bottom:1px solid var(--ink);display:none;grid-template-columns:1fr auto 52px;align-items:center;height:calc(48px + var(--safe-t));box-sizing:border-box;font-feature-settings:"tnum";z-index:5}
+#hud.on{display:grid}
+#hudL{padding-left:14px;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hudL small{font-weight:500;color:var(--ink2);font-size:12px;margin-left:6px}
+#hudC{padding:0 12px;font-size:15px;font-weight:700;text-align:right;white-space:nowrap}
+#hudC .warn{color:var(--shu)}
+#pauseBtn{width:52px;height:48px;border:0;border-left:1px solid var(--rule);background:transparent;display:grid;place-items:center}
+#pauseBtn i{display:block;width:12px;height:14px;border-left:4px solid var(--ink);border-right:4px solid var(--ink);box-sizing:border-box}
+/* シート: 下から出る帳票。親指で押せる位置にボタンを置く */
+#sheetBg{position:absolute;inset:0;background:rgba(34,32,28,.5);display:none;z-index:10}
+#sheetBg.on{display:block}
+#sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
+#sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
+#sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
+#sheet dt{color:var(--ink2)}
+#sheet dd{margin:0;font-weight:600;font-feature-settings:"tnum"}
+#sheet .acts{display:grid;gap:8px}
+.btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
+.btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn:active{transform:translateY(1px);opacity:.9}
+.sub{display:flex;justify-content:center;gap:4px}
+.sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
+/* 判子: 結果シートの右上に押される。中身は最大4字 */
+.stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
+.stamp.round{border-radius:50%}
+.stamp span{display:block}
+@keyframes stampIn{from{transform:rotate(-8deg) scale(1.9);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:.92}}
+@media (prefers-reduced-motion:reduce){#sheet,.stamp{animation:none}}
+/* ===== GAME HACK 共通UI（ここまで）===== */
+:root{--scene:#AEB9C4}
+/* ---- ゲーム固有の見た目: 雪国の町内会。HUD=琺瑯の掲示、シート=回覧板 ---- */
+:root{--paper:#FBFAF4; --paper2:#EEEBDF; --ink:#1F2F3F; --ink2:#55606A; --rule:#C9CDCB; --board:#2F5B4A; --mincho:"Hiragino Mincho ProN","Yu Mincho","YuMincho","BIZ UDMincho",serif}
+#hud{background:#F2F0E8;border-bottom:3px double var(--ink)}
+#hudL{font-family:var(--mincho);font-size:16px;letter-spacing:.04em}
+#hudL small{font-family:var(--font)}
+#pauseBtn{border-left:1px solid var(--ink)}
+#sheetBg{background:rgba(20,30,38,.48)}
+#sheet{background:var(--paper);border-top:0;border-left:7px solid var(--board);border-right:7px solid var(--board);padding-top:40px;
+  background-image:linear-gradient(var(--board),var(--board)),repeating-linear-gradient(transparent 0 31px,rgba(31,47,63,.05) 31px 32px);
+  background-size:100% 18px,100% 100%;background-repeat:no-repeat,repeat}
+#sheet::before{content:"";position:absolute;top:4px;left:50%;transform:translateX(-50%);width:92px;height:22px;background:#B9BEC2;border:2px solid #7D858B;border-radius:2px}
+#sheet .no{display:inline-block;border:1.5px solid var(--ink);padding:3px 9px 2px;letter-spacing:.2em;color:var(--ink);font-weight:700;margin-bottom:10px}
+#sheet h1{font-family:var(--mincho);font-weight:800;letter-spacing:.08em}
+#sheet .lead{font-size:14.5px}
+#sheet dl{border-top:2px solid var(--ink);border-bottom:1px solid var(--ink)}
+#sheet dl div{border-bottom:1px solid var(--rule);grid-template-columns:7em 1fr}
+#sheet dl div:last-child{border-bottom:0}
+#sheet dt{border-right:1px solid var(--rule);margin-right:10px;font-family:var(--mincho);color:var(--ink)}
+#sheet .acts::after{content:"雪国町内会　除雪当番";display:block;text-align:right;font-family:var(--mincho);font-size:12px;color:var(--ink2);letter-spacing:.12em;margin-top:4px}
+.btn{background:var(--board);color:#FBFAF4}
+.sub button{color:var(--ink)}
+.stamp{font-family:var(--mincho);font-weight:800;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 3px var(--shu)}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <span class="badge">仕様書公開中・制作者募集</span>
-  <h1>屋根雪おろし</h1>
-  <p>実降雪データで積もる雪。雪庇の崩落物理を読み、落とす向きと順序を決める。失敗＝雪の塊が隣家に崩落「ご近所トラブル発生」。</p>
-  <div class="box">
-    <b>発想の型</b>
-    <ul>
-      <li>題材: 雪国の冬の重労働と「落とす向き」の判断</li>
-      <li>物理化: 屋根の雪＝斜面上の物理ブロック群。落とす＝スワイプ方向に崩落。隣家・車・通行人＝当たり判定つき障害物</li>
-      <li>技術: 実降雪データで積雪量は固定。雪庇の崩れ方（摩擦角・連鎖）を読み、落とす順序と向きを決める技術</li>
-      <li>失敗の見せ場: 雪の塊が隣家に崩落して「ご近所トラブル発生」、自分に落ちて「生き埋め」</li>
-      <li>データ: 気象庁の積雪深データ（地点別・日別）</li>
-      <li>操作: スワイプで雪を落とす方向指定。長押しで雪おろし棒（精密）</li>
-    </ul>
-  </div>
-  <p>つくってみたい人は <a href="https://github.com/k-ito-schoolagent/game-hack/issues">issue</a> で宣言してください。
-  詳しい設計書は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/games/yukiyane/SPEC.md">SPEC.md</a>。
-  はじめてのプルリクエスト歓迎です（<a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">参加のしかた</a>）。</p>
-  <p><a href="../../">← GAME HACK ポータルへ</a></p>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <!-- 共通UI: ここから -->
+  <div id="hud"><div id="hudL"></div><div id="hudC"></div><button id="pauseBtn" aria-label="一時停止"><i></i></button></div>
+  <div id="sheetBg"><div id="sheet" role="dialog" aria-modal="true"></div></div>
+  <!-- 共通UI: ここまで -->
 </div>
+<script>
+'use strict';
+/* ============================================================
+ * GAME HACK No.08 屋根雪おろし
+ * 型: 題材(雪国の屋根の雪おろし) × 物理化(屋根の雪=斜面上のかたまり。摩擦・衝突・連鎖で滑り落ちる)
+ *     × 権限(雪のかたまりの重さkgが見える) × 技術(向き・強さ・順番で落とし先を決める) × 見せ場(隣家・カーポート・通学路・巻き込まれ)
+ *
+ * 約束:
+ *  - 乱数で勝敗を決めない（固定シーケンスか実データ）
+ *  - 失敗はプレイヤーの操作・判断に帰因できる
+ *  - 操作は1つに絞る。スマホ縦持ち・親指操作・タップ領域44px以上
+ *  - 単一ファイル・外部依存なし・ビルド不要
+ * ============================================================ */
+
+// ================================================================
+// GAME HACK 共通UI（ここから）— 書き換えずにコピーする
+// ================================================================
+// 論理座標: 横幅 W=420 固定。高さ H は端末の縦横比に合わせて 700〜920 で伸びる（上下の黒帯を出さない）
+// 描画は H を見てレイアウトする（上端=HUD 下、下端=親指ゾーン）
+const W=420; let H=760;
+const HUD_H=48;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0,SAFE_T=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=window.innerWidth; VH=window.innerHeight;
+  cv.width=Math.round(VW*DPR); cv.height=Math.round(VH*DPR);
+  H=Math.max(700,Math.min(920,Math.round(W*VH/VW)));
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+  SAFE_T=(parseFloat(getComputedStyle($('hud')).paddingTop)||0)/SC;
+  if(typeof onResize==='function')onResize();
+}
+// 画面座標 → 論理座標
+function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
+// DOM 要素の中心 → 論理座標（下部ボタンとの距離判定などに使う）
+function elCenter(el){ const r=el.getBoundingClientRect(); return toGame({clientX:r.left+r.width/2,clientY:r.top+r.height/2}); }
+// HUD の下端（論理座標）。ゲームの描画はここから下に置く
+function topY(){ return HUD_H+SAFE_T; }
+// 振動（対応端末のみ）
+function buzz(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(_){} }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const UI={
+  hud(l,lSmall,c){ $('hud').classList.add('on'); $('hudL').innerHTML=esc(l)+(lSmall?'<small>'+esc(lSmall)+'</small>':''); $('hudC').innerHTML=c||''; },
+  hideHud(){ $('hud').classList.remove('on'); },
+  /* シートを開く
+   * o = { no:'No.01 · 乗務報告', title, lead, rows:[[ラベル,値],...], stamp:'不可'|'発車'(最大4字), round:true(丸印),
+   *       main:[ラベル,fn], subs:[[ラベル,fn],...] } */
+  sheet(o){
+    const s=$('sheet');
+    let h='';
+    if(o.stamp){ const t=[...o.stamp]; const lines=t.length===4?[t.slice(0,2).join(''),t.slice(2).join('')]:t.length===3?[t.join('')]:[t.join('')];
+      const fs=t.length<=2?27:t.length===3?20:22;
+      h+='<div class="stamp'+(o.round?' round':'')+'" style="font-size:'+fs+'px">'+lines.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'; }
+    if(o.no)h+='<p class="no">'+esc(o.no)+'</p>';
+    h+='<h1>'+esc(o.title)+'</h1>';
+    if(o.lead)h+='<p class="lead">'+esc(o.lead)+'</p>';
+    if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
+    h+='<div class="acts">';
+    if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
+    h+='</div>';
+    s.innerHTML=h; s.scrollTop=0;
+    s.querySelectorAll('button').forEach(b=>{
+      const k=b.dataset.k, fn=k==='main'?o.main[1]:o.subs[+k.slice(1)][1];
+      b.addEventListener('click',e=>{ e.stopPropagation(); fn(); });
+    });
+    $('sheetBg').classList.add('on');
+    const m=s.querySelector('.btn'); if(m)setTimeout(()=>m.focus({preventScroll:true}),50);
+  },
+  close(){ $('sheetBg').classList.remove('on'); },
+  open(){ return $('sheetBg').classList.contains('on'); },
+};
+// 共有（𝕏）とポータルへ
+function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function toPortal(){ location.href='../../'; }
+// 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
+let pausedFrom=null;
+function pause(){
+  if(G.screen!=='play')return;
+  pausedFrom='play'; G.screen='pause';
+  UI.sheet({no:GAME_NO+' · 一時停止中',title:'一時停止',main:['再開する',resume],subs:[['この面をやり直す',()=>{UI.close();restart();}],['一覧へ戻る',toPortal]]});
+}
+function resume(){ if(G.screen!=='pause')return; UI.close(); G.screen='play'; lastTs=0; }
+$('pauseBtn').addEventListener('click',e=>{ e.stopPropagation(); G.screen==='pause'?resume():pause(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden)pause(); });
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ G.screen==='pause'?resume():pause(); } });
+// ===== GAME HACK 共通UI（ここまで）=====
+
+
+
+
+// ---- ゲーム固有 ----------------------------------------------
+const GAME_NO='No.08';
+const TAG='屋根雪おろし';
+
+// ---- SIM: 屋根雪の物理（決定的。ゲーム本体とソルバーで同一コード）----
+// 単位: m, s, kg。原点=自宅の中心の地面。屋根に沿った座標 s（左軒 -L … 棟 0 … 右軒 +L）
+// 雪の重さ: 積雪1cm・1m²あたり3kg（=密度300kg/m³。概略値）。かたまりは奥行き1m分
+const SIM={g:9.8,dt:1/240,eaveH:4.6,half:6.5,rho:300,cpH:2.2};
+function geom(st){ const th=Math.atan(st.pitch/10); return {th,sin:Math.sin(th),cos:Math.cos(th),L:SIM.half/Math.cos(th)}; }
+function makeChunks(st){
+  const gm=geom(st), len=gm.L/st.n, out=[]; let id=0;
+  for(const side of [-1,1]) for(let k=0;k<st.n;k++){
+    const d=st.depth/100*st.prof[k];
+    out.push({id:id++,side,k,s:side*(k+.5)*len,len,d,m:Math.round(len*d*SIM.rho/10)*10});
+  }
+  return out;
+}
+// 着地: 軒から斜面方向に速さ v で飛び出す。d=軒からの水平距離
+function landing(st,side,v){
+  const gm=geom(st), g=SIM.g, h=SIM.eaveH, vx=v*gm.cos, vy=v*gm.sin;
+  const tAt=y=>(-vy+Math.sqrt(vy*vy+2*g*(h-y)))/g;
+  if(side>0&&st.cp){ const t=tAt(SIM.cpH), d=vx*t; if(d>=st.cp[0]&&d<=st.cp[1]) return {zone:'car',d,t,y:SIM.cpH}; }
+  const tg=tAt(0), d=vx*tg;
+  if(side<0){
+    if(d>st.gap){ const t=Math.min(st.gap/Math.max(vx,1e-6),tg); return {zone:'nb',d:Math.min(d,st.gap),t,y:Math.max(0,h-vy*t-g*t*t/2)}; }
+    return {zone:'gap',d,t:tg,y:0};
+  }
+  if(st.cp&&d>=st.cp[0]&&d<=st.cp[1]) return {zone:'car',d,t:tg,y:0};
+  if(d<st.ditch[0]) return {zone:'yard',d,t:tg,y:0};
+  if(d<=st.ditch[1]) return {zone:'ditch',d,t:tg,y:0};
+  return {zone:'road',d,t:tg,y:0};
+}
+// 1回のひと押しを最後まで計算する。dir: +1=軒へ（下り） -1=棟へ（上り）, level: 0弱 1中 2強
+function simulate(st,chunks,pushId,dir,level){
+  const gm=geom(st), g=SIM.g, dt=SIM.dt, L=gm.L, mu=Math.tan(gm.th)-st.acc/(g*gm.cos);
+  const cs=chunks.map(c=>({...c,v:0,on:true}));
+  const p=cs.find(c=>c.id===pushId), dn=Math.sign(p.s)||p.side;
+  p.v=(dir>0?dn:-dn)*st.J[level]/p.m; p.loose=true;
+  const me=dir>0?p.s-dn*p.len/2:p.s+dn*p.len/2;   // 押す人は、押す向きの反対側に立つ
+  const frames=[], falls=[]; let swept=null, quiet=0, step=0;
+  const supported=(c,on)=>{
+    const sd=c.s>=0?1:-1;
+    if(Math.abs(c.s)+c.len/2>=L-0.03) return true;            // 軒先の凍った雪庇が支える
+    for(const o of on){ if(o===c)continue; const gap=sd*(o.s-c.s)-(o.len+c.len)/2; if(sd*(o.s-c.s)>0&&gap<=0.03) return true; }
+    return false;
+  };
+  for(step=0;step<240*25;step++){
+    const on=cs.filter(c=>c.on).sort((a,b)=>a.s-b.s);
+    let moving=0;
+    for(const c of on){
+      const sd=c.s>=0?1:-1, ag=sd*g*gm.sin;
+      // 一度動いた雪は凍着が切れていて止まらない（トタンの動摩擦は勾配より小さい）
+      if(c.v!==0||c.loose){ c.loose=true; c.v+=(ag-Math.sign(c.v||sd)*mu*g*gm.cos)*dt; if(c.v===0)c.v=sd*1e-9; }
+      else if(st.slip[c.s>=0?1:0]&&!supported(c,on)){ c.loose=true; c.v=sd*1e-6; }   // ゆるんだ面: 下の支えがなければ滑り出す
+      c.s+=c.v*dt; if(c.v!==0)moving++;
+    }
+    for(let it=0;it<4;it++) for(let i=0;i+1<on.length;i++){
+      const a=on[i], b=on[i+1], ov=(b.s-a.s)-(a.len+b.len)/2;
+      if(ov<0){
+        if(a.v>b.v){ a.loose=b.loose=true; const v=(a.m*a.v+b.m*b.v)/(a.m+b.m); a.v=v; b.v=v; }   // 完全非弾性: ぶつかった雪は一緒に動く
+        const t=a.m+b.m; a.s+=ov*b.m/t; b.s-=ov*a.m/t;
+      }
+    }
+    for(const c of on){
+      if(Math.abs(c.s)>L){ c.on=false; const side=c.s>0?1:-1, v=Math.abs(c.v);
+        falls.push({id:c.id,m:c.m,side,v,t0:(step+1)*dt,...landing(st,side,v)}); }
+    }
+    if(!swept&&step>2) for(const c of cs) if(c.on&&c.v!==0&&Math.abs(c.s-me)<c.len/2-0.08){ swept={id:c.id,t:(step+1)*dt}; }
+    if(step%4===0) frames.push(cs.map(c=>c.on?c.s:null));
+    if(moving===0&&on.every(c=>!st.slip[c.s>=0?1:0]||supported(c,on))){ if(++quiet>2)break; } else quiet=0;
+  }
+  frames.push(cs.map(c=>c.on?c.s:null));
+  const rest=cs.filter(c=>c.on).map(c=>({id:c.id,side:c.s>=0?1:-1,k:c.k,s:c.s,len:c.len,d:c.d,m:c.m}));
+  return {frames,falls,swept,me,rest,T:step*dt};
+}
+// 通学路の通行人（固定ダイヤ。16秒周期）。d=右の軒からの距離
+const PED_PERIOD=16, PLAY=1.6, PED_FROM=2.4, PED_ROAD=3.7, PED_TO=4.45;   // PLAY: 雪の動きの再生倍率（通行人の時計は実時間）。PED_TO=画面の右端（見えない人には当たらない）
+function peds(T){
+  const u=((T%PED_PERIOD)+PED_PERIOD)%PED_PERIOD, out=[];
+  // 雪壁の陰の路地から出てきて、道路を右（学校・商店）へ歩いていく。陰にいる間（behind）は落ちても当たらない
+  const walk=(kind,t0,v)=>{ const d=PED_FROM+v*(u-t0); if(u>=t0&&d<PED_TO) out.push({kind,d,ph:(u-t0)*v,behind:d<PED_ROAD}); };
+  walk('kid',1.0,0.55); walk('kid2',3.2,0.55); walk('oba',8.0,0.3);
+  return out;
+}
+// 結果の判定（時刻順）。T0=押した時のプレイ時刻（null なら通行人を見ない＝ソルバー用）
+function judge(st,res,cap,T0){
+  const ev=[], c={...cap};
+  if(res.swept) ev.push({t:res.swept.t,type:'self',id:res.swept.id});
+  const fs=res.falls.slice().sort((a,b)=>(a.t0+a.t)-(b.t0+b.t));
+  for(const f of fs){
+    const t=f.t0+f.t; let type=f.zone, who=null;
+    if(f.zone==='gap'){ c.gap-=f.m; if(c.gap<0) type='gapfull'; }
+    else if(f.zone==='yard'){ c.yard-=f.m; if(c.yard<0) type='yardfull'; }
+    else if(f.zone==='road'&&T0!=null){ const p=peds(T0+t/PLAY).find(p=>!p.behind&&Math.abs(p.d-f.d)<1.0); if(p){ type='ped'; who=p.kind; } }
+    ev.push({t,type,f,who});
+  }
+  ev.sort((a,b)=>a.t-b.t);
+  const fail=ev.find(e=>FAILS.includes(e.type))||null;
+  return {ev,fail,cap:c};
+}
+const FAILS=['self','nb','car','gapfull','yardfull','ped'];
+// ---- SIM END
+
+// 実データ: 気象庁 最深積雪（地点の観測値）。屋根の雪の深さ＝その日の積雪深とする
+const STAGES=[
+ {place:'青森',pref:'青森県',depth:183,date:'2026年2月1日',rank:'青森の観測史上6位',pitch:5,acc:0.3,slip:[0,0],n:3,prof:[0.85,1,1.15],gap:1.3,cp:null,ditch:[2.7,3.6],gf:0,yf:0},
+ {place:'十日町',pref:'新潟県',depth:391,date:'1981年2月28日',rank:'歴代全国6位',pitch:5,acc:0.3,slip:[0,0],n:3,prof:[0.85,1,1.15],gap:1.3,cp:[1.1,1.9],ditch:[2.7,3.6],gf:.4,yf:.3},
+ {place:'津南',pref:'新潟県',depth:419,date:'2022年2月24日',rank:'歴代全国5位',pitch:5,acc:0.3,slip:[1,0],n:3,prof:[0.85,1,1.15],gap:1.3,cp:[1.1,1.9],ditch:[2.7,3.6],gf:.4,yf:.2},
+ {place:'肘折',pref:'山形県',depth:445,date:'2018年2月13日',rank:'歴代全国4位',pitch:6,acc:0.3,slip:[1,0],n:4,prof:[0.8,0.95,1.05,1.2],gap:1.3,cp:[1.1,1.9],ditch:[2.7,3.6],gf:.4,yf:.2},
+ {place:'酸ケ湯',pref:'青森県',depth:566,date:'2013年2月26日',rank:'歴代全国2位',pitch:5,acc:0.3,slip:[1,0],n:4,prof:[0.8,0.95,1.05,1.2],gap:1.5,cp:[1.1,1.9],ditch:[2.7,3.6],gf:.4,yf:.2},
+];
+for(const [i,st] of STAGES.entries()){
+  const L=SIM.half/Math.cos(Math.atan(st.pitch/10)), mref=L/st.n*st.depth/100*SIM.rho;
+  st.J=[0.6,1.6,5.0].map(v=>Math.round(v*mref/10)*10);   // 押す力 弱・中・強（中段の雪に初速 0.6/1.6/5.0 m/s）
+  const tot=st.depth/100*SIM.rho*L*st.prof.reduce((a,b)=>a+b,0)/st.n*2;
+  st.gapCap=st.gf?Math.round(tot*st.gf/100)*100:1e9; st.yardCap=st.yf?Math.round(tot*st.yf/100)*100:1e9;
+  st.name='第'+(i+1)+'面';
+}
+// ---- STAGES END
+
+const G={screen:'title',stage:0,T:0,chunks:[],cap:null,anim:null,fail:null,failT:0,drag:null,me:0,swipes:0,piles:[],landed:null,doneT:-1,total:[],hit:null,shake:0};
+let lastTs=0;
+// 画面: 隣家の壁〜道路（右の軒から4.75m）までが横幅いっぱい。屋根の雪が横幅の約75%を占める
+// 縦横等倍（屋根の勾配は物理と同じに見せる）。地面は画面の約84%。地面より下の帯は置き場と流雪溝の断面
+const VIEW_L=-(6.5+1.5+0.7), VIEW_R=6.5+4.75;
+const S=W/(VIEW_R-VIEW_L); const SY=S; let X0=-VIEW_L*S, GY=600;
+function snowTop(st){ const gm=geom(st); return Math.max(...makeChunks(st).map(c=>roofPt(gm,c.s).y+c.d)); }
+function layoutY(){ GY=Math.round(H*0.84); }
+function onResize(){ if(typeof G!=='undefined') layoutY(); }
+const wx=x=>X0+x*S, wy=y=>GY-y*SY;
+const fmt=n=>Math.round(n).toLocaleString('ja-JP');
+const cur=()=>STAGES[G.stage];
+
+function startStage(i){
+  G.stage=i; const st=cur();
+  G.chunks=makeChunks(st); G.cap={gap:st.gapCap,yard:st.yardCap};
+  G.T=0; G.anim=null; G.fail=null; G.failT=0; G.drag=null; G.swipes=0; G.piles=[]; G.doneT=-1; G.hit=null; G.shake=0;
+  G.landed={gap:0,yard:0,ditch:0,road:0};
+  G.me=-0.01; G.meFace=1;
+  G.screen='play'; UI.close(); lastTs=0; layoutY();
+}
+function restart(){ startStage(G.stage); }
+
+// ---- 操作: かたまりを はらう（スワイプ） ----
+const LV=['弱','中','強'];
+function chunkPoly(st,c,s){
+  // 雪の深さは鉛直にとる（切った断面は垂直、上面は屋根と平行）
+  const gm=geom(st), a=s-c.len/2+0.05, b=s+c.len/2-0.05, bot=[], top=[], N=6;
+  for(let i=0;i<=N;i++){ const u=a+(b-a)*i/N, r=roofPt(gm,u); bot.push([r.x,r.y]); top.push([r.x,r.y+c.d]); }
+  // 上の角を少し丸める
+  const t0=top[0], t1=top[1], tn=top[N], tm=top[N-1];
+  top[0]=[t0[0]+(t1[0]-t0[0])*0.35,t0[1]-0.12]; top[N]=[tn[0]+(tm[0]-tn[0])*0.35,tn[1]-0.12];
+  return {bot,top:top.reverse()};
+}
+function roofPt(gm,s){ const L=gm.L, u=Math.max(-L,Math.min(L,s)); return {x:u*gm.cos, y:SIM.eaveH+(L-Math.abs(u))*gm.sin}; }
+function chunkCenter(st,c,s){ const gm=geom(st), r=roofPt(gm,s); return {x:wx(r.x), y:wy(r.y+c.d*0.5)}; }
+function pickChunk(p){
+  const st=cur(); let best=null, bd=1e9;
+  for(const c of G.chunks){ const q=chunkCenter(st,c,c.s), dx=(p.x-q.x), dy=(p.y-q.y)*0.6, dd=Math.hypot(dx,dy); if(dd<bd){bd=dd;best=c;} }
+  return bd<70?best:null;
+}
+function dragInfo(d){
+  const st=cur(), gm=geom(st), c=G.chunks.find(c=>c.id===d.id); if(!c)return null;
+  const sd=c.s>=0?1:-1, ux=sd*gm.cos, uy=gm.sin;   // 画面上の「軒へ」の向き（y は下向き）
+  const dx=d.x-d.x0, dy=d.y-d.y0, len=Math.hypot(dx,dy);
+  if(len<18) return {c,ok:false};
+  const dir=(dx*ux+dy*uy)>=0?1:-1, lv=len<75?0:len<150?1:2;
+  return {c,ok:true,dir,lv,len};
+}
+function push(id,dir,lv){
+  if(G.anim||G.fail)return;
+  const st=cur(), c=G.chunks.find(c=>c.id===id);
+  const res=simulate(st,G.chunks,id,dir,lv), j=judge(st,res,G.cap,G.T);
+  G.swipes++;
+  G.me=res.me; G.meFace=(dir>0?1:-1)*(c.s>=0?1:-1);
+  G.anim={res,j,t:0,src:G.chunks.slice(),act:{c,dir,lv},evI:0,end:Math.max(res.frames.length/60,...res.falls.map(f=>f.t0+f.t))+0.25};
+  buzz(12);
+}
+$('wrap').addEventListener('pointerdown',e=>{
+  if(G.screen!=='play'||G.anim||G.fail)return;
+  const p=toGame(e), c=pickChunk(p); if(!c)return;
+  G.drag={id:c.id,x0:p.x,y0:p.y,x:p.x,y:p.y};
+  try{ $('wrap').setPointerCapture(e.pointerId); }catch(_){}
+});
+$('wrap').addEventListener('pointermove',e=>{ if(!G.drag)return; const p=toGame(e); G.drag.x=p.x; G.drag.y=p.y; });
+$('wrap').addEventListener('pointerup',e=>{
+  if(!G.drag)return; const p=toGame(e); G.drag.x=p.x; G.drag.y=p.y;
+  const inf=dragInfo(G.drag); G.drag=null;
+  if(G.screen==='play'&&inf&&inf.ok) push(inf.c.id,inf.dir,inf.lv);
+});
+$('wrap').addEventListener('pointercancel',()=>{ G.drag=null; });
+
+// ---- 進行 ----
+function update(dt){
+  G.T+=dt; if(G.shake>0)G.shake=Math.max(0,G.shake-dt);
+  if(G.fail){
+    G.failT+=dt;
+    // 失敗のあとも雪と人は落ち続ける（判定はしない）
+    const a=G.anim;
+    if(a&&a.t<a.end){ a.t+=dt*PLAY; while(a.evI<a.j.ev.length&&a.j.ev[a.evI].t<=a.t){ const e=a.j.ev[a.evI++]; if(e===G.fail||!e.f)continue; G.piles.push({zone:e.f.zone,side:e.f.side,d:e.f.d,m:e.f.m,t:G.T,y:e.f.y||0}); } }
+    if(G.failT>1.2&&G.screen==='play') failSheet();
+    return;
+  }
+  const a=G.anim;
+  if(a){
+    a.t+=dt*PLAY;
+    while(a.evI<a.j.ev.length&&a.j.ev[a.evI].t<=a.t){
+      const e=a.j.ev[a.evI++];
+      if(FAILS.includes(e.type)){ startFail(e); return; }
+      const f=e.f; G.landed[f.zone]+=f.m;
+      if(f.zone==='gap')G.cap.gap-=f.m; if(f.zone==='yard')G.cap.yard-=f.m;
+      G.piles.push({zone:f.zone,side:f.side,d:f.d,m:f.m,t:G.T});
+      buzz(8);
+    }
+    if(a.t>=a.end){ G.chunks=a.res.rest.map(c=>({...c})); G.anim=null; if(!G.chunks.length) G.doneT=0; }
+  }
+  if(G.doneT>=0){ G.doneT+=dt; if(G.doneT>0.7) clear(); }
+}
+function startFail(e){
+  G.fail=e; G.failT=0; G.shake=0.45; buzz([30,40,60]);
+  if(e.f&&e.type!=='self') G.piles.push({zone:e.type,side:e.f.side,d:e.f.d,m:e.f.m,t:G.T,y:e.f.y||0});
+}
+function actText(){
+  const a=G.anim, c=a.act.c, st=cur();
+  const side=c.s<0?'左（隣家側）':'右（道路側）';
+  const pos=st.n===3?['棟ぎわ','中ほど','軒先'][c.k]:['棟ぎわ','上段','下段','軒先'][c.k];
+  return side+'の'+pos+'の雪 '+fmt(c.m)+'kg を「'+LV[a.act.lv]+'」で'+(a.act.dir>0?'軒へ押した':'棟へ押し上げた');
+}
+const WHO={kid:'通学の子ども',kid2:'通学の子ども',oba:'隣のおばあちゃん'};
+function failSheet(){
+  const e=G.fail, st=cur(), a=G.anim, act=actText(); let title, lead;
+  const f=e.f;
+  if(e.type==='nb'){ title='ご近所トラブル'; lead='隣のおばあちゃん「ちょっと！ うちの屋根に落ちたよ！」\n'+act+'。'+fmt(f.m)+'kg の雪が秒速'+f.v.toFixed(1)+'mで軒を飛び出し、'+st.gap.toFixed(1)+'m 先の隣家に当たりました。'; }
+  else if(e.type==='gapfull'){ title='ご近所トラブル'; lead='隣のおばあちゃん「勝手口が開かないよ！」\n'+act+'。隣家との間の置き場は残り '+fmt(Math.max(0,G.cap.gap))+'kg でしたが、'+fmt(f.m)+'kg を落として隣家の壁まで埋めました。'; }
+  else if(e.type==='car'){ title='カーポート崩落'; lead='「バキッ」\n'+act+'。'+fmt(f.m)+'kg の雪が秒速'+f.v.toFixed(1)+'mで軒を飛び出し、'+f.d.toFixed(1)+'m 先のカーポートの屋根を直撃。屋根が折れて車が埋まりました。'; }
+  else if(e.type==='yardfull'){ title='カーポート崩落'; lead='「車が埋まった……」\n'+act+'。庭の雪置き場は残り '+fmt(Math.max(0,G.cap.yard))+'kg でしたが、'+fmt(f.m)+'kg を落とし、あふれた雪山がカーポートへ崩れました。'; }
+  else if(e.type==='ped'){ title='通学路に落雪'; lead=WHO[e.who]+'「わっ！」\n'+act+'。'+fmt(f.m)+'kg の雪が流雪溝を越えて道路へ。歩いていた'+WHO[e.who]+'の目の前に落ちました。'; }
+  else { const own=e.id===a.act.c.id, m=a.src.find(c=>c.id===e.id).m;
+    title='巻き込まれ'; lead='「うわっ」\n'+act+'。'+(own?'棟を越えられなかった '+fmt(m)+'kg の雪が滑り戻り、':'支えを失った上の雪 '+fmt(m)+'kg が滑り出し、')+'あなたごと軒から落ちました。'; }
+  G.screen='result';
+  const rows=[['面',st.name+' '+st.place+'（積雪 '+st.depth+'cm）'],['下ろした雪',fmt(sumLanded())+'kg / '+fmt(roofTotal(st))+'kg'],['はらった回数',G.swipes+'回']];
+  UI.sheet({no:'回覧 雪おろし報告',title,lead,stamp:'崩落',rows,
+    main:['この面をやり直す',restart],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.place+' 積雪'+st.depth+'cm の屋根で「'+title+'」。'+fmt(sumLanded())+'kg 下ろしたところで'+G.swipes+'回目に崩落',TAG)],['一覧へ',toPortal]]});
+}
+const sumLanded=()=>G.landed.gap+G.landed.yard+G.landed.ditch+G.landed.road;
+const roofTotal=st=>makeChunks(st).reduce((a,c)=>a+c.m,0);
+function clear(){
+  G.doneT=-1; G.screen='result';
+  const st=cur(), last=G.stage>=STAGES.length-1, L=G.landed;
+  G.total[G.stage]={kg:sumLanded(),sw:G.swipes};
+  const rows=[['地点',st.place+'（'+st.pref+'） '+st.date],['積雪',st.depth+'cm（'+st.rank+'）'],['下ろした雪',fmt(sumLanded())+'kg'],
+    ['落とし先','庭 '+fmt(L.yard)+' ・ 隣との間 '+fmt(L.gap)+' ・ 流雪溝 '+fmt(L.ditch)+(L.road?' ・ 道路 '+fmt(L.road):'')+' kg'],['はらった回数',G.swipes+'回']];
+  if(last){ const all=G.total.reduce((a,t)=>a+(t?t.kg:0),0), sw=G.total.reduce((a,t)=>a+(t?t.sw:0),0); rows.push(['5面の合計',fmt(all)+'kg ・ '+sw+'回']); }
+  UI.sheet({no:'回覧 雪おろし報告',title:last?'雪おろし 完了':st.name+' '+st.place+' 完了',stamp:'完了',round:true,
+    lead:last?'酸ケ湯の566cmまで、隣家にも車にも通学路にも落とさずに下ろしきった。':'',rows,
+    main:[last?'はじめから':'次の面へ',()=>startStage(last?0:G.stage+1)],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.place+' 積雪'+st.depth+'cm の屋根から '+fmt(sumLanded())+'kg を'+G.swipes+'回で下ろした',TAG)],['一覧へ',toPortal]]});
+}
+function showTitle(){
+  G.screen='title'; UI.hideHud(); G.stage=0; G.chunks=makeChunks(STAGES[0]); G.cap={gap:1e9,yard:1e9}; G.landed={gap:0,yard:0,ditch:0,road:0}; layoutY();
+  UI.sheet({no:'回覧 '+GAME_NO,title:'屋根雪おろし',
+    lead:'大雪の朝。屋根の雪をかたまりごと下ろす。\n左は隣家、右はカーポートと通学路。落とす向きと順番で、雪の行き先が決まる。',
+    rows:[['あなたの権限','屋根の雪のかたまりの重さ（kg）が見える'],['操作','かたまりを、落としたい向きへはらう（長くはらうほど強く押す）'],
+      ['失敗','隣家・カーポート・通行人に落とす／置き場をあふれさせる／上の雪に巻き込まれる'],
+      ['出典','積雪深: 気象庁「歴代全国ランキング（最深積雪）」「青森 観測史上1〜10位の値」。雪の重さ 1cm・1m²あたり3kg は概略値']],
+    main:['はじめる',()=>startStage(0)],subs:[['一覧へ',toPortal]]});
+}
+
+// ---- 描画 ----
+const FLAKES=[]; for(let i=0;i<90;i++) FLAKES.push({x:Math.random()*W,y:Math.random()*1000,r:0.8+Math.random()*1.8,v:18+Math.random()*30,w:Math.random()*6});
+function path(pts){ ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.closePath(); }
+function fillPoly(pts,c){ path(pts); ctx.fillStyle=c; ctx.fill(); }
+function ell(x,y,rx,ry,c){ ctx.beginPath(); ctx.ellipse(x,y,Math.max(.1,rx),Math.max(.1,ry),0,0,Math.PI*2); ctx.fillStyle=c; ctx.fill(); }
+function rr(x,y,w,h,c){ ctx.fillStyle=c; ctx.fillRect(x,y,w,h); }
+
+function drawSky(){
+  const g=ctx.createLinearGradient(0,0,0,GY); g.addColorStop(0,'#AEB9C4'); g.addColorStop(1,'#DCE2E7');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,GY+2);
+  // 遠くの山と杉林
+  const mt=GY-80, top=Math.max(topY()+150,GY-470);
+  fillPoly([[0,mt-120],[70,top+120],[150,top+40],[230,top+90],[300,top],[380,top+70],[420,top+60],[420,mt],[0,mt]],'#BFC8D0');
+  fillPoly([[0,mt-40],[90,mt-130],[180,mt-70],[270,mt-115],[360,mt-60],[420,mt-90],[420,mt],[0,mt]],'#ADB8C1');
+
+  ctx.fillStyle='#8E9AA3';
+  for(let i=0;i<30;i++){ const x=i*15-4, h=26+((i*37)%17); ctx.beginPath(); ctx.moveTo(x,GY-70); ctx.lineTo(x+7,GY-70-h); ctx.lineTo(x+14,GY-70); ctx.fill(); }
+  rr(0,GY-72,W,14,'#E6EAEE');
+  // 裏の通りの家並み（雪をかぶった屋根）
+  for(const [x,w,h,rf] of [[-10,70,46,22],[52,64,38,18],[300,72,44,20],[362,70,50,24]]){
+    const b=GY-58; rr(x,b-h,w,h,'#9FA8AE'); fillPoly([[x-4,b-h],[x+w/2,b-h-rf],[x+w+4,b-h]],'#7E8A92');
+    fillPoly([[x-6,b-h+1],[x-2,b-h-6],[x+w/2,b-h-rf-8],[x+w+2,b-h-6],[x+w+6,b-h+1]],'#EEF2F4');
+    rr(x+w*0.25,b-h+12,10,8,'#C9D2D8'); rr(x+w*0.62,b-h+12,10,8,'#C9D2D8'); }
+}
+function drawFlakes(dt){
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  for(const f of FLAKES){ f.y+=f.v*dt; if(f.y>H){f.y=-4;} const x=(f.x+Math.sin((f.y+f.w*40)/40)*6)%W; ctx.beginPath(); ctx.arc(x,f.y,f.r,0,Math.PI*2); ctx.fill(); }
+}
+function drawGround(st){
+  // 地面の雪（手前ほど少し青い）
+  rr(0,GY,W,H-GY,'#E9EDF1'); rr(0,GY,W,3,'#F7F9FA');
+  ctx.fillStyle='#DFE5EA'; for(let i=0;i<4;i++) rr(0,GY+30+i*26,W,1.5,'#E1E7EC');
+  const E=SIM.half;
+  // 流雪溝（コンクリートの溝と流れ）
+  const d0=wx(E+st.ditch[0]), d1=wx(E+st.ditch[1]);
+  rr(d0,GY-1,d1-d0,18,'#8C9399'); rr(d0+3,GY+1,d1-d0-6,12,'#3F5B6A');
+  ctx.strokeStyle='rgba(220,235,240,.6)'; ctx.lineWidth=1;
+  for(let i=0;i<3;i++){ const ox=((G.T*24+i*9)%(d1-d0-8)); ctx.beginPath(); ctx.moveTo(d0+4+ox,GY+4+i*3); ctx.lineTo(d0+9+ox,GY+4+i*3); ctx.stroke(); }
+  rr(d0-2,GY-3,5,4,'#A7ADB2'); rr(d1-3,GY-3,5,4,'#A7ADB2');
+  // 道路（除雪された路面と轍）
+  const r0=wx(E+st.ditch[1]);
+  rr(r0,GY,W-r0,H-GY,'#6E7378'); rr(r0,GY,W-r0,3,'#E9EDF1');
+  for(let i=0;i<4;i++) rr(r0+4,GY+16+i*22,W-r0,4,'rgba(235,240,244,.55)');
+  // 矢羽根（道路の端を示す赤白の標識）
+  const yx=Math.round(r0)+2; rr(yx,GY-112,3,112,'#7A7D80');
+  for(let i=0;i<5;i++) rr(yx-6,GY-110+i*9,8,9,i%2?'#F4F4F0':'#C23A2E');
+  fillPoly([[yx-6,GY-65],[yx+2,GY-65],[yx-2,GY-58]],'#F4F4F0');
+}
+// 路地の出口の雪壁（通行人はこの陰から出てくる）
+function drawSnowWall(st){
+  const x0=wx(SIM.half+st.ditch[1]-0.25), x1=wx(SIM.half+st.ditch[1]+0.08), h=1.0*SY;
+  fillPoly([[x0-4,GY],[x0,GY-h+4],[x0+6,GY-h],[x1,GY-h+3],[x1+3,GY]],'#F1F4F6');
+  ctx.strokeStyle='#CED7DE'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x0,GY-h+4); ctx.lineTo(x0+6,GY-h); ctx.lineTo(x1,GY-h+3); ctx.stroke();
+}
+function drawNeighbor(st){
+  const ex=wx(-SIM.half-st.gap), ey=wy(4.2);
+  // 壁
+  rr(-10,ey+6,ex-6+10,GY-ey-6,'#9C8F7C');
+  for(let y=ey+14;y<GY;y+=7){ rr(-10,y,ex-6+10,1,'rgba(60,50,40,.18)'); }
+  // 屋根（右の軒先だけ見える）
+  const k=0.6, rx=-10, ry=ey-(ex-rx)*k;
+  fillPoly([[ex+3,ey],[rx,ry],[rx,ry+7],[ex+3,ey+6]],'#35585B');
+  fillPoly([[ex+3,ey],[rx,ry],[rx,ry-30],[ex-4,ey-24],[ex+8,ey-14],[ex+9,ey-4]],'#F3F5F7');
+  ctx.strokeStyle='#D3DBE2'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(rx,ry-30); ctx.lineTo(ex-4,ey-24); ctx.lineTo(ex+8,ey-14); ctx.stroke();
+  // 勝手口の灯り
+  rr(ex-14,GY-44,8,44,'#5E4A38'); rr(ex-13,GY-40,6,14,'#E8D9A8');
+}
+// 失敗の瞬間に出てくる人・ハザード（落ちた雪より手前に描く）
+function drawFailOverlay(st){
+  const e=G.fail; if(!e)return;
+  if((e.type==='nb'||e.type==='gapfull')&&G.failT>0.35){
+    const ex=wx(-SIM.half-st.gap), ox=ex+14, oy=GY-2; person('oba',ox,oy,1,0,true);
+    bubble(ox+30,oy-50,'ちょっと！',1);
+  }
+  if((e.type==='car'||e.type==='yardfull')&&st.cp&&Math.floor(G.failT*4)%2===0){
+    const cx=wx(SIM.half+(st.cp[0]+st.cp[1])/2); ell(cx-8,GY-14,3,3,'#F2A93B'); ell(cx+8,GY-14,3,3,'#F2A93B');
+  }
+}
+function drawCarport(st){
+  if(!st.cp)return;
+  const x0=wx(SIM.half+st.cp[0]-0.1), x1=wx(SIM.half+st.cp[1]+0.1), y=wy(SIM.cpH);
+  const broken=G.fail&&(G.fail.type==='car'||G.fail.type==='yardfull')&&G.failT>0.05;
+  // 車（後ろから見た軽自動車）
+  const cx=(x0+x1)/2, cw=0.95*S, cb=GY;
+  const hz=broken&&Math.floor(G.failT*4)%2===0;
+  fillPoly([[cx-cw/2,cb-6],[cx-cw/2,cb-17],[cx-cw/2+3,cb-31],[cx+cw/2-3,cb-31],[cx+cw/2,cb-17],[cx+cw/2,cb-6]],'#D9DCDA');
+  rr(cx-cw/2+4,cb-29,cw-8,9,'#3E4A52');
+  rr(cx-cw/2+1,cb-17,4,5,hz?'#F2A93B':'#B9473B'); rr(cx+cw/2-5,cb-17,4,5,hz?'#F2A93B':'#B9473B');
+  rr(cx-6,cb-13,12,4,'#F3F1E6');
+  rr(cx-cw/2+1,cb-6,5,6,'#222'); rr(cx+cw/2-6,cb-6,5,6,'#222');
+  // 柱と屋根（ポリカ）
+  ctx.fillStyle='#8D9296'; ctx.fillRect(x0,y,3,GY-y); ctx.fillRect(x1-3,y,3,GY-y);
+  if(!broken){ rr(x0-3,y-3,x1-x0+6,4,'#7F878C'); rr(x0-3,y-9,x1-x0+6,6,'#F3F5F7'); }
+  else { fillPoly([[x0-3,y-2],[cx,y+16],[x1+3,y-2],[x1+3,y+3],[cx,y+21],[x0-3,y+3]],'#7F878C'); }
+}
+function drawHouse(st){
+  const gm=geom(st), wl=wx(-5.75), wr=wx(5.75), et=wy(SIM.eaveH);
+  // 外壁（下見板）
+  rr(wl,et,wr-wl,GY-et,'#B49B78');
+  for(let y=et+6;y<GY;y+=6) rr(wl,y,wr-wl,1,'rgba(70,50,30,.2)');
+  rr(wl,wy(2.35),wr-wl,3,'#8A7458');
+  // 窓（1階は雪囲いの板つき）
+  const ww=1.5*S, wh=1.0*SY;
+  for(const [x,y] of [[-4.6,3.9],[-1.6,3.9],[1.4,3.9],[3.6,3.9],[-4.6,1.9],[2.4,1.9]]){
+    const px=wx(x), py=wy(y); rr(px,py,ww,wh,'#3D4447'); rr(px+2,py+2,ww-4,wh-4,'#AFC0C8'); rr(px+ww/2-1,py+2,2,wh-4,'#3D4447');
+    if(y<3) for(let i=0;i<4;i++) rr(px-1,py+1+i*wh/4,ww+2,wh/4-2,'#8B6E4B');
+  }
+  // 玄関と風除室
+  const dx=wx(-1.6), dw=2.0*S, dt=wy(2.1);
+  rr(dx,dt,dw,GY-dt,'#6F5A43'); rr(dx+3,dt+3,dw-6,GY-dt-3,'#B9C9CF'); rr(dx+dw/2-1,dt+3,2,GY-dt-3,'#6F5A43');
+  // 屋根（トタン）。軒の出 0.75m
+  const L=gm.L, pts=[];
+  for(const s of [-L,0,L]){ const r=roofPt(gm,s); pts.push([wx(r.x),wy(r.y)]); }
+  const th=6;
+  fillPoly([pts[0],pts[1],pts[2],[pts[2][0],pts[2][1]+th],[pts[1][0],pts[1][1]+th],[pts[0][0],pts[0][1]+th]],'#7B3A2C');
+  ctx.strokeStyle='rgba(40,15,10,.45)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]+th); ctx.lineTo(pts[1][0],pts[1][1]+th); ctx.lineTo(pts[2][0],pts[2][1]+th); ctx.stroke();
+  // ゆるんだ面: 濡れたトタンの光
+  for(const sd of [-1,1]) if(st.slip[sd>0?1:0]){
+    ctx.strokeStyle='rgba(215,230,240,.75)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(pts[1][0]+sd*6,pts[1][1]+4); ctx.lineTo(pts[sd>0?2:0][0]-sd*4,pts[sd>0?2:0][1]+2); ctx.stroke();
+  }
+  // つらら
+  ctx.fillStyle='rgba(225,238,245,.95)';
+  for(const sd of [-1,1]){ const ex=pts[sd>0?2:0][0], ey=pts[sd>0?2:0][1]+th;
+    const melt=st.slip[sd>0?1:0];
+    for(let i=0;i<7;i++){ const x=ex-sd*(2+i*5), l=(melt?5:9)+((i*7+3)%5)*(melt?1.5:3); ctx.beginPath(); ctx.moveTo(x-2,ey); ctx.lineTo(x+2,ey); ctx.lineTo(x,ey+l); ctx.fill(); }
+    // 雨だれ
+    if(melt){ const k=(G.T*1.3)%1; ell(ex-sd*8,ey+12+k*40,1.2,2,'rgba(170,200,215,.8)'); }
+  }
+}
+function chunkPath(st,c,s){
+  const {bot,top}=chunkPoly(st,c,s); const pts=bot.concat(top).map(p=>[wx(p[0]),wy(p[1])]);
+  // 軒先の雪庇（もとの軒先の段）
+  const gm=geom(st);
+  if(c.k===st.n-1&&Math.abs(s)+c.len/2>gm.L-0.2){
+    const sd=s>=0?1:-1, r=roofPt(gm,sd*gm.L), ex=wx(r.x), ey=wy(r.y), ty=wy(r.y+c.d)+3;
+    // 雪庇: 上面が軒から張り出し、垂れ下がる
+    return {pts,corn:[[ex-sd*4,ey],[ex-sd*4,ty],[ex+sd*12,ty+3],[ex+sd*20,ty+14],[ex+sd*19,ty+30],[ex+sd*13,ty+44],[ex+sd*8,ey+8],[ex,ey+6]]};
+  }
+  return {pts,corn:null};
+}
+function drawChunk(st,c,s,hl){
+  const wet=st.slip[s>=0?1:0];
+  const {pts,corn}=chunkPath(st,c,s);
+  const base=wet?'#E2E8EC':'#F5F7F9', shade=wet?'#C3CED6':'#D5DDE4';
+  if(corn){ path(corn); ctx.fillStyle=base; ctx.fill(); ctx.strokeStyle=shade; ctx.lineWidth=1; ctx.stroke(); }
+  path(pts); ctx.fillStyle=base; ctx.fill();
+  ctx.strokeStyle=hl?'#22201C':shade; ctx.lineWidth=hl?2:1.2; ctx.stroke();
+  // 層の筋（降った日ごとの層）
+  const n=pts.length/2;
+  ctx.strokeStyle=wet?'rgba(130,150,165,.25)':'rgba(140,160,180,.22)'; ctx.lineWidth=1;
+  for(const f of [0.33,0.62]){ ctx.beginPath(); for(let i=0;i<n;i++){ const b=pts[i], t=pts[pts.length-1-i]; const x=b[0]+(t[0]-b[0])*f, y=b[1]+(t[1]-b[1])*f; i?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke(); }
+}
+// 重さの表示: 屋根の雪の上にそろえた2段の帯に、各かたまりの真上に置き、細い引き出し線でかたまりへつなぐ（親指で隠れにくい上側）。
+// 隣どうしは段を互い違いにする。measureText で実測し、ほかの kg 表示・引き出し線・自分（人物）・上の帯に重なれば
+// 2段ずつ上げ、それでも収まらなければ縮める（下限10px）
+const rectHit=(a,b)=>a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h;
+const guideAlpha=()=>G.screen==='play'&&G.swipes===0?Math.max(0,Math.min(1,(5-G.T)/0.8)):0;
+// 上の帯（気象庁テロップ・ゆるみの注意・はじめの手引き）の下端
+function telopBottom(st){ return topY()+12+52+(st.slip[0]||st.slip[1]?28:0)+(guideAlpha()>0?56:0)+4; }
+function labelBase(st){ const gm=geom(st); return Math.min(...makeChunks(st).map(c=>wy(roofPt(gm,c.s).y+c.d)))-6; }
+function labelRects(st){
+  const a=G.anim, list=a?a.src:G.chunks, gm=geom(st), items=[];
+  list.forEach((c,i)=>{
+    const p=a?animChunkPos(a,i,c):{s:c.s}; if(!p||p.s===undefined)return;
+    const r=roofPt(gm,p.s), idx=c.side<0?st.n-1-c.k:st.n+c.k;
+    items.push({c,x0:wx(r.x),y0:wy(r.y+c.d),t:fmt(c.m),row:idx%2});
+  });
+  const me=G.screen!=='title'?mePos(st):null, obst=[];
+  if(me&&!me.buried) obst.push({x:me.x-13,y:me.y-41,w:26,h:42});
+  const top=telopBottom(st), base=labelBase(st);
+  items.sort((p,q)=>p.row-q.row||p.x0-q.x0);
+  const placed=[];
+  for(const it of items){
+    let best=null;
+    for(const fs of [13,12,11,10]){
+      ctx.font='800 '+fs+'px '+FONT; const w1=ctx.measureText(it.t).width; ctx.font='700 '+(fs*0.73)+'px '+FONT; const w2=ctx.measureText('kg').width;
+      const w=w1+w2+1, h=fs+2;
+      for(let row=it.row;row<=it.row+8&&!best;row+=2){
+        const y=Math.min(base,it.y0-4)-row*(h+4), x=Math.max(4,Math.min(W-4-w,it.x0-w/2)), rc={x:x-1,y:y-h+1,w:w+2,h:h+1};
+        if(rc.y<top) break;
+        const ld={x:it.x0-1,y:y+2,w:2,h:Math.max(0,it.y0-y-3)};
+        if(placed.some(q=>rectHit(q.rc,rc)||(q.ld.h>0&&rectHit(q.ld,rc)))||obst.some(o=>rectHit(o,rc))) continue;
+        if(ld.h>0&&placed.some(q=>rectHit(q.rc,ld))) continue;
+        best={...it,fs,w1,w,h,x,y,rc,ld,up:row};
+      }
+      if(best)break;
+    }
+    if(!best){ ctx.font='800 10px '+FONT; const w1=ctx.measureText(it.t).width, w=w1+9, x=Math.max(4,Math.min(W-4-w,it.x0-w/2)), y=it.y0-4;
+      best={...it,fs:10,w1,w,h:12,x,y,up:0,rc:{x:x-1,y:y-11,w:w+2,h:13},ld:{x:0,y:0,w:0,h:0},bad:true}; }
+    placed.push(best);
+  }
+  return {placed,obst,top};
+}
+// 引き出し線は人物より奥に描く（人物の後ろを通る）
+function drawLeaders(st){
+  const {placed}=labelRects(st);
+  ctx.strokeStyle='rgba(31,47,63,.5)'; ctx.lineWidth=1;
+  for(const L of placed) if(L.ld.h>0){ ctx.beginPath(); ctx.moveTo(L.x0,L.y+2); ctx.lineTo(L.x0,L.y0-1); ctx.stroke(); }
+}
+function drawLabels(st){
+  const {placed}=labelRects(st);
+  ctx.lineJoin='round'; ctx.textAlign='left';
+  for(const L of placed){
+    ctx.strokeStyle='rgba(251,250,244,.92)'; ctx.lineWidth=3.5; ctx.fillStyle='#1F2F3F';
+    ctx.font='800 '+L.fs+'px '+FONT; ctx.strokeText(L.t,L.x,L.y); ctx.fillText(L.t,L.x,L.y);
+    ctx.font='700 '+(L.fs*0.73)+'px '+FONT; ctx.strokeText('kg',L.x+L.w1+1,L.y); ctx.fillText('kg',L.x+L.w1+1,L.y);
+  }
+}
+// 検証用: 気象庁の帯の文字が帯の中に収まるか（全面）
+function __telopCheck(){ const bad=[];
+  for(const st of STAGES){
+    ctx.font='600 11px '+FONT; const w0=ctx.measureText(st.date+'　気象庁 観測値（'+st.rank+'）').width; if(20+w0>W-20) bad.push('line1 '+st.place);
+    ctx.font='700 21px '+FONT; const wp=ctx.measureText(st.place+'（'+st.pref+'）').width;
+    ctx.font='700 15px '+FONT; const wc=ctx.measureText('cm').width; ctx.font='800 28px '+FONT; const wd=ctx.measureText(String(st.depth)).width; ctx.font='600 13px '+FONT; const wk=ctx.measureText('積雪').width;
+    if(20+wp+8>W-28-wc-wd-wk) bad.push('line2 '+st.place);
+    if(st.slip[0]||st.slip[1]){ ctx.font='600 12px '+FONT; if(20+ctx.measureText('日中 気温+2℃　'+(st.slip[0]?'左（南向き）':'右')+'の屋根の雪がゆるんでいます').width>W-20) bad.push('slip '+st.place); }
+  }
+  return bad; }
+// 検証用: kg 表示どうし・人物・帯との重なりと画面はみ出しを数える
+function __labelCheck(){
+  const st=cur(), {placed,obst,top}=labelRects(st), bad=[];
+  placed.forEach((p,i)=>{ if(p.bad)bad.push('unplaced '+p.t);
+    if(p.rc.x<0||p.rc.x+p.rc.w>W||p.rc.y<top) bad.push('out '+p.t);
+    placed.forEach((q,j)=>{ if(j>i&&rectHit(p.rc,q.rc)) bad.push('overlap '+p.t+'/'+q.t); if(j!==i&&q.ld.h>0&&rectHit(p.rc,q.ld)) bad.push('leader '+q.t+' x '+p.t); });
+    obst.forEach(o=>{ if(rectHit(o,p.rc)) bad.push('me '+p.t); }); });
+  return {n:placed.length,minFs:Math.min(...placed.map(p=>p.fs)),maxUp:Math.max(0,...placed.map(p=>p.up)),bad};
+}
+// 人物: kind=me|kid|kid2|oba。x,y=足元。face=向き(1右)
+function person(kind,x,y,face,ph,still){
+  ctx.save(); ctx.translate(x,y); ctx.scale(face<0?-1:1,1);
+  const sw=still?0:Math.sin(ph*5)*3;
+  if(kind==='kid'||kind==='kid2'){
+    const coat=kind==='kid'?'#2F4A7A':'#7A3346';
+    // 長靴・脚
+    rr(-4+sw*.5,-9,3.5,9,'#203040'); rr(1-sw*.5,-9,3.5,9,'#203040');
+    // コート
+    fillPoly([[-6,-9],[6,-9],[5,-22],[-5,-22]],coat);
+    // ランドセル（背中）
+    rr(-10,-22,6,10,kind==='kid'?'#2A2A2A':'#8E2A2A'); rr(-10,-22,6,2,'#555');
+    // 頭・黄色い帽子
+    ell(0,-27,4.6,4.8,'#EAC7A6'); fillPoly([[-5.5,-28],[5.5,-28],[4.5,-32.5],[-4.5,-32.5]],'#E6C229'); rr(-6.5,-28.5,13,1.6,'#E6C229');
+    ell(2.6,-27,0.7,0.7,'#2a2a2a');
+  }else if(kind==='oba'){
+    // 腰の曲がった体・杖
+    ctx.strokeStyle='#5A4632'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(9,-20); ctx.lineTo(11+sw*.4,0); ctx.stroke();
+    rr(-3+sw*.4,-8,3,8,'#4B4038'); rr(1-sw*.4,-8,3,8,'#4B4038');
+    fillPoly([[-6,-8],[6,-8],[8,-20],[3,-27],[-4,-25]],'#7A5C48');   // ちゃんちゃんこ
+    ctx.strokeStyle='#5E4A3C'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(4,-22); ctx.lineTo(9,-20); ctx.stroke();
+    ell(6,-29,4.4,4.4,'#E2BFA0'); fillPoly([[1,-31],[6,-35],[11,-31],[11,-28],[9,-31],[3,-31]],'#6E5F86');  // 頬かむり
+    rr(1.5,-31,3,6,'#6E5F86'); ell(8.6,-29,0.6,0.6,'#2a2a2a');
+  }else{
+    // 自分: 防寒着・ヘルメット・スノーダンプ
+    rr(-5+sw*.4,-11,4,11,'#2B3440'); rr(1-sw*.4,-11,4,11,'#2B3440');
+    rr(-6,-2,5,2,'#111'); rr(1,-2,5,2,'#111');
+    fillPoly([[-7,-11],[7,-11],[6.5,-27],[-6.5,-27]],'#D26A2E');
+    rr(-7,-19,14,2,'#E9E3D2');
+    ell(0,-31,5,5,'#E5C3A2'); fillPoly([[-5.5,-32],[5.5,-32],[5,-36.5],[0,-38],[-5,-36.5]],'#F2F2EE'); rr(-6,-32.5,12,1.5,'#D8D8D2');
+    ell(3,-31,0.7,0.7,'#2a2a2a');
+    // スノーダンプ
+    ctx.strokeStyle='#7A7A7A'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(4,-20); ctx.lineTo(14,-7); ctx.stroke();
+    fillPoly([[12,-9],[22,-11],[22,-3],[12,-3]],'#E2B93B');
+  }
+  ctx.restore();
+}
+function bubble(x,y,t,alpha){
+  ctx.save(); ctx.globalAlpha=alpha; ctx.font='700 13px '+FONT; const w=ctx.measureText(t).width+14;
+  const bx=Math.max(4,Math.min(W-w-4,x-w/2));
+  rr(bx,y-20,w,22,'#FFFFFF'); ctx.strokeStyle='#22201C'; ctx.lineWidth=1.2; ctx.strokeRect(bx,y-20,w,22);
+  fillPoly([[x-4,y+1],[x+4,y+1],[x,y+8]],'#FFFFFF');
+  ctx.fillStyle='#22201C'; ctx.textAlign='left'; ctx.fillText(t,bx+7,y-4); ctx.restore();
+}
+function blob(x,y,r,rot,wet){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.beginPath();
+  for(let i=0;i<9;i++){ const a=i/9*Math.PI*2, rr=r*(0.82+0.18*Math.sin(i*2.3)); i?ctx.lineTo(Math.cos(a)*rr*1.25,Math.sin(a)*rr*.8):ctx.moveTo(Math.cos(a)*rr*1.25,Math.sin(a)*rr*.8); }
+  ctx.closePath(); ctx.fillStyle=wet?'#E2E8EC':'#F5F7F9'; ctx.fill(); ctx.strokeStyle='#C9D2DA'; ctx.lineWidth=1; ctx.stroke(); ctx.restore();
+}
+// 落とした雪の山
+function drawPiles(st){
+  const zx=p=>wx(p.side*(SIM.half+p.d));
+  for(const p of G.piles){
+    const age=G.T-p.t, x=zx(p), r=Math.sqrt(p.m/SIM.rho*2/(Math.PI*1.6))*S;   // 断面積 m/ρ（奥行き1m）の半楕円
+    if(p.zone==='ditch'){ if(age<1.2){ ctx.globalAlpha=1-age/1.2; ell(x,GY+3,r*.8,4,'#F5F7F9'); ctx.globalAlpha=1; } continue; }
+    if(p.zone==='nb'||p.zone==='car'){ blob(x,wy(p.y||0)-r*.4,r*.9,0.4,false); continue; }
+    ctx.beginPath(); ctx.ellipse(x,GY+1,r*1.1,r*.7,0,Math.PI,0); ctx.fillStyle='#F2F5F7'; ctx.fill(); ctx.strokeStyle='#CED7DE'; ctx.lineWidth=1; ctx.stroke();
+  }
+}
+// 再生中のかたまりの位置
+function animChunkPos(a,i,c){
+  const fi=Math.min(a.res.frames.length-1,Math.floor(a.t*60)), s=a.res.frames[fi][i];
+  if(s!==null) return {s};
+  const f=a.res.falls.find(f=>f.id===c.id); if(!f) return null;
+  const st=cur(), gm=geom(st), tau=Math.min(a.t-f.t0,f.t); if(tau<0) return {s:f.side*gm.L};
+  if(a.t-f.t0>f.t) return null;
+  const x=f.side*(SIM.half+f.v*gm.cos*tau), y=SIM.eaveH-f.v*gm.sin*tau-SIM.g*tau*tau/2;
+  return {x,y,rot:f.side*tau*4};
+}
+function drawRoofSnow(st){
+  const a=G.anim, list=a?a.src:G.chunks, hlId=G.drag?G.drag.id:null;
+  const fly=[];
+  list.forEach((c,i)=>{
+    const p=a?animChunkPos(a,i,c):{s:c.s}; if(!p)return;
+    if(p.s!==undefined){ drawChunk(st,c,p.s,c.id===hlId); }
+    else fly.push([c,p]);
+  });
+  for(const [c,p] of fly){ const r=Math.sqrt(c.len*c.d)*S*0.5; blob(wx(p.x),wy(p.y)-r*0.6,r,p.rot,st.slip[p.x>0?1:0]); }
+  return fly;
+}
+function mePos(st){
+  const gm=geom(st), a=G.anim;
+  if(G.fail&&G.fail.type==='self'&&a){
+    const i=a.src.findIndex(c=>c.id===G.fail.id), c=a.src[i], p=animChunkPos(a,i,c);
+    if(p&&p.s!==undefined){ const r=roofPt(gm,p.s), sd=p.s>=0?1:-1; return {x:wx(r.x),y:wy(r.y+c.d),rot:sd*0.9}; }
+    if(p) return {x:wx(p.x),y:wy(p.y)-Math.sqrt(c.len*c.d)*S*0.8,rot:p.rot};
+    const f=a.res.falls.find(f=>f.id===c.id); return {x:wx(f.side*(SIM.half+f.d)),y:GY+4,rot:f.side*1.6,buried:true};
+  }
+  // 立っている場所の雪の上
+  const s=G.me; let top=0; const list=a?a.src:G.chunks;
+  list.forEach((c,i)=>{ const q=a?animChunkPos(a,i,c):{s:c.s}; if(q&&q.s!==undefined&&Math.abs(q.s-s)<c.len/2+0.05) top=Math.max(top,c.d); });
+  if(top===0) for(const c of (a?a.src:G.chunks)) if(Math.abs(c.s-s)<c.len/2+0.6) top=Math.max(top,c.d);
+  const r=roofPt(gm,s); return {x:wx(r.x),y:wy(r.y+top)+1,rot:0};
+}
+function drawMe(st){
+  const p=mePos(st);
+  ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot||0);
+  if(p.buried){ rr(-6,-6,4,8,'#111'); rr(2,-7,4,9,'#111'); ctx.restore(); return; }
+  person('me',0,0,G.meFace,0,true); ctx.restore();
+}
+function drawPeds(behind){
+  const T=G.fail?G.T-G.failT:G.T, st=cur();
+  for(const p of peds(T)){
+    if(!!p.behind!==behind)continue;
+    const x=wx(SIM.half+p.d), fade=behind?Math.min(1,(p.d-PED_FROM)/0.3):1;
+    let y=GY+(behind?-4:6), hop=0;
+    const hit=G.fail&&G.fail.type==='ped'&&G.fail.who===p.kind;
+    if(hit){ hop=-Math.max(0,Math.sin(Math.min(1,G.failT*3)*Math.PI))*8; }
+    ctx.globalAlpha=fade; person(p.kind,x,y+hop,1,p.ph,!!G.fail); ctx.globalAlpha=1;
+    if(hit&&G.failT>0.15) bubble(x,y-44,'わっ！',1);
+  }
+}
+function drawTelop(st){
+  const y=topY()+12;
+  ctx.fillStyle='rgba(28,38,58,.86)'; ctx.fillRect(10,y,W-20,52);
+  ctx.fillStyle='#FFFFFF'; ctx.textAlign='left';
+  ctx.font='600 11px '+FONT; ctx.fillText(st.date+'　気象庁 観測値（'+st.rank+'）',20,y+17);
+  ctx.font='700 21px '+FONT; ctx.fillText(st.place+'（'+st.pref+'）',20,y+42);
+  ctx.textAlign='right'; ctx.font='700 15px '+FONT; ctx.fillText('cm',W-20,y+42); const wc=ctx.measureText('cm').width;
+  ctx.font='800 28px '+FONT; ctx.fillText(st.depth,W-22-wc,y+43); const wd=ctx.measureText(String(st.depth)).width;
+  ctx.font='600 13px '+FONT; ctx.fillText('積雪',W-28-wc-wd,y+42);
+  let ny=y+58;
+  if(st.slip[0]||st.slip[1]){
+    ctx.fillStyle='rgba(243,239,228,.92)'; ctx.fillRect(10,ny,W-20,24);
+    ctx.fillStyle='#22201C'; ctx.textAlign='left'; ctx.font='600 12px '+FONT;
+    ctx.fillText('日中 気温+2℃　'+(st.slip[0]?'左（南向き）':'右')+'の屋根の雪がゆるんでいます', 20, ny+16); ny+=28;
+  }
+  // はじめの数秒だけの手引き
+  const g=guideAlpha();
+  if(g>0){ ctx.globalAlpha=g; ctx.fillStyle='rgba(243,239,228,.94)'; ctx.fillRect(40,ny+8,W-80,48);
+    ctx.fillStyle='#22201C'; ctx.textAlign='center'; ctx.font='700 14px '+FONT; ctx.fillText('雪のかたまりを、落としたい向きへはらう',W/2,ny+28);
+    ctx.font='500 12px '+FONT; ctx.fillText('長くはらうほど強く押す（弱・中・強）',W/2,ny+46); ctx.globalAlpha=1; }
+}
+function drawDrag(st){
+  if(!G.drag)return; const inf=dragInfo(G.drag); if(!inf)return;
+  const c=inf.c, q=chunkCenter(st,c,c.s), gm=geom(st), sd=c.s>=0?1:-1;
+  if(!inf.ok){ return; }
+  const ux=sd*gm.cos*inf.dir, uy=gm.sin*inf.dir, Lp=34+inf.lv*24;
+  const x1=q.x+ux*Lp, y1=q.y+uy*Lp-(inf.dir<0?6:0);
+  ctx.strokeStyle='#22201C'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(q.x,q.y); ctx.lineTo(x1,y1); ctx.stroke();
+  for(let i=0;i<=inf.lv;i++){ const k=1-i*0.32, cx=q.x+ux*Lp*k, cy=q.y+uy*Lp*k-(inf.dir<0?6:0)*k, nx=-uy, ny=ux;
+    ctx.beginPath(); ctx.moveTo(cx-ux*9+nx*7,cy-uy*9+ny*7); ctx.lineTo(cx,cy); ctx.lineTo(cx-ux*9-nx*7,cy-uy*9-ny*7); ctx.stroke(); }
+  const lab=LV[inf.lv]+(inf.dir>0?'・軒へ':'・棟へ');
+  ctx.font='700 13px '+FONT; const w=ctx.measureText(lab).width+12;
+  const lx=Math.max(4,Math.min(W-w-4,x1-w/2)); let ly=Math.min(y1,q.y)-34;
+  // kg 表示と重なるなら矢印の先の下へ
+  const {placed}=labelRects(st); if(placed.some(L=>rectHit(L.rc,{x:lx,y:ly,w,h:22}))) ly=Math.max(y1,q.y)+12;
+  rr(lx,ly,w,22,'#F3EFE4'); ctx.strokeStyle='#22201C'; ctx.lineWidth=1; ctx.strokeRect(lx,ly,w,22);
+  ctx.fillStyle='#22201C'; ctx.textAlign='left'; ctx.fillText(lab,lx+6,ly+16);
+}
+let FONT='sans-serif', prevTs=0;
+function draw(){
+  const st=cur(), dt=Math.min(0.05,(performance.now()-prevTs)/1000||0); prevTs=performance.now();
+  ctx.save();
+  if(G.shake>0){ const k=G.shake*10; ctx.translate(Math.sin(G.T*90)*k,Math.cos(G.T*70)*k*.5); }
+  drawSky(); drawGround(st); drawPeds(true); drawSnowWall(st); drawNeighbor(st); drawCarport(st); drawHouse(st); drawPiles(st);
+  drawRoofSnow(st); drawFailOverlay(st); drawLeaders(st);
+  if(G.screen!=='title') drawMe(st);
+  drawPeds(false); drawLabels(st);
+  drawFlakes(dt);
+  ctx.restore();
+  drawTelop(st); drawDrag(st);
+  if(G.screen==='play'||G.screen==='pause'){
+    const c=G.cap, lim=c.yard<1e8;
+    const warn=v=>v<1500?'<span class="warn">'+fmt(Math.max(0,v))+'</span>':fmt(v);
+    UI.hud(st.name,st.place, lim?'置き場 庭'+warn(c.yard)+'・隣'+warn(c.gap)+'kg':'屋根 '+fmt(G.chunks.reduce((a,c)=>a+c.m,0))+'kg');
+  }
+}
+
+// ---- メインループ ----
+function frame(ts){
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.05):0; lastTs=ts;
+  if(G.screen==='play') update(dt);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle=getComputedStyle(document.body).backgroundColor; ctx.fillRect(0,0,VW,VH);
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR,TY*DPR);
+  draw();
+  requestAnimationFrame(frame);
+}
+window.addEventListener('resize',resize); resize();
+FONT=getComputedStyle(document.body).fontFamily;
+showTitle();
+requestAnimationFrame(frame);
+</script>
 </body>
 </html>
