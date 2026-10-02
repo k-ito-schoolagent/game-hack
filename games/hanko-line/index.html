@@ -43,7 +43,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 #sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
 @keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 #sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
-#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px;word-break:auto-phrase;text-wrap:balance}
 #sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
 #sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
 #sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
@@ -274,7 +274,7 @@ const ALL={
   mozo:mk({dept:'第3学年',who:'井上 美咲',subj:'模造紙の購入について',cat:'consumable',kian:[10,7],when:[[10,14]],
     rows:[['模造紙 50枚',3,'束',1980],['水性マーカー 8色',10,'組',620]]}),
   grade1:mk({want:'grade',dept:'第4学年',who:'石川 直人',subj:'職場体験礼状用はがきの購入について',cat:'consumable',kian:[10,6],when:[[10,9]],
-    rows:[['郵便はがき',120,'枚',85]]}),
+    rows:[['郵便はがき',60,'枚',85]]}),
   bus:mk({dept:'第1学年',who:'佐野 健',subj:'芸術鑑賞会のバス借上げについて',cat:'rental',kian:[10,2],when:[[10,30]],
     rows:[['中型バス借上げ',3,'台',98000]]}),
   game1:mk({want:'shibutsu',dept:'第1学年',who:'小川 真理',subj:'学級レクリエーション用品の購入について',cat:'consumable',kian:[10,6],when:[[10,16]],
@@ -301,7 +301,7 @@ const ALL={
   yoshifix:mk({dept:'第1学年',who:'小川 真理',subj:'学年通信用紙の購入について',cat:'consumable',kian:[10,2],when:[[10,9]],fix:{old:8,seal:'小川'},
     rows:[['色上質紙 A4',5,'冊',780]]}),
   ord1:mk({want:'order',dept:'第2学年',who:'山田 花子',subj:'社会科見学の入館料について',cat:'rental',kian:[10,5],when:[[10,1]],
-    rows:[['入館料（団体）',118,'人',300]]}),
+    rows:[['入館料（生徒）',96,'人',300]]}),
   piano:mk({dept:'第3学年',who:'井上 美咲',subj:'音楽室ピアノの調律について',cat:'repair',kian:[10,6],when:[[10,21]],
     rows:[['ピアノ調律',2,'台',16500]]}),
   // ---- 金 ----
@@ -318,7 +318,7 @@ const ALL={
   pot:mk({dept:'事務室',who:'高橋 恵',subj:'職員室用電気ポットの購入について',cat:'equipment',kian:[10,8],when:[[10,14]],
     rows:[['電気ポット 3L',1,'台',12800]]}),
   onsen1:mk({want:'shibutsu',dept:'第3学年',who:'石川 直人',subj:'全国進路指導研究大会への出張について',cat:'travel',kian:[10,8],when:[[10,29],[10,30]],
-    rows:[['交通費（往復）',1,'式',27400],['宿泊料',1,'泊',10900],['日当',2,'日',2200],['温泉旅館 延泊',1,'泊',18000]]}),
+    rows:[['交通費（往復）',1,'式',27400],['宿泊料',1,'泊',10900],['温泉旅館 延泊',1,'泊',18000]]}),
   shinsa:mk({dept:'第2学年',who:'山田 花子',subj:'英語暗唱大会の審査謝礼について',cat:'fee',kian:[10,7],when:[[11,6]],
     rows:[['審査謝礼',3,'人',5000]]}),
   addr2:mk({want:'addr',dept:'第1学年',who:'林 さくら',subj:'運動会用テントの修繕について',cat:'repair',kian:[10,8],when:[[10,21]],
@@ -646,7 +646,7 @@ function ftxt(s,x0,x1,y,size,opt){
   const sx=w>maxW?maxW/w:1, a=opt.a||'left', ax=a==='left'?x0:a==='right'?x1:(x0+x1)/2;
   ctx.fillStyle=opt.c||INK; ctx.textAlign=a;
   ctx.save(); ctx.translate(ax,y); ctx.scale(sx,1); ctx.fillText(s,0,0); ctx.restore();
-  if(LAYOUT_LOG){ const L=a==='left'?ax:a==='right'?ax-w*sx:ax-w*sx/2; LAYOUT_LOG.push({s,x0,x1,l:L,r:L+w*sx,size,size0,sx}); }
+  if(LAYOUT_LOG){ const L=a==='left'?ax:a==='right'?ax-w*sx:ax-w*sx/2; LAYOUT_LOG.push({s,x0,x1,l:L,r:L+w*sx,y,size,size0,sx}); }
 }
 // 見出し（灰）＋値。値は見出しの実測幅の右から書類の右余白まで
 function labeled(lab,val,y,size,wt,x1){
@@ -852,7 +852,7 @@ function draw(){
   ctx.restore();
   if(G.screen==='play'||G.screen==='pause'||G.fx){
     const D=DAYS[G.day], left=G.docs.filter(o=>o.st==='belt'||o.st==='held').length;
-    UI.hud(D.name,fmtD(D.md),'残り '+left+'件　監査メモ '+(G.miss?'<span class="warn">'+G.miss+'</span>':'0')+'/3');
+    UI.hud(D.name,fmtD(D.md),'残り'+left+'件　メモ'+(G.miss?'<span class="warn">'+G.miss+'</span>':'0')+'/3');
   }
 }
 
