@@ -2,40 +2,820 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>梅雨前線ディフェンス（仕様書公開中） | GAME HACK</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>梅雨前線ディフェンス | GAME HACK</title>
+<meta name="description" content="太平洋高気圧になって、北上する梅雨前線を天気図の上でせき止める。押しすぎると別の地方が大雨、届かれると「梅雨入りしたと見られます」。">
+<meta name="theme-color" content="#E9EEEC">
+<!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>梅</text></svg>">
 <style>
-  body{margin:0;background:#0d1526;color:#eaf3fc;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.8}
-  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
-  .badge{display:inline-block;font-size:12px;font-weight:700;border:1px solid #ffb300;color:#ffb300;border-radius:6px;padding:2px 10px;margin-bottom:14px}
-  h1{font-size:26px;margin:0 0 14px}
-  p,li{font-size:14.5px;color:#c9dcf2}
-  a{color:#ffb300}
-  .box{background:#16233c;border-radius:12px;padding:14px 16px;margin:14px 0}
-  .box b{color:#ffb300}
+/* ================================================================
+ * GAME HACK 共通UI（ここから）— 全ゲームで同じものをコピーして使う
+ * 世界観: 業務帳票。紙 × 墨 × 朱（ハンコの赤）。
+ * - 朱は「判子」と「失敗」にだけ使う。ボタンや装飾には使わない
+ * - 角丸は 2px まで。影・グラデーション・絵文字は使わない
+ * ================================================================ */
+:root{
+  --paper:#F3EFE4; --paper2:#E8E1CF; --ink:#22201C; --ink2:#5E584D; --rule:#CDC3AC; --shu:#C8372D;
+  --font:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--scene,#2b2a27);font-family:var(--font);color:var(--ink);-webkit-text-size-adjust:100%}
+#wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+canvas{display:block;width:100%;height:100%}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+/* HUD: 帳票の見出し帯。左=どこ / 中=いまの数値 / 右=一時停止 */
+#hud{position:absolute;left:0;right:0;top:0;padding-top:var(--safe-t);background:var(--paper);border-bottom:1px solid var(--ink);display:none;grid-template-columns:1fr auto 52px;align-items:center;height:calc(48px + var(--safe-t));box-sizing:border-box;font-feature-settings:"tnum";z-index:5}
+#hud.on{display:grid}
+#hudL{padding-left:14px;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hudL small{font-weight:500;color:var(--ink2);font-size:12px;margin-left:6px}
+#hudC{padding:0 12px;font-size:15px;font-weight:700;text-align:right;white-space:nowrap}
+#hudC .warn{color:var(--shu)}
+#pauseBtn{width:52px;height:48px;border:0;border-left:1px solid var(--rule);background:transparent;display:grid;place-items:center}
+#pauseBtn i{display:block;width:12px;height:14px;border-left:4px solid var(--ink);border-right:4px solid var(--ink);box-sizing:border-box}
+/* シート: 下から出る帳票。親指で押せる位置にボタンを置く */
+#sheetBg{position:absolute;inset:0;background:rgba(34,32,28,.5);display:none;z-index:10}
+#sheetBg.on{display:block}
+#sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
+#sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
+#sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
+#sheet dt{color:var(--ink2)}
+#sheet dd{margin:0;font-weight:600;font-feature-settings:"tnum"}
+#sheet .acts{display:grid;gap:8px}
+.btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
+.btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn:active{transform:translateY(1px);opacity:.9}
+.sub{display:flex;justify-content:center;gap:4px}
+.sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
+/* 判子: 結果シートの右上に押される。中身は最大4字 */
+.stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
+.stamp.round{border-radius:50%}
+.stamp span{display:block}
+@keyframes stampIn{from{transform:rotate(-8deg) scale(1.9);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:.92}}
+@media (prefers-reduced-motion:reduce){#sheet,.stamp{animation:none}}
+/* ===== GAME HACK 共通UI（ここまで）===== */
+/* ===== ゲーム固有の見た目: 地方気象台の「お知らせ」（発表文）と天気図の凡例 ===== */
+:root{--scene:#E9EEEC;--paper:#FBFBF7;--paper2:#EEF2F1;--ink:#1B2A44;--ink2:#4E5966;--rule:#C3CBCF}
+/* HUD: 天気図の凡例の枠（二重罫）。数値は等幅数字 */
+#hud{border-bottom:3px double var(--ink)}
+#hudL{letter-spacing:.04em}
+#hudL small{font-weight:600;color:var(--ink2);border:1px solid var(--rule);padding:1px 4px;margin-left:6px;font-size:11.5px}
+#hudC{font-size:14px;padding:0 10px}
+#pauseBtn{border-left:1px solid var(--ink)}
+@media (max-width:374px){#hudL{font-size:14px;padding-left:10px}#hudL small{font-size:11px;margin-left:4px}#hudC{font-size:13px;padding:0 8px}}
+/* シート: 発表文の書式。見出し・本文・参考事項の表 */
+#sheet{border-top:3px double var(--ink)}
+#sheet .no{letter-spacing:.08em;padding-bottom:7px;border-bottom:1px solid var(--rule);margin-bottom:12px}
+#sheet h1{font-size:22px;line-height:1.45;letter-spacing:.01em;word-break:auto-phrase;text-wrap:pretty}
+#sheet > .no:first-child + h1{padding-right:0}
+#sheet .lead{font-size:14.5px;text-indent:1em}
+#sheet dl{border:1px solid var(--ink)}
+#sheet dl div{padding:0;grid-template-columns:8em 1fr}
+#sheet dl div:last-child{border-bottom:0}
+#sheet dt{background:var(--paper2);padding:8px 10px;border-right:1px solid var(--rule);font-size:13px}
+#sheet dd{padding:8px 10px}
+/* 結果の発表文だけ、地方気象台のお知らせと同じ（見出し）（本文）（参考事項）を付ける */
+#sheet .stamp ~ h1::before,#sheet .stamp ~ .lead::before,#sheet .stamp ~ dl::before{display:block;font-size:12px;font-weight:500;color:var(--ink2);letter-spacing:.06em;text-indent:0;line-height:1.6}
+#sheet .stamp ~ h1::before{content:"（見出し）"}
+#sheet .stamp ~ .lead::before{content:"（本文）"}
+#sheet .stamp ~ dl{position:relative;margin-top:30px}
+#sheet .stamp ~ dl::before{content:"（参考事項）";position:absolute;left:0;top:-23px}
+
 </style>
 </head>
 <body>
-<div class="wrap">
-  <span class="badge">仕様書公開中・制作者募集</span>
-  <h1>梅雨前線ディフェンス</h1>
-  <p>プレイヤーは太平洋高気圧。実データの梅雨前線を押し返し、梅雨入りを遅らせる。押しすぎると別の地域に大雨。失敗＝「梅雨入り宣言」テロップ。</p>
-  <div class="box">
-    <b>発想の型</b>
-    <ul>
-      <li>題材: 梅雨入りを1日でも遅らせたい洗濯民の願い</li>
-      <li>物理化: プレイヤー＝太平洋高気圧（円）。梅雨前線＝北上してくる帯。円で帯を押し返すと湾曲して北上が遅れる</li>
-      <li>技術: 実データの前線の動きは固定。押す角度・タイミング・強さの配分。押しすぎると別地域に大雨マスが出るトレードオフを読む</li>
-      <li>失敗の見せ場: 気象庁テロップ風「◯◯地方 梅雨入り宣言」が画面を覆う</li>
-      <li>データ: 気象庁の梅雨入り・梅雨明け日（地方別・年別）＋前線帯の概略位置</li>
-      <li>操作: 高気圧をドラッグで移動。長押しで勢力チャージ</li>
-    </ul>
-  </div>
-  <p>つくってみたい人は <a href="https://github.com/k-ito-schoolagent/game-hack/issues">issue</a> で宣言してください。
-  詳しい設計書は <a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/games/baiu-defense/SPEC.md">SPEC.md</a>。
-  はじめてのプルリクエスト歓迎です（<a href="https://github.com/k-ito-schoolagent/game-hack/blob/main/CONTRIBUTING.md">参加のしかた</a>）。</p>
-  <p><a href="../../">← GAME HACK ポータルへ</a></p>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <!-- 共通UI: ここから -->
+  <div id="hud"><div id="hudL"></div><div id="hudC"></div><button id="pauseBtn" aria-label="一時停止"><i></i></button></div>
+  <div id="sheetBg"><div id="sheet" role="dialog" aria-modal="true"></div></div>
+  <!-- 共通UI: ここまで -->
 </div>
+<script>
+'use strict';
+/* ============================================================
+ * 梅雨前線ディフェンス
+ * 型: 題材(梅雨入り) × 物理化(高気圧=前線をせき止める円盤・停滞=雨量が積もる) × 権限(太平洋高気圧を指で動かせる) × 技術(地方の上でなく海の上で前線を止める位置取り) × 見せ場(「梅雨入りしたと見られます」テロップ)
+ * 梅雨入りの平年日は気象庁「過去の梅雨入りと梅雨明け」（1991〜2020年の平均）。前線の形・雨量は概略
+ * ============================================================ */
+
+// ================================================================
+// GAME HACK 共通UI（ここから）— 書き換えずにコピーする
+// ================================================================
+// 論理座標: 横幅 W=420 固定。高さ H は端末の縦横比に合わせて 700〜920 で伸びる（上下の黒帯を出さない）
+// 描画は H を見てレイアウトする（上端=HUD 下、下端=親指ゾーン）
+const W=420; let H=760;
+const HUD_H=48;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0,SAFE_T=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=window.innerWidth; VH=window.innerHeight;
+  cv.width=Math.round(VW*DPR); cv.height=Math.round(VH*DPR);
+  H=Math.max(700,Math.min(920,Math.round(W*VH/VW)));
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+  SAFE_T=(parseFloat(getComputedStyle($('hud')).paddingTop)||0)/SC;
+  if(typeof onResize==='function')onResize();
+}
+// 画面座標 → 論理座標
+function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
+// DOM 要素の中心 → 論理座標（下部ボタンとの距離判定などに使う）
+function elCenter(el){ const r=el.getBoundingClientRect(); return toGame({clientX:r.left+r.width/2,clientY:r.top+r.height/2}); }
+// HUD の下端（論理座標）。ゲームの描画はここから下に置く
+function topY(){ return HUD_H+SAFE_T; }
+// 振動（対応端末のみ）
+function buzz(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(_){} }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const UI={
+  hud(l,lSmall,c){ $('hud').classList.add('on'); $('hudL').innerHTML=esc(l)+(lSmall?'<small>'+esc(lSmall)+'</small>':''); $('hudC').innerHTML=c||''; },
+  hideHud(){ $('hud').classList.remove('on'); },
+  /* シートを開く
+   * o = { no:'No.01 · 乗務報告', title, lead, rows:[[ラベル,値],...], stamp:'不可'|'発車'(最大4字), round:true(丸印),
+   *       main:[ラベル,fn], subs:[[ラベル,fn],...] } */
+  sheet(o){
+    const s=$('sheet');
+    let h='';
+    if(o.stamp){ const t=[...o.stamp]; const lines=t.length===4?[t.slice(0,2).join(''),t.slice(2).join('')]:t.length===3?[t.join('')]:[t.join('')];
+      const fs=t.length<=2?27:t.length===3?20:22;
+      h+='<div class="stamp'+(o.round?' round':'')+'" style="font-size:'+fs+'px">'+lines.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'; }
+    if(o.no)h+='<p class="no">'+esc(o.no)+'</p>';
+    h+='<h1>'+esc(o.title)+'</h1>';
+    if(o.lead)h+='<p class="lead">'+esc(o.lead)+'</p>';
+    if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
+    h+='<div class="acts">';
+    if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
+    h+='</div>';
+    s.innerHTML=h; s.scrollTop=0;
+    s.querySelectorAll('button').forEach(b=>{
+      const k=b.dataset.k, fn=k==='main'?o.main[1]:o.subs[+k.slice(1)][1];
+      b.addEventListener('click',e=>{ e.stopPropagation(); fn(); });
+    });
+    $('sheetBg').classList.add('on');
+    const m=s.querySelector('.btn'); if(m)setTimeout(()=>m.focus({preventScroll:true}),50);
+  },
+  close(){ $('sheetBg').classList.remove('on'); },
+  open(){ return $('sheetBg').classList.contains('on'); },
+};
+// 共有（𝕏）とポータルへ
+function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function toPortal(){ location.href='../../'; }
+// 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
+let pausedFrom=null;
+function pause(){
+  if(G.screen!=='play')return;
+  pausedFrom='play'; G.screen='pause';
+  UI.sheet({no:GAME_NO+' · 一時停止中',title:'一時停止',main:['再開する',resume],subs:[['この面をやり直す',()=>{UI.close();restart();}],['一覧へ戻る',toPortal]]});
+}
+function resume(){ if(G.screen!=='pause')return; UI.close(); G.screen='play'; lastTs=0; }
+$('pauseBtn').addEventListener('click',e=>{ e.stopPropagation(); G.screen==='pause'?resume():pause(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden)pause(); });
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ G.screen==='pause'?resume():pause(); } });
+// ===== GAME HACK 共通UI（ここまで）=====
+
+// ==CORE== 天気図の物理（DOM 非依存。scratchpad の solver.js がこの区間だけ切り出して検証する）
+// 投影: 正距円筒に近い簡略投影。経度 123°E が x=0、北緯 46.5° が y=0（地図座標。画面では topY() を足す）
+const LON0=123, LAT0=46.5, KX=17.5, KY=17.5/Math.cos(36*Math.PI/180);
+const lx=lon=>(lon-LON0)*KX, ly=lat=>(LAT0-lat)*KY;
+const xlon=x=>x/KX+LON0, ylat=y=>LAT0-y/KY;
+// 日付: 5月1日=0
+const md=(m,d)=>m===4?d-31:m===5?d-1:m===6?30+d:60+d;
+function dstr(day){ const d=Math.floor(day+1e-6); return d<0?'4月'+(31+d)+'日':d<31?'5月'+(d+1)+'日':d<61?'6月'+(d-30)+'日':'7月'+(d-60)+'日'; }
+
+// 気象庁「過去の梅雨入りと梅雨明け」平年値（1991〜2020年の平均）。city は判定に使う代表地点（概略）
+// pts は大雨の集計で陸地をどの地方に振り分けるかの代表点（概略）
+const REG=[
+  {id:'okinawa', name:'沖縄',    city:'那覇',   lon:127.68,lat:26.21,on:[5,10],last:[5,4],  pts:[[127.8,26.4]]},
+  {id:'amami',   name:'奄美',    city:'名瀬',   lon:129.49,lat:28.38,on:[5,12],last:[5,3],  pts:[[129.4,28.3]]},
+  {id:'kyushuS', name:'九州南部',city:'鹿児島', lon:130.55,lat:31.56,on:[5,30],last:[5,20], pts:[[130.5,31.5],[131.3,32.0],[130.9,31.2]]},
+  {id:'kyushuN', name:'九州北部',city:'福岡',   lon:130.40,lat:33.58,on:[6,4], last:[6,2],  pts:[[130.4,33.5],[129.9,32.9],[130.8,32.7],[131.4,33.2],[131.6,34.2]]},
+  {id:'shikoku', name:'四国',    city:'高松',   lon:134.05,lat:34.34,on:[6,5], last:[6,2],  pts:[[132.8,33.5],[133.6,33.7],[134.3,33.9]]},
+  {id:'chugoku', name:'中国',    city:'広島',   lon:132.46,lat:34.40,on:[6,6], last:[6,2],  pts:[[132.6,34.6],[133.8,34.8],[133.2,35.3],[134.3,35.3]]},
+  {id:'kinki',   name:'近畿',    city:'大阪',   lon:135.52,lat:34.69,on:[6,6], last:[6,2],  pts:[[135.5,34.7],[135.8,34.0],[135.2,35.3],[136.0,35.1]]},
+  {id:'tokai',   name:'東海',    city:'名古屋', lon:136.97,lat:35.17,on:[6,6], last:[6,2],  pts:[[136.9,35.2],[138.3,35.0],[137.2,35.8],[136.4,34.5]]},
+  {id:'kanto',   name:'関東甲信',city:'東京',   lon:139.75,lat:35.69,on:[6,7], last:[6,2],  pts:[[139.7,35.7],[140.2,35.4],[138.5,35.7],[138.2,36.3],[139.6,36.5]]},
+  {id:'hokuriku',name:'北陸',    city:'新潟',   lon:139.05,lat:37.91,on:[6,11],last:[6,20], pts:[[139.0,37.7],[137.2,36.7],[136.4,36.1],[138.6,37.3]]},
+  {id:'tohokuS', name:'東北南部',city:'仙台',   lon:140.87,lat:38.26,on:[6,12],last:[6,20], pts:[[140.9,38.3],[140.3,38.3],[140.4,37.4],[140.0,38.9]]},
+  {id:'tohokuN', name:'東北北部',city:'盛岡',   lon:141.15,lat:39.70,on:[6,15],last:[6,21], pts:[[141.2,39.7],[140.7,40.7],[140.2,39.7],[141.6,40.4]]},
+];
+// 気象庁の発表で使う地方名（「九州南部」「東北南部」「東北北部」は「地方」を付けない）
+const JNAME={okinawa:'沖縄地方',amami:'奄美地方',kyushuS:'九州南部',kyushuN:'九州北部地方',shikoku:'四国地方',chugoku:'中国地方',kinki:'近畿地方',tokai:'東海地方',kanto:'関東甲信地方',hokuriku:'北陸地方',tohokuS:'東北南部',tohokuN:'東北北部'};
+const REGI={}; REG.forEach((r,i)=>{ r.i=i; r.jname=JNAME[r.id]; r.onDay=md(r.on[0],r.on[1]); REGI[r.id]=r; });
+
+// 前線の自然な北上: 各地方の代表地点に平年の梅雨入り日ちょうどに達するよう、日付→基準緯度を折れ線で結ぶ
+const M_PX=5;         // 前線が代表地点の何px南まで来たら梅雨入りとするか
+const TILT=0.1;                                     // 前線は西南西→東北東にわずかに傾く
+const WIG=lon=>0.25*Math.sin((lon-120)/3.1);        // 天気図らしい緩いうねり（固定）
+const ANCH=(()=>{
+  const m=new Map();
+  REG.forEach(r=>{ const b=r.lat-M_PX/KY-TILT*(r.lon-135)-WIG(r.lon); m.set(r.onDay,Math.max(m.get(r.onDay)??-99,b)); });
+  const a=[...m.entries()].sort((p,q)=>p[0]-q[0]);
+  for(let i=1;i<a.length;i++) a[i][1]=Math.max(a[i][1],a[i-1][1]+0.05);
+  a.unshift([a[0][0]-21,a[0][1]-2.8]);                 // 4月中旬: 前線は沖縄の南（概略）
+  const L=a[a.length-1]; a.push([L[0]+30,L[1]+0.28*30]); // 平年の東北北部梅雨入り以降も 0.28°/日 で北上（概略）
+  return a;
+})();
+function baseLat(day){
+  const a=ANCH; if(day<=a[0][0])return a[0][1];
+  for(let i=1;i<a.length;i++) if(day<=a[i][0]){ const t=(day-a[i-1][0])/(a[i][0]-a[i-1][0]); return a[i-1][1]+t*(a[i][1]-a[i-1][1]); }
+  return a[a.length-1][1];
+}
+const natLat=(lon,day)=>baseLat(day)+TILT*(lon-135)+WIG(lon);
+
+// 面: 守る地方と、平年から何日遅らせるか
+const STAGES=[
+  {r:'okinawa', K:7, person:0},
+  {r:'kyushuS', K:8, person:1},
+  {r:'kinki',   K:6, person:2},
+  {r:'kanto',   K:7, person:0},
+  {r:'hokuriku',K:7, person:1},
+  {r:'tohokuN', K:11, person:2},
+];
+STAGES.forEach(s=>{ const r=REGI[s.r]; s.start=r.onDay-5; s.end=r.onDay+s.K; s.name=r.jname; });
+
+const R_DISK=118;     // 高気圧の半径（px）
+const V_FRONT=70;     // 前線が自然位置へ戻る速さ（px/日）
+const MOVE_CAP=700;   // 高気圧の移動上限（px/日）
+const BULGE=0.2;      // せき止めた分だけ両脇の前線が北へ張り出す割合
+const RAIN=45;        // 停滞前線 1 点あたりの雨量（mm/日）
+const RAIN_R=0.9;     // 地方の代表点からこの距離（度）までの前線が雨を降らせる
+const TAU=2;          // 雨量の減衰（日）
+const DLIM=120;        // 前線を押し込める深さの限界（px）
+const GMAX=300;       // この雨量で「大雨」
+const COLS=[]; for(let x=-42;x<=462;x+=7) COLS.push(x);
+
+// 陸地判定（日本のみ。北海道は梅雨の地方区分外なので除外）
+let JP=[];
+function setCoast(jp){
+  JP=jp.map(f=>{ const xs=[],ys=[]; for(let i=0;i<f.length;i+=2){ xs.push(f[i]); ys.push(f[i+1]); }
+    return {xs,ys,x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys)}; });
+}
+function onLand(lon,lat){
+  for(const p of JP){
+    if(p.y1>44.5) continue;
+    if(lon<p.x0||lon>p.x1||lat<p.y0||lat>p.y1) continue;
+    let c=false; const n=p.xs.length;
+    for(let i=0,j=n-1;i<n;j=i++){ if((p.ys[i]>lat)!==(p.ys[j]>lat) && lon<(p.xs[j]-p.xs[i])*(lat-p.ys[i])/(p.ys[j]-p.ys[i])+p.xs[i]) c=!c; }
+    if(c) return true;
+  }
+  return false;
+}
+function nearestReg(lon,lat){
+  let best=null,bd=1e9; const k=Math.cos(36*Math.PI/180);
+  for(const r of REG) for(const p of r.pts){ const d=((lon-p[0])*k)**2+(lat-p[1])**2; if(d<bd){bd=d;best=r;} }
+  return bd<1.6? best:null;
+}
+
+function simInit(si){
+  const st=STAGES[si], r=REGI[st.r];
+  const S={si,day:st.start,end:st.end,target:r.id,hx:lx(r.lon)+100,hy:ly(r.lat)-70,a:[],N:[],d:[],b:[],held:[],g:{},onset:{},dmax:0,fail:null,clear:false,peak:{},rainCells:[]};
+  REG.forEach(q=>{ S.g[q.id]=0; S.peak[q.id]=0; if(natLat(q.lon,S.day)>=q.lat-M_PX/KY) S.onset[q.id]=q.onDay; });
+  COLS.forEach((x,i)=>{ S.a[i]=ly(natLat(xlon(x),S.day)); S.N[i]=S.a[i]; S.d[i]=0; S.b[i]=0; S.held[i]=false; });
+  constrain(S);
+  return S;
+}
+function constrain(S){
+  // 前線は1本の線: どこか1点でも高気圧の南側でせき止められていれば、圏内に入った点はすべて南の縁へ
+  const south=S.held.some(h=>h);
+  COLS.forEach((x,i)=>{
+    const dx=x-S.hx; S.held[i]=false;
+    if(Math.abs(dx)<R_DISK){ const s=Math.sqrt(R_DISK*R_DISK-dx*dx), top=S.hy-s, bot=S.hy+s;
+      if(S.a[i]>top-0.01&&S.a[i]<bot+0.01){ S.a[i]=(south||S.a[i]>=S.hy)?bot:top; S.held[i]=S.a[i]===bot; } }
+  });
+}
+function frontYAt(S,x){ const f=(x-COLS[0])/7, i=Math.max(0,Math.min(COLS.length-2,Math.floor(f))), t=f-i; return S.a[i]*(1-t)+S.a[i+1]*t; }
+
+// dt: 日。tx,ty: 指が示す高気圧の目標位置（地図座標）
+function simStep(S,dt,tx,ty){
+  if(S.fail||S.clear) return;
+  S.day+=dt;
+  // 高気圧の移動（上限つき）
+  let mx=tx-S.hx,my=ty-S.hy; const L=Math.hypot(mx,my), cap=MOVE_CAP*dt;
+  if(L>cap){ mx*=cap/L; my*=cap/L; }
+  S.hx=Math.max(-70,Math.min(490,S.hx+mx)); S.hy=Math.max(ly(49),Math.min(ly(14),S.hy+my));
+  // 前線の自然位置へ寄る（せき止めた分は両脇が北へ張り出す）
+  COLS.forEach((x,i)=>{
+    const N=ly(natLat(xlon(x),S.day)); S.N[i]=N;
+    const e=Math.max(0,Math.abs(x-S.hx)-R_DISK);
+    S.b[i]=BULGE*S.dmax*Math.exp(-((e/60)**2)); const T=N-S.b[i];
+    const df=T-S.a[i], v=V_FRONT*dt; S.a[i]+=Math.max(-v,Math.min(v,df));
+  });
+  constrain(S);
+  // 押しすぎ: 自然位置より DLIM 以上南へ押し込んだ点は、高気圧の北側へ乗り越える
+  // （せき止めていた部分がまとめて北側の縁へ移る）
+  const oi=COLS.findIndex((x,i)=>S.held[i]&&S.a[i]-S.N[i]>DLIM);
+  if(oi>=0){ S.overDay=S.day; S.overX=COLS[oi];
+    COLS.forEach((x,i)=>{ if(!S.held[i])return; const dx=x-S.hx; S.a[i]=S.hy-Math.sqrt(Math.max(0,R_DISK*R_DISK-dx*dx)); S.held[i]=false; }); }
+  // 停滞した前線（高気圧にせき止められている部分）が上にある地方に雨が積もる
+  let dmax=0; const decay=Math.exp(-dt/TAU); for(const k in S.g) S.g[k]*=decay;
+  S.rainCells.length=0; const ck=Math.cos(36*Math.PI/180);
+  COLS.forEach((x,i)=>{
+    const d=S.held[i]?S.a[i]-S.N[i]:0; S.d[i]=d; if(d>dmax)dmax=d;
+    if(d<3) return;
+    const w=Math.min(1,d/25), lon=xlon(x), la=ylat(S.a[i]); let tot=0;
+    for(const r of REG){ if(r.id===S.target) continue;
+      let k=0; for(const p of r.pts){ const q=1-Math.hypot((lon-p[0])*ck,la-p[1])/RAIN_R; if(q>k)k=q; }
+      if(k>0){ S.g[r.id]+=RAIN*w*k*dt; tot+=k; } }
+    S.rainCells.push([x,S.a[i],w*Math.min(1,tot)]);
+  });
+  S.dmax=dmax;
+  for(const k in S.g){ if(S.g[k]>S.peak[k])S.peak[k]=S.g[k];
+    if(S.g[k]>=GMAX){ S.fail={type:'rain',reg:k,day:S.day}; return; } }
+  // 梅雨入り判定（前線が代表地点のすぐ南まで来たら）
+  for(const r of REG){ if(S.onset[r.id]!=null) continue;
+    if(frontYAt(S,lx(r.lon))<=ly(r.lat)+M_PX){ S.onset[r.id]=S.day; if(r.id===S.target){ S.fail={type:'onset',reg:r.id,day:S.day}; return; } } }
+  if(S.day>=S.end) S.clear=true;
+}
+// ==/CORE==
+
+// 海岸線: Natural Earth 1:50m（パブリックドメイン）を簡略化した経度・緯度
+const COAST={"jp":[[133.37,36.2,133.24,36.18,133.21,36.29,133.3,36.34],[138.34,37.82,138.23,37.83,138.32,37.97,138.25,37.99,138.31,38.16,138.5,38.32,138.45,38.08,138.58,38.07,138.5,37.9],[134.93,34.29,134.82,34.2,134.68,34.25,134.83,34.47,135.0,34.54,134.91,34.4],[130.62,30.26,130.45,30.26,130.39,30.39,130.5,30.47,130.67,30.37],[130.96,30.4,130.87,30.39,130.87,30.44,131.04,30.82,131.06,30.64],[130.08,32.23,130.0,32.19,129.98,32.35,130.01,32.52,130.17,32.54,130.2,32.34],[129.28,34.12,129.21,34.08,129.19,34.15,129.21,34.32,129.34,34.28],[129.39,34.35,129.37,34.31,129.27,34.37,129.33,34.61,129.45,34.69,129.48,34.54],[128.67,32.78,128.84,32.76,128.89,32.65,128.82,32.65,128.75,32.59,128.66,32.63],[129.08,32.84,129.0,32.95,129.11,33.13,129.12,33.07,129.18,32.99],[143.82,44.12,144.1,44.1,144.48,43.95,144.72,43.93,145.37,44.33,145.13,43.87,145.14,43.66,145.34,43.3,145.49,43.28,145.67,43.39,145.83,43.39,145.51,43.17,145.35,43.18,144.92,43.0,144.63,42.95,144.2,42.97,143.97,42.88,143.43,42.42,143.24,42.0,142.51,42.26,141.85,42.58,141.41,42.55,140.99,42.34,140.71,42.56,140.48,42.56,140.35,42.44,140.33,42.29,140.53,42.13,140.73,42.12,141.15,41.81,141.08,41.76,140.66,41.82,140.38,41.52,140.09,41.43,140.0,41.58,140.11,41.91,140.06,42.07,139.84,42.28,139.83,42.45,139.89,42.65,140.43,42.95,140.49,43.05,140.4,43.17,140.39,43.3,140.49,43.34,140.82,43.21,141.14,43.18,141.3,43.2,141.37,43.28,141.4,43.64,141.64,44.02,141.66,44.26,141.76,44.48,141.78,44.72,141.58,45.16,141.67,45.4,141.94,45.51,142.88,44.67],[131.17,33.6,131.37,33.57,131.58,33.65,131.7,33.6,131.71,33.5,131.54,33.27,131.9,33.25,131.85,33.12,131.95,33.05,131.91,32.97,132.01,32.92,131.66,32.47,131.34,31.4,131.07,31.44,131.04,31.38,131.1,31.26,130.69,31.02,130.79,31.27,130.7,31.58,130.8,31.67,130.66,31.72,130.56,31.56,130.54,31.4,130.64,31.27,130.59,31.18,130.2,31.29,130.15,31.41,130.29,31.45,130.32,31.6,130.19,31.77,130.2,31.95,130.19,32.09,130.39,32.22,130.64,32.62,130.5,32.66,130.57,32.73,130.55,32.83,130.38,33.09,130.24,33.18,130.13,33.1,130.18,32.85,130.33,32.85,130.34,32.7,130.25,32.68,130.05,32.77,129.77,32.57,129.83,32.73,129.69,32.88,129.68,33.06,129.83,32.89,129.99,32.85,129.9,33.02,129.58,33.24,129.61,33.34,129.84,33.32,129.83,33.44,130.37,33.63,130.48,33.83,130.72,33.93,130.95,33.87,131.06,33.67],[134.36,34.26,134.64,34.23,134.67,33.85,134.74,33.82,134.38,33.61,134.18,33.25,133.96,33.45,133.63,33.51,133.29,33.36,132.98,32.84,132.8,32.75,132.64,32.76,132.71,32.9,132.5,32.92,132.43,33.06,132.52,33.26,132.41,33.33,132.41,33.43,132.03,33.34,132.64,33.69,132.78,33.99,132.94,34.1,133.19,33.93,133.58,34.02,133.64,34.13,133.6,34.24,133.95,34.35],[141.23,41.37,141.46,41.4,141.4,41.1,141.43,40.72,141.46,40.61,141.8,40.29,141.99,39.79,141.98,39.43,141.9,39.11,141.66,38.97,141.55,38.76,141.47,38.4,141.11,38.34,140.96,38.15,140.93,37.95,141.04,37.47,141.0,37.11,140.73,36.73,140.57,36.23,140.62,36.06,140.87,35.72,140.64,35.66,140.46,35.51,140.35,35.18,140.06,35.04,139.92,34.9,139.84,34.91,139.8,34.96,139.83,35.3,140.1,35.59,139.99,35.67,139.83,35.66,139.77,35.49,139.65,35.41,139.74,35.25,139.68,35.15,139.47,35.3,139.25,35.28,139.13,35.15,139.09,34.84,138.84,34.62,138.76,34.7,138.8,34.97,138.9,35.03,138.72,35.12,138.58,35.09,138.19,34.6,137.54,34.66,137.06,34.58,137.29,34.7,137.28,34.77,137.03,34.77,136.96,34.83,136.94,34.72,136.87,34.73,136.9,35.04,136.8,35.05,136.69,34.98,136.53,34.68,136.88,34.43,136.85,34.32,136.33,34.18,135.92,33.56,135.7,33.49,135.45,33.55,135.13,34.01,135.1,34.29,135.38,34.5,135.42,34.62,135.36,34.65,135.04,34.63,134.74,34.77,134.58,34.77,134.25,34.71,133.97,34.53,132.77,34.26,132.66,34.25,132.42,34.35,132.31,34.32,132.15,33.84,131.74,34.05,131.23,33.95,131.07,34.02,130.92,33.98,130.89,34.26,130.95,34.35,131.35,34.41,132.26,35.02,132.7,35.42,132.92,35.51,133.27,35.56,133.38,35.46,133.98,35.51,135.17,35.75,135.27,35.72,135.23,35.59,135.33,35.53,135.68,35.5,135.8,35.55,136.1,35.77,136.01,35.99,136.07,36.12,136.7,36.74,136.75,36.95,136.72,37.2,136.84,37.38,137.32,37.52,137.34,37.44,136.9,37.12,136.99,37.03,137.02,36.84,137.25,36.75,137.34,36.77,137.51,36.95,138.32,37.22,138.63,37.47,138.89,37.84,139.36,38.1,139.52,38.5,139.8,38.88,140.04,39.41,140.06,39.62,139.99,39.86,139.74,39.92,139.91,40.02,140.01,40.26,139.92,40.53,139.97,40.67,140.28,40.85,140.34,41.01,140.32,41.16,140.39,41.23,140.63,41.2,140.68,40.89,140.75,40.83,140.94,40.94,141.12,40.88,141.23,40.99,141.24,41.21,141.2,41.24,140.8,41.14,140.8,41.25,140.94,41.51],[124.29,24.52,124.19,24.34,124.08,24.44,124.12,24.47,124.21,24.46,124.3,24.59],[123.89,24.28,123.68,24.29,123.75,24.35,123.77,24.41,123.93,24.36],[128.26,26.65,127.87,26.44,127.9,26.33,127.79,26.26,127.8,26.15,127.73,26.1,127.65,26.09,127.65,26.15,127.73,26.43,127.93,26.56,127.91,26.69,128.1,26.67,128.25,26.88,128.33,26.81],[129.45,28.21,129.37,28.13,129.16,28.25,129.58,28.46,129.69,28.52,129.71,28.43,129.46,28.27]],"other":[[121.01,22.62,120.84,21.93,120.74,21.96,120.58,22.36,120.32,22.55,120.07,23.15,120.16,23.71,120.84,24.72,121.04,25.03,121.52,25.28,121.93,24.97,121.4,23.17],[126.63,37.78,127.09,38.28,128.04,38.31,128.37,38.62,129.34,37.27,129.47,36.74,129.4,36.05,129.57,36.05,129.21,35.18,128.51,35.1,128.44,34.87,128.04,35.02,127.71,34.95,127.72,34.72,127.4,34.82,127.48,34.63,127.32,34.46,127.17,34.55,127.25,34.76,127.03,34.61,126.53,34.31,126.26,34.67,126.52,34.7,126.59,34.82,126.42,34.82,126.29,35.15,126.61,35.57,126.49,35.65,126.75,35.87,126.54,36.17,126.49,36.69,126.16,36.77,126.49,37.01,126.87,36.82,126.98,36.94,126.75,37.19,126.56,37.72],[128.74,34.8,128.52,34.82,128.59,34.93,128.72,35.01],[128.07,34.81,127.98,34.7,127.84,34.81,127.92,34.92],[126.23,34.37,126.11,34.4,126.23,34.53,126.38,34.5],[126.52,37.74,126.52,37.6,126.41,37.65,126.41,37.82],[126.33,33.22,126.2,33.37,126.7,33.55,126.9,33.52,126.87,33.34],[130.69,42.3,130.42,42.73,131.07,42.9,131.26,43.38,131.17,43.7,131.26,44.07,130.98,44.84,131.45,44.98,131.85,45.33,132.94,45.03,133.11,45.13,133.19,45.49,133.44,45.6,133.51,45.88,133.86,46.25,133.87,46.5,134.2,47.13,134.17,47.3,134.75,47.72,134.57,48.02,134.67,48.25,134.29,48.37,133.02,48.06,132.48,47.71,131.0,47.69,130.73,48.02,130.8,48.34,130.55,48.6,130.62,48.77,130.2,48.89,129.5,49.39,129.12,49.36,128.7,49.6,128.0,49.57,127.71,49.67,127.5,49.87,127.59,50.21,127.34,50.35,127.31,50.71,127.01,51,119.64,51,119.16,50.41,119.35,50.28,119.26,50.07,118.45,49.84,117.87,49.51,117,49.7,117.0,51,140.65,51,140.48,50.55,140.62,50.08,140.46,49.91,140.52,49.6,140.31,49.05,140.38,48.96,140.11,48.42,139.37,47.89,138.59,47.06,138.34,46.54,137.69,45.82,135.87,44.37,135.13,43.53,134.01,42.95,133.16,42.7,132.3,42.88,132.31,43.31,131.87,43.1,131.94,43.3,131.16,42.63,130.71,42.66,130.83,42.52],[143.6,51,144.27,49.31,144.69,48.87,144.71,48.64,143.97,49.28,143.38,49.29,143.03,49.11,142.57,48.07,142.56,47.74,143.22,46.79,143.49,46.75,143.58,46.36,143.46,46.07,143.28,46.56,142.64,46.72,142.41,46.55,142.08,45.92,141.96,46.01,141.83,46.45,142.04,47.14,141.96,47.59,142.18,48.01,141.87,48.75,142.14,49.57,142.07,50.63,142.21,51],[152.0,46.9,151.86,46.87,152.23,47.14],[149.69,45.64,149.45,45.59,149.67,45.84,150.35,46.21,150.55,46.21],[148.6,45.32,147.66,44.98,146.9,44.4,147.56,45.06,147.89,45.23,147.92,45.38,148.06,45.26,148.32,45.28,148.77,45.53,148.84,45.36],[146.71,43.74,146.62,43.81,146.88,43.83],[146.21,44.5,146.57,44.44,145.91,44.1,145.59,43.85,145.56,43.66,145.46,43.87],[128.37,38.62,128.04,38.31,127.09,38.28,126.63,37.78,126.37,37.88,126.12,37.74,125.77,37.99,125.36,37.72,125.31,37.84,124.99,37.93,125.21,38.08,124.69,38.13,125.07,38.56,125.55,38.69,125.17,38.81,125.41,39.29,125.36,39.53,124.78,39.76,124.64,39.62,124.35,39.91,124.39,40.1,124.89,40.46,125.99,40.9,126.72,41.72,127.06,41.69,127.18,41.53,128.15,41.39,128.29,41.61,128.05,41.99,128.92,42.04,129.31,42.41,129.7,42.45,129.9,43.0,130.24,42.89,130.25,42.74,130.69,42.3,130.24,42.18,129.76,41.71,129.71,40.86,128.51,40.13,127.57,39.78,127.39,39.21,127.79,39.08],[121.86,31.49,121.34,31.64,121.21,31.81,121.46,31.76],[122.3,29.96,122.02,30.01,121.97,30.14,122.28,30.07],[119.82,25.46,119.7,25.43,119.78,25.65],[117,46.36,117.33,46.36,117.44,46.59,117.74,46.52,118.31,46.72,119.87,46.67,119.9,46.86,119.71,47.15,118.5,47.98,117.77,47.99,117.35,47.65,117,47.82,117,49.7,117.87,49.51,118.45,49.84,119.26,50.07,119.35,50.28,119.16,50.41,119.64,51,127.01,51,127.31,50.71,127.34,50.35,127.59,50.21,127.5,49.87,127.71,49.67,128.0,49.57,128.7,49.6,129.12,49.36,129.5,49.39,130.2,48.89,130.55,48.86,130.55,48.6,130.8,48.34,130.73,48.02,131.0,47.69,132.48,47.71,132.71,47.95,133.14,48.11,133.47,48.1,134.29,48.37,134.67,48.25,134.57,48.02,134.75,47.72,134.17,47.3,134.2,47.13,133.87,46.5,133.86,46.25,133.51,45.88,133.44,45.6,133.19,45.49,133.11,45.13,132.94,45.03,131.85,45.33,131.45,44.98,130.98,44.84,131.26,44.07,131.17,43.7,131.26,43.38,131.07,42.9,130.45,42.76,130.53,42.54,130.25,42.74,130.24,42.89,129.9,43.0,129.7,42.45,129.31,42.41,128.92,42.04,128.05,41.99,128.29,41.61,128.15,41.39,127.18,41.53,126.9,41.78,126.6,41.64,126.49,41.36,125.99,40.9,124.89,40.46,124.27,39.92,123.65,39.88,123.03,39.67,122.33,39.37,121.98,39.05,121.68,39.0,121.65,38.87,121.16,38.73,121.11,38.92,121.68,39.11,121.63,39.22,121.82,39.39,121.28,39.38,121.27,39.54,121.52,39.64,121.52,39.84,121.8,39.95,122.28,40.54,121.83,40.97,121.73,40.85,121.17,40.9,120.48,40.23,119.39,39.75,118.98,39.18,118.3,39.07,118.04,39.23,117.87,39.19,117.55,38.69,117.66,38.42,118.01,38.18,118.94,38.04,119.09,37.7,118.95,37.33,119.29,37.14,119.76,37.16,120.26,37.68,120.75,37.83,121.64,37.46,122.06,37.53,122.67,37.4,122.45,37.07,122.52,36.95,122.34,36.83,121.93,36.96,121.05,36.61,120.81,36.63,120.9,36.44,120.71,36.41,120.64,36.13,120.39,36.05,120.33,36.23,120.18,36.2,120.09,36.12,120.28,35.98,119.43,35.3,119.17,34.85,120.27,34.27,120.87,33.02,120.85,32.66,121.34,32.43,121.45,32.15,121.83,31.9,121.87,31.7,121.76,31.7,120.97,31.87,120.52,32.11,120.04,31.94,120.72,31.98,120.79,31.82,121.66,31.32,121.83,31.06,121.88,30.92,121.42,30.79,120.9,30.39,120.45,30.39,120.19,30.24,120.49,30.3,120.63,30.13,121.26,30.3,121.68,29.98,122.08,29.87,121.51,29.48,121.89,29.63,121.97,29.49,121.92,29.14,121.72,29.26,121.45,29.13,121.68,28.95,121.54,28.93,121.66,28.85,121.48,28.64,121.61,28.29,121.27,28.22,121.15,28.33,120.96,28.04,120.75,28.01,120.83,27.89,120.59,27.58,120.61,27.41,120.28,27.1,120.04,26.63,119.88,26.61,119.82,26.85,119.71,26.73,119.59,26.78,119.88,26.33,119.46,26.05,119.14,26.12,119.33,25.95,119.62,26.0,119.54,25.59,119.62,25.39,119.18,25.45,119.29,25.23,118.98,25.21,118.91,24.93,118.64,24.84,118.66,24.62,118.09,24.63,118.01,24.48,117.84,24.47,118.06,24.25,117.63,23.84,117.47,23.84,117.42,23.62,117.29,23.71,117,23.63]]};
+
+// ---- ゲーム固有 ----------------------------------------------
+const GAME_NO='No.05';
+const TAG='梅雨前線ディフェンス';
+const DAY_SEC=1.5;                 // 1日 = 1.5秒
+setCoast(COAST.jp);
+
+const G={screen:'title',stage:0,S:null,tx:0,ty:0,anim:null,guide:0,pops:[],wet:0,records:[],t:0};
+let lastTs=0;
+
+// 洗濯物を干している場所（面ごと）
+const PLACES=['那覇市のベランダ','鹿児島市の物干し台','大阪市のベランダ','東京都内のベランダ','新潟市の物干し台','盛岡市の庭'];
+
+function startStage(i){
+  G.stage=i; G.S=simInit(i); G.tx=G.S.hx; G.ty=G.S.hy; G.anim=null; G.guide=3.4; G.pops=[]; G.wet=0;
+  G.screen='play'; UI.close(); lastTs=0;
+}
+function restart(){ startStage(G.stage); }
+
+function update(dt){
+  G.t+=dt;
+  if(G.anim){ G.anim.t+=dt; if(G.anim.kind==='fail')G.wet=Math.min(1,G.wet+dt*1.2); if(G.anim.t>=G.anim.dur){ const a=G.anim; G.anim=null; a.done(); } return; }
+  G.guide=Math.max(0,G.guide-dt);
+  const S=G.S, before=Object.assign({},S.onset);
+  let rem=dt/DAY_SEC;
+  while(rem>1e-9&&!S.fail&&!S.clear){ const h=Math.min(rem,1/120); simStep(S,h,G.tx,G.ty); rem-=h; }
+  for(const r of REG) if(before[r.id]==null&&S.onset[r.id]!=null&&r.id!==S.target) G.pops.push({r,t:0,k:G.pops.filter(p=>p.t<0.4).length});
+  G.pops.forEach(p=>p.t+=dt); G.pops=G.pops.filter(p=>p.t<2.6);
+  if(S.fail){ buzz([30,40,80]); G.anim={kind:'fail',t:0,dur:1.2,done:fail}; }
+  else if(S.clear){ G.anim={kind:'clear',t:0,dur:0.9,done:clear}; }
+}
+
+// ---- 結果 ----
+const delayStr=d=>d>0?'平年より'+d+'日遅く':d<0?'平年より'+(-d)+'日早く':'平年並み';
+function maxRain(S){ let k=null,v=0; for(const id in S.peak) if(S.peak[id]>v){v=S.peak[id];k=id;} return {r:k&&REGI[k],v:Math.round(v)}; }
+function fail(){
+  const S=G.S, st=STAGES[G.stage], r=REGI[S.target], f=S.fail;
+  G.screen='result';
+  if(f.type==='onset'){
+    const day=Math.floor(f.day), dl=day-r.onDay;
+    const over=S.overDay!=null&&f.day-S.overDay<0.6;
+    const cause=over?'前線を南へ押し込みすぎて、高気圧の北側へ乗り越えられました'
+      :'高気圧の南の縁が'+r.city+'より北にあり、前線が'+r.city+'まで届きました';
+    UI.sheet({no:GAME_NO+' · 梅雨の時期に関する気象情報',title:r.jname+'は梅雨入りしたと見られます',stamp:'梅雨入',
+      lead:r.jname+'は、前線や低気圧の影響で曇りや雨となっています。向こう一週間も、前線や低気圧の影響で曇りや雨の日が多い見込みです。\nこのため、'+r.jname+'は、'+dstr(day)+'ごろに梅雨入りしたと見られます。',
+      rows:[['梅雨入り',dstr(day)+'ごろ（'+delayStr(dl)+'）'],['平年',dstr(r.onDay)+'ごろ'],['目標',dstr(S.end)+'まで晴れ'],['原因',cause],['洗濯物',PLACES[G.stage]+'で全部ぬれました']],
+      main:['この面をやり直す',restart],
+      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+r.jname+'は'+dstr(day)+'ごろに梅雨入りしたと見られます（'+delayStr(dl)+'）。目標の'+dstr(S.end)+'まで守れませんでした',TAG)],['一覧へ',toPortal]]});
+  }else{
+    const q=REGI[f.reg], day=Math.floor(f.day);
+    UI.sheet({no:GAME_NO+' · 気象情報',title:'前線が停滞し、'+q.jname+'で大雨',stamp:'大雨',
+      lead:'梅雨前線が'+q.jname+'付近に停滞し、'+q.jname+'では'+dstr(day)+'にかけて大雨となっています。',
+      rows:[['雨量',q.jname+' '+GMAX+'mm'],['日付',dstr(day)],['原因','高気圧で前線を'+q.jname+'の上にせき止め続けました'],['守っていた地方',r.jname+'（'+dstr(S.end)+'まで）']],
+      main:['この面をやり直す',restart],
+      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+r.jname+'の梅雨入りを遅らせようとして、'+q.jname+'に大雨（'+GMAX+'mm）を降らせました',TAG)],['一覧へ',toPortal]]});
+  }
+}
+function clear(){
+  const S=G.S, st=STAGES[G.stage], r=REGI[S.target], mr=maxRain(S);
+  G.screen='result'; G.records[G.stage]={K:st.K,rain:mr};
+  const last=G.stage>=STAGES.length-1;
+  const early=REG.filter(q=>q.id!==S.target&&S.onset[q.id]!=null&&S.onset[q.id]<q.onDay-1).map(q=>q.jname);
+  const rows=[['晴れ',dstr(S.end)+'まで（'+delayStr(st.K)+'）'],['平年',dstr(r.onDay)+'ごろ'],['最大雨量',mr.r?mr.r.jname+' '+mr.v+'mm':'なし']];
+  if(early.length) rows.push(['先に梅雨入り',early.join('・')+'（平年より早く）']);
+  if(last){
+    UI.sheet({no:GAME_NO+' · 梅雨の時期に関する気象情報',title:'東北北部まで、梅雨入りを遅らせました',stamp:'晴天',round:true,
+      lead:'沖縄から東北北部まで、6つの地方で洗濯物を守りきりました。',
+      rows:STAGES.map((s,i)=>[REGI[s.r].jname,dstr(s.end)+'まで晴れ（+'+s.K+'日）']),
+      main:['はじめから',()=>startStage(0)],
+      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】太平洋高気圧になって、沖縄から東北北部まで梅雨入りを平年より6〜11日遅らせました',TAG)],['一覧へ',toPortal]]});
+  }else{
+    UI.sheet({no:GAME_NO+' · 梅雨の時期に関する気象情報',title:r.jname+'は'+dstr(S.end).replace('月','月\u2060')+'まで晴れ',stamp:'晴天',round:true,
+      lead:PLACES[G.stage]+'の洗濯物は、'+dstr(S.end)+'まで乾いたままです。',
+      rows,
+      main:['次の面へ',()=>startStage(G.stage+1)],
+      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+r.jname+'の梅雨入りを'+delayStr(st.K)+'しました（'+dstr(S.end)+'まで晴れ）',TAG)],['一覧へ',toPortal]]});
+  }
+}
+function showTitle(){
+  G.screen='title'; UI.hideHud(); G.S=simInit(2); G.S.hx=lx(141); G.S.hy=ly(26); G.S.a=G.S.N.slice(); G.anim=null;
+  UI.sheet({no:GAME_NO+' · 業務内容',title:'梅雨前線ディフェンス',
+    lead:'あなたは太平洋高気圧。南から北上してくる梅雨前線をせき止めて、洗濯物を干している地方の梅雨入りを平年より遅らせる。',
+    rows:[['あなたの権限','太平洋高気圧を指で好きな場所へ動かせる'],['操作','画面のどこでもドラッグすると、高気圧が同じだけ動く'],
+      ['失敗','守る地方が梅雨入りする／せき止めた前線の下の地方の雨量が'+GMAX+'mmに達する'],
+      ['出典','梅雨入りの平年日: 気象庁「過去の梅雨入りと梅雨明け」（1991〜2020年の平均）data.jma.go.jp/cpd/baiu/　発表文: 地方気象台「梅雨入りに関するお知らせ」　前線の位置・雨量は平年日に合わせた概略値']],
+    main:['はじめる',()=>startStage(0)],subs:[['面を選ぶ',showStages],['一覧へ',toPortal]]});
+}
+function showStages(){
+  UI.sheet({no:GAME_NO+' · 面を選ぶ',title:'どの地方を守るか',
+    rows:STAGES.map((s,i)=>[(i+1)+'. '+REGI[s.r].name,dstr(s.end)+'まで晴れ'+[...'（平年'+dstr(REGI[s.r].onDay)+'ごろ）'].join('\u2060')]),
+    main:['1. 沖縄から',()=>startStage(0)],
+    subs:STAGES.slice(1).map((s,i)=>[(i+2)+'',()=>startStage(i+1)]).concat([['戻る',showTitle]])});
+}
+
+// ---- 入力: どこを触っても高気圧が指と同じだけ動く ----
+let drag=null;
+const clampT=()=>{ G.tx=Math.max(-70,Math.min(490,G.tx)); G.ty=Math.max(ly(49),Math.min(ly(14),G.ty)); };
+$('wrap').addEventListener('pointerdown',e=>{
+  if(G.screen!=='play'||G.anim||e.target.closest('#hud'))return;
+  const p=toGame(e); drag={id:e.pointerId,x:p.x,y:p.y,tx:G.tx,ty:G.ty}; G.guide=Math.min(G.guide,0.6);
+});
+window.addEventListener('pointermove',e=>{
+  if(!drag||e.pointerId!==drag.id||G.screen!=='play')return;
+  const p=toGame(e); G.tx=drag.tx+(p.x-drag.x); G.ty=drag.ty+(p.y-drag.y); clampT();
+});
+['pointerup','pointercancel'].forEach(k=>window.addEventListener(k,e=>{ if(drag&&e.pointerId===drag.id)drag=null; }));
+window.addEventListener('keydown',e=>{
+  if(G.screen!=='play')return; const k={ArrowLeft:[-8,0],ArrowRight:[8,0],ArrowUp:[0,-8],ArrowDown:[0,8]}[e.key];
+  if(k){ G.tx+=k[0]; G.ty+=k[1]; clampT(); e.preventDefault(); }
+});
+
+// ---- 描画 ----
+const C={sea:'#E9EEEC',land:'#DCD5BE',land2:'#CFC7AC',coast:'#6E6754',grid:'#B4BDB9',iso:'#4A4740',ink:'#22201C',ink2:'#5E584D',
+  hi:'#1E4FA8',lo:'#B8322A',warm:'#C8372D',cold:'#2350B0'};
+const FONT='"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif';
+let LAND_JP=null,LAND_OT=null;
+function buildPaths(){
+  const mk=list=>{ const p=new Path2D(); list.forEach(f=>{ for(let i=0;i<f.length;i+=2){ const x=lx(f[i]),y=ly(f[i+1]); i?p.lineTo(x,y):p.moveTo(x,y); } p.closePath(); }); return p; };
+  LAND_JP=mk(COAST.jp); LAND_OT=mk(COAST.other);
+}
+buildPaths();
+
+// ---- 天気図の文字の配置: 毎フレーム、優先度の高い順に置き、重なる・はみ出す位置には置かない ----
+// LB: 置いた矩形（画面の論理座標）。LQ: 最後にまとめて描く文字。LMISS: 置けなかった必須ラベル（検証用）
+let LB=[],LQ=[],LMISS=[];
+function lbHit(r){ return LB.some(q=>r[0]<q[2]&&r[2]>q[0]&&r[1]<q[3]&&r[3]>q[1]); }
+function lbIn(r){ return r[0]>=1&&r[2]<=W-1&&r[1]>=topY()+1&&r[3]<=H-1; }
+function lbBlock(x0,y0,x1,y1,kind){ LB.push([x0,y0,x1,y1,kind||'block']); }
+// o={text,font,h,pad,bg,fg,kind,req}; cands=[[cx,cy],...] 中心の候補を順に試す。文字は measureText で実測
+function label(o,cands){
+  ctx.font=o.font; const w=ctx.measureText(o.text).width+2*(o.pad??3), h=o.h;
+  for(const [cx,cy] of cands){ const r=[cx-w/2,cy-h/2,cx+w/2,cy+h/2];
+    if(lbIn(r)&&!lbHit(r)){ LB.push([...r,o.kind||'label',o.text]); LQ.push({...o,r}); return r; } }
+  if(o.req) LMISS.push(o.text);
+  return null;
+}
+function drawQueued(){
+  ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(const q of LQ){ const [x0,y0,x1,y1]=q.r; ctx.globalAlpha=q.alpha??1;
+    if(q.bg){ ctx.fillStyle=q.bg; ctx.fillRect(x0,y0,x1-x0,y1-y0); }
+    if(q.box){ ctx.strokeStyle=q.box; ctx.lineWidth=1; ctx.strokeRect(x0+0.5,y0+0.5,x1-x0-1,y1-y0-1); }
+    ctx.font=q.font; ctx.fillStyle=q.fg; ctx.fillText(q.text,(x0+x1)/2,(y0+y1)/2+0.5); }
+  ctx.restore();
+}
+
+// 気圧: 前線に沿った気圧の谷 + 低気圧 + オホーツク海高気圧（背景の等圧線用）
+function lowPos(S){ const st=STAGES[S.si]; const x=((S.day-st.start)*34+40)%560-60; return {x,y:frontYAt(S,x)}; }
+function pBg(S,x,y,fy,lo){
+  let p=1005+0.07*Math.abs(y-fy);
+  p-=7*Math.exp(-((x-lo.x)**2+(y-lo.y)**2)/(55*55));
+  p+=9*Math.exp(-((x-470)**2+(y+40)**2)/(150*150));
+  return p;
+}
+function drawIsobars(S,top){
+  const step=14, nx=Math.ceil(W/step)+2, ny=Math.ceil((H-top)/step)+2, lo=lowPos(S);
+  const nat=x=>{ const f=(x-COLS[0])/7, i=Math.max(0,Math.min(COLS.length-2,Math.floor(f))), t=f-i; return S.N[i]*(1-t)+S.N[i+1]*t; };
+  const val=[]; for(let i=0;i<nx;i++){ const x=i*step-step, fy=nat(x); val[i]=[]; for(let j=0;j<ny;j++) val[i][j]=pBg(S,x,j*step-step,fy,lo); }
+  ctx.save(); ctx.translate(0,top);
+  // 高気圧の圏内は高気圧の等圧線だけを描く
+  ctx.beginPath(); ctx.rect(-20,-20,W+40,H+40); ctx.arc(S.hx,S.hy,R_DISK+5,0,Math.PI*2,true); ctx.clip();
+  ctx.strokeStyle=C.iso; ctx.lineWidth=1;
+  const labels=[];
+  for(const lv of [1004,1008,1012,1016]){
+    ctx.beginPath(); ctx.lineWidth=lv===1000||lv===1020?2:1;
+    for(let i=0;i<nx-1;i++) for(let j=0;j<ny-1;j++){
+      const a=val[i][j],b=val[i+1][j],c=val[i+1][j+1],d=val[i][j+1];
+      const pts=[]; const x0=i*step-step,y0=j*step-step;
+      const e=(p,q,t0,t1)=>{ if((p<lv)!==(q<lv)){ const t=(lv-p)/(q-p); pts.push([t0[0]+(t1[0]-t0[0])*t,t0[1]+(t1[1]-t0[1])*t]); } };
+      e(a,b,[x0,y0],[x0+step,y0]); e(b,c,[x0+step,y0],[x0+step,y0+step]); e(d,c,[x0,y0+step],[x0+step,y0+step]); e(a,d,[x0,y0],[x0,y0+step]);
+      if(pts.length>=2){ ctx.moveTo(pts[0][0],pts[0][1]); ctx.lineTo(pts[1][0],pts[1][1]);
+        if(pts.length===4){ ctx.moveTo(pts[2][0],pts[2][1]); ctx.lineTo(pts[3][0],pts[3][1]); }
+        if(!labels[lv]&&x0>370&&x0<392&&y0>20&&y0<H-top-160) labels[lv]=[pts[0][0],pts[0][1]]; }
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+  S._isoLabels=Object.keys(labels).map(lv=>[String(lv).slice(2),labels[lv][0],labels[lv][1]+top]);
+  return lo;
+}
+
+// 停滞前線: 赤の半円（北側）と青の三角（南側）が交互に並ぶ
+// 前線の折れ線。せき止められた部分の両端は、高気圧の縁に沿って回り込ませる
+function frontPts(S){
+  const out=[], R=R_DISK+1.5, onC=f=>[S.hx+R*Math.cos(f),S.hy+R*Math.sin(f)];
+  for(let i=0;i<COLS.length;i++){
+    if(i>0&&S.held[i-1]!==S.held[i]){
+      const hi=S.held[i-1]?i-1:i, oi=S.held[i-1]?i:i-1;
+      if(S.a[oi]<S.a[hi]-8){
+        let f=Math.atan2(S.a[hi]-S.hy,COLS[hi]-S.hx); const west=COLS[oi]<COLS[hi], pts=[];
+        for(let k=0;k<70;k++){ f+=(west?1:-1)*0.05; const q=onC(f); if(q[1]<=S.a[oi])break; pts.push(q); }
+        out.push(...(S.held[i-1]?pts:pts.reverse()));
+      }
+    }
+    out.push([COLS[i],S.a[i]]);
+  }
+  return out;
+}
+function drawFront(S,top){
+  const P=frontPts(S).map(p=>[p[0],p[1]+top]);
+  const seg=[]; let tot=0; for(let i=1;i<P.length;i++){ const l=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]); seg.push(l); tot+=l; }
+  const at=s=>{ let i=0; while(i<seg.length-1&&s>seg[i]){ s-=seg[i]; i++; } const t=seg[i]?Math.min(1,s/seg[i]):0;
+    const a=P[i],b=P[i+1]; const dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy)||1; return {x:a[0]+dx*t,y:a[1]+dy*t,tx:dx/L,ty:dy/L}; };
+  const U=26; ctx.lineWidth=2.6; ctx.lineCap='butt';
+  for(let s=0,k=0;s<tot;s+=U,k++){
+    const red=k%2===0; ctx.strokeStyle=red?C.warm:C.cold; ctx.fillStyle=ctx.strokeStyle;
+    ctx.beginPath(); for(let u=0;u<=U;u+=3){ const p=at(Math.min(tot,s+u)); u?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y); } ctx.stroke();
+    const m=at(Math.min(tot,s+U/2)); let nx=m.ty,ny=-m.tx; if(ny>0||(ny===0&&nx<0)){ nx=-nx; ny=-ny; } // n は北向き
+    ctx.beginPath();
+    if(red){ for(let k2=0;k2<=10;k2++){ const f=Math.PI*k2/10, c=Math.cos(f), sn=Math.sin(f); ctx.lineTo(m.x+5.5*(c*m.tx+sn*nx),m.y+5.5*(c*m.ty+sn*ny)); } }
+    else { ctx.moveTo(m.x-6*m.tx,m.y-6*m.ty); ctx.lineTo(m.x+6*m.tx,m.y+6*m.ty); ctx.lineTo(m.x-7.5*nx,m.y-7.5*ny); }
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+const RADAR=[[0.1,'#A0D2FF'],[0.25,'#218CFF'],[0.4,'#0041FF'],[0.55,'#FAF500'],[0.7,'#FF9900'],[0.85,'#FF2800'],[9,'#B40068']];
+const radarCol=f=>RADAR.find(c=>f<c[0])[1];
+
+function drawMap(S,top){
+  ctx.fillStyle=C.sea; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.translate(0,top);
+  // 緯度経度線（5度ごと）
+  ctx.strokeStyle=C.grid; ctx.lineWidth=0.8; ctx.setLineDash([3,4]); ctx.beginPath();
+  for(let lon=125;lon<=145;lon+=5){ ctx.moveTo(lx(lon),-top); ctx.lineTo(lx(lon),H); }
+  for(let lat=15;lat<=45;lat+=5){ ctx.moveTo(0,ly(lat)); ctx.lineTo(W,ly(lat)); }
+  ctx.stroke(); ctx.setLineDash([]);
+  // 陸地
+  ctx.fillStyle=C.land2; ctx.fill(LAND_OT); ctx.fillStyle=C.land; ctx.fill(LAND_JP);
+  ctx.strokeStyle=C.coast; ctx.lineWidth=0.9; ctx.lineJoin='round'; ctx.stroke(LAND_OT); ctx.stroke(LAND_JP);
+  // 雨（レーダーの色）: 停滞した前線の下に積もった雨量
+  for(const r of REG){ const g=S.g[r.id]; if(g<12) continue; const f=g/GMAX;
+    ctx.globalAlpha=0.5; ctx.fillStyle=radarCol(f);
+    for(const p of r.pts){ ctx.beginPath(); ctx.arc(lx(p[0]),ly(p[1]),RAIN_R*KX*0.75,0,Math.PI*2); ctx.fill(); }
+    ctx.globalAlpha=1; }
+  // 前線の下で降っている雨
+  ctx.fillStyle='#218CFF';
+  for(const c of S.rainCells){ if(c[2]<0.05) continue; ctx.globalAlpha=0.35*c[2];
+    for(let k=0;k<3;k++){ const ox=((c[0]*7+k*13+Math.floor(G.t*9))%11)-5, oy=((c[0]*3+k*7+Math.floor(G.t*11))%13)-9; ctx.fillRect(c[0]+ox,c[1]+oy,1.3,3.5); } }
+  ctx.globalAlpha=1;
+  ctx.restore();
+}
+
+function drawHigh(S,top){
+  const x=S.hx,y=S.hy+top, warn=S.dmax>DLIM*0.78;
+  ctx.save();
+  ctx.fillStyle='rgba(255,246,214,0.32)'; ctx.beginPath(); ctx.arc(x,y,R_DISK,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle=C.iso;
+  [[1,1012],[0.66,1016],[0.34,1020]].forEach(([f,lv],i)=>{
+    ctx.lineWidth=i===0?(warn?2.2+Math.sin(G.t*18):1.6):1; ctx.beginPath(); ctx.arc(x,y,R_DISK*f,0,Math.PI*2); ctx.stroke();
+  });
+  ctx.restore();
+}
+// 高気圧の「高」「1024」: 中心が画面の外へ出ても文字は画面内に寄せる
+function labelHigh(S,top){
+  const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const x=cl(S.hx,22,W-22), y=cl(S.hy+top,top+26,H-30);
+  label({text:'高',font:'800 30px '+FONT,h:32,pad:2,fg:C.hi,kind:'high',req:true},[[x,y-4]]);
+  label({text:'1024',font:'700 12px '+FONT,h:13,pad:2,fg:C.hi,kind:'high',req:true},[[x,y+19]]);
+}
+// 高気圧の等圧線の値（12・16・20）: 円の上端。置けなければ省く
+function labelHighRings(S,top){
+  [[1,'12'],[0.66,'16'],[0.34,'20']].forEach(([f,t])=>label({text:t,font:'600 10px '+FONT,h:12,pad:4,bg:C.sea,fg:C.iso,kind:'iso'},[[S.hx,S.hy+top-R_DISK*f]]));
+}
+function drawLowMark(lo,top){
+  if(lo.x<-10||lo.x>W+10) return;
+  ctx.save(); ctx.strokeStyle=C.lo; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(lo.x-4,lo.y+top-4); ctx.lineTo(lo.x+4,lo.y+top+4); ctx.moveTo(lo.x+4,lo.y+top-4); ctx.lineTo(lo.x-4,lo.y+top+4); ctx.stroke();
+  ctx.restore();
+}
+// 低気圧の「低」「1002」: ×の北側に「低」、その横に気圧。左右の端では文字だけ画面内に寄せる。置けなければ南側、それでもだめなら省く
+function labelLow(lo,top){
+  if(lo.x<-10||lo.x>W+10) return;
+  const y=lo.y+top;
+  const x=Math.max(13,Math.min(W-13,lo.x));
+  const a=label({text:'低',font:'800 22px '+FONT,h:24,pad:1,fg:C.lo,kind:'low'},[[x,y-19],[x,y+19]]);
+  if(!a) return;
+  const cy=(a[1]+a[3])/2+4, f='700 11px '+FONT; ctx.font=f; const hw=ctx.measureText('1002').width/2+2;
+  label({text:'1002',font:f,h:12,pad:1,fg:C.lo,kind:'low'},[[a[2]+hw+1,cy],[a[0]-hw-1,cy]]);
+}
+
+// 守る地方の代表地点・ほかの地方の雨量
+function drawCityMark(S,top){
+  const r=REGI[S.target], x=lx(r.lon), y=ly(r.lat)+top;
+  ctx.save(); ctx.fillStyle=C.ink; ctx.beginPath(); ctx.arc(x,y,3.6,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle=C.ink; ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2); ctx.stroke(); ctx.restore();
+  lbBlock(x-9,y-9,x+9,y+9,'city-mark');
+}
+function labelCity(S,top){
+  const r=REGI[S.target], x=lx(r.lon), y=ly(r.lat)+top;
+  ctx.font='800 13px '+FONT; const w=ctx.measureText(r.city).width+8;
+  label({text:r.city,font:'800 13px '+FONT,h:18,pad:4,bg:'rgba(251,251,247,0.94)',fg:C.ink,kind:'city',req:true},
+    [[x+11+w/2,y],[x-11-w/2,y],[x,y-19],[x,y+19],[x+11+w/2,y-20],[x-11-w/2,y-20],[x+11+w/2,y+20],[x-11-w/2,y+20]]);
+}
+// ほかの地方の梅雨入り（発表の直後だけ）と、停滞前線の下の雨量
+// 雨量ラベルの候補位置: 代表点の上下 → 左右 → 外側の輪
+const RAIN_CANDS=[[0,-10],[0,10],[52,0],[-52,0],[0,-28],[0,28],[52,-18],[-52,-18],[52,18],[-52,18]].concat([...Array(16)].flatMap((_,k)=>[[Math.round(90*Math.cos(k*Math.PI/8)),Math.round(46*Math.sin(k*Math.PI/8))]]));
+function labelOthers(S,top){
+  const rise=[0,-18,18,-36,36,-54,54,-72];
+  G.pops.forEach(p=>{ const q=p.r, px=lx(q.lon), py=ly(q.lat)+top-16-Math.min(p.t,1)*6;
+    p.lab=label({text:q.name+' 梅雨入り',font:'700 11px '+FONT,h:16,pad:4,bg:'rgba(27,42,68,0.88)',fg:'#FBFBF7',kind:'pop',req:true,alpha:Math.min(1,(2.6-p.t)/0.6)},
+      rise.map(d=>[px,py+d]).concat(rise.map(d=>[px+70,py+d]),rise.map(d=>[px-70,py+d]))); });
+  for(const r of REG){ const g=S.g[r.id]; if(g<60||r.id===S.target) continue;
+    const p=r.pts[0], x=lx(p[0]), y=ly(p[1])+top;
+    label({text:r.name+' '+Math.round(g)+'mm',font:'700 11px '+FONT,h:15,pad:4,bg:'rgba(251,251,247,0.94)',fg:g>GMAX*0.7?C.warm:C.ink,kind:'rain',req:true},
+      RAIN_CANDS.map(d=>[x+d[0],y+d[1]])); }
+}
+// 緯度・経度の目盛り（地図の端）。ほかの文字と重なる位置では省く
+function labelGrid(S,top,lonY){
+  for(let lat=20;lat<=45;lat+=5) label({text:lat+'°N',font:'500 9.5px '+FONT,h:11,pad:1,fg:C.ink2,kind:'grid'},[[16,ly(lat)+top+8]]);
+  for(let lon=125;lon<=145;lon+=5) label({text:lon+'°E',font:'500 9.5px '+FONT,h:11,pad:1,fg:C.ink2,kind:'grid'},[[lx(lon),lonY]]);
+}
+
+// ---- 洗濯物を干す人（右下の小窓） ----
+function drawPerson(kind,x,y,reach){
+  // x,y=足元。reach: 0..1 腕の上げ具合
+  ctx.save(); ctx.translate(x,y); ctx.lineCap='round'; ctx.lineJoin='round';
+  const P={
+    0:{h:58,sh:12,hip:10,body:'#8E7FA0',body2:'#776989',leg:'#5A5A66',skin:'#E9C3A0',hair:'#E4E2DC',stoop:5,skirt:true},   // 高齢の女性（細身・やや前かがみ・白髪のおだんご・カーディガン）
+    1:{h:66,sh:15,hip:15,body:'#F2F0EA',body2:'#D9D5CB',leg:'#2F3F5E',skin:'#D9A982',hair:'#2A2622',stoop:0,belly:true},  // 中年の男性（大柄・Tシャツ・短髪）
+    2:{h:62,sh:11,hip:10,body:'#2E5E4E',body2:'#244C3F',leg:'#2E5E4E',skin:'#EFC9A8',hair:'#231F1C',stoop:0,pony:true},   // 高校生（細身・ジャージ・ポニーテール）
+  }[kind];
+  const h=P.h, hipY=-h*0.47, shY=-h*0.8+P.stoop*0.4, hx=P.stoop;
+  // 脚
+  ctx.fillStyle=P.leg;
+  if(P.skirt){ ctx.beginPath(); ctx.moveTo(-P.hip,hipY); ctx.lineTo(P.hip+1,hipY); ctx.lineTo(P.hip+3,-8); ctx.lineTo(-P.hip-2,-8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=P.skin; ctx.fillRect(-5,-8,3,6); ctx.fillRect(3,-8,3,6); }
+  else { ctx.beginPath(); ctx.moveTo(-P.hip+1,hipY); ctx.lineTo(-1,hipY); ctx.lineTo(-2,-3); ctx.lineTo(-P.hip+2,-3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=P.body2==='#244C3F'?'#244C3F':shade(P.leg); ctx.beginPath(); ctx.moveTo(1,hipY); ctx.lineTo(P.hip-1,hipY); ctx.lineTo(P.hip-2,-3); ctx.lineTo(2,-3); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle='#3B3530'; ctx.fillRect(-P.hip+1,-3,8,3); ctx.fillRect(1,-3,8,3);
+  // 胴
+  ctx.fillStyle=P.body; ctx.beginPath();
+  ctx.moveTo(-P.sh+hx,shY); ctx.lineTo(P.sh+hx,shY);
+  if(P.belly){ ctx.quadraticCurveTo(P.sh+8,(shY+hipY)/2+4,P.hip,hipY+2); } else ctx.lineTo(P.hip,hipY+2);
+  ctx.lineTo(-P.hip,hipY+2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=P.body2; ctx.beginPath(); ctx.moveTo(-P.sh+hx,shY); ctx.lineTo(-P.sh+hx+5,shY); ctx.lineTo(-P.hip+5,hipY+2); ctx.lineTo(-P.hip,hipY+2); ctx.closePath(); ctx.fill();
+  if(kind===2){ ctx.strokeStyle='#E8E4D8'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(-P.sh+hx+2,shY+2); ctx.lineTo(-P.hip+2,hipY); ctx.moveTo(P.sh+hx-2,shY+2); ctx.lineTo(P.hip-2,hipY); ctx.stroke(); }
+  // 腕（物干しへ伸ばす）
+  const ax=P.sh+hx-2, ay=shY+3, ex=ax+10+reach*4, ey=ay-6-reach*10, wx=ex+6, wy=ey-12-reach*6;
+  ctx.strokeStyle=P.body; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(ex,ey); ctx.stroke();
+  ctx.strokeStyle=P.skin; ctx.lineWidth=4.5; ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(wx,wy); ctx.stroke();
+  ctx.strokeStyle=P.body2; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(-P.sh+hx+3,ay); ctx.lineTo(ax-3,ay+8); ctx.stroke();
+  // 首・頭（右を向いた横顔）
+  const hy=shY-10, hdx=hx+2;
+  ctx.fillStyle=P.skin; ctx.fillRect(hdx-3,shY-5,6,6);
+  ctx.beginPath(); ctx.ellipse(hdx,hy,8,9,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(hdx+7,hy-1); ctx.lineTo(hdx+10,hy+2); ctx.lineTo(hdx+7,hy+3); ctx.fill(); // 鼻
+  ctx.fillStyle=P.hair; ctx.beginPath(); ctx.ellipse(hdx-1.5,hy-3,8.5,7,0,Math.PI,Math.PI*2.05); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(hdx-9,hy-3); ctx.lineTo(hdx-2,hy-3); ctx.lineTo(hdx-3,hy+5); ctx.lineTo(hdx-8,hy+3); ctx.closePath(); ctx.fill();
+  if(kind===0){ ctx.beginPath(); ctx.arc(hdx-8,hy-7,4.5,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#8F8A80'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.arc(hdx+4,hy+0,2.6,0,Math.PI*2); ctx.stroke(); }
+  if(P.pony){ ctx.beginPath(); ctx.moveTo(hdx-8,hy-5); ctx.quadraticCurveTo(hdx-16,hy,hdx-13,hy+10); ctx.lineTo(hdx-10,hy+2); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle='#2A2622'; ctx.beginPath(); ctx.arc(hdx+4.5,hy-1,1,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function shade(hex){ const n=parseInt(hex.slice(1),16); const f=v=>Math.max(0,Math.round(v*0.82)); return '#'+[n>>16,(n>>8)&255,n&255].map(f).map(v=>v.toString(16).padStart(2,'0')).join(''); }
+function mixWet(hex,w){ const n=parseInt(hex.slice(1),16); const f=v=>Math.round(v*(1-0.4*w)); return 'rgb('+[n>>16,(n>>8)&255,n&255].map(f).join(',')+')'; }
+
+function drawBalcony(S){
+  const bw=170,bh=132,bx=10,by=H-bh-12, r=REGI[S.target];
+  // 前線までの近さ → 空模様
+  const near=Math.max(0,Math.min(1,1-(frontYAt(S,lx(r.lon))-ly(r.lat)-M_PX)/70));
+  const wet=G.wet, clearA=G.anim&&G.anim.kind==='clear';
+  ctx.save(); ctx.translate(bx,by);
+  ctx.fillStyle='#F3EFE4'; ctx.fillRect(-3,-3,bw+6,bh+6); ctx.strokeStyle=C.ink; ctx.lineWidth=1; ctx.strokeRect(-3,-3,bw+6,bh+6);
+  ctx.beginPath(); ctx.rect(0,0,bw,bh); ctx.clip();
+  // 空
+  const cl=Math.max(near*0.85,wet);
+  const sky=[156-cl*40,201-cl*70,232-cl*86].map(Math.round);
+  ctx.fillStyle='rgb('+sky.join(',')+')'; ctx.fillRect(0,0,bw,bh);
+  if(cl<0.6){ ctx.globalAlpha=1-cl/0.6; ctx.fillStyle='#FFE58A'; ctx.beginPath(); ctx.arc(bw-26,22,11+(clearA?3:0),0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
+  if(cl>0.2){ ctx.fillStyle='rgba(120,128,134,'+Math.min(0.9,cl)+')';
+    [[30,16,22],[62,10,26],[100,18,24],[140,12,28]].forEach(([x,y,rr])=>{ ctx.beginPath(); ctx.ellipse(x,y,rr,10,0,0,Math.PI*2); ctx.fill(); }); }
+  // 建物の壁と手すり
+  ctx.fillStyle='#CBC4B3'; ctx.fillRect(0,bh-44,bw,44); ctx.fillStyle='#B7AF9C'; ctx.fillRect(0,bh-44,bw,4);
+  ctx.strokeStyle='#8D8676'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,bh-56); ctx.lineTo(bw,bh-56); ctx.stroke();
+  ctx.lineWidth=1.2; for(let x=6;x<bw;x+=10){ ctx.beginPath(); ctx.moveTo(x,bh-56); ctx.lineTo(x,bh-44); ctx.stroke(); }
+  // 物干し竿
+  const py=34; ctx.strokeStyle='#7C8B93'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(56,py); ctx.lineTo(bw-4,py); ctx.stroke();
+  ctx.fillStyle='#6A6F70'; ctx.fillRect(bw-8,py,4,bh-py);
+  // 洗濯物（シャツ・タオル・靴下・子どもの服）
+  const sway=Math.sin(G.t*2.2)*(1-wet)*2;
+  const shirt=(x,col)=>{ ctx.fillStyle=mixWet(col,wet); ctx.beginPath(); ctx.moveTo(x-12,py+1); ctx.lineTo(x+12,py+1); ctx.lineTo(x+20,py+9); ctx.lineTo(x+14,py+13); ctx.lineTo(x+11,py+10); ctx.lineTo(x+11+sway,py+36); ctx.lineTo(x-11+sway,py+36); ctx.lineTo(x-11,py+10); ctx.lineTo(x-14,py+13); ctx.lineTo(x-20,py+9); ctx.closePath(); ctx.fill(); ctx.fillStyle='rgba(0,0,0,.08)'; ctx.fillRect(x+3,py+10,8,26); };
+  shirt(80,'#FFFFFF');
+  ctx.fillStyle=mixWet('#9CC8DE',wet); ctx.fillRect(100,py+1,18+sway*0.3,40); ctx.fillStyle=mixWet('#E8F2F7',wet); for(let k=0;k<3;k++) ctx.fillRect(100,py+8+k*11,18,4);
+  ctx.fillStyle=mixWet('#F0C64A',wet); ctx.beginPath(); ctx.moveTo(124,py+1); ctx.lineTo(140,py+1); ctx.lineTo(145,py+7); ctx.lineTo(140,py+9); ctx.lineTo(139+sway,py+25); ctx.lineTo(125+sway,py+25); ctx.lineTo(124,py+9); ctx.lineTo(119,py+7); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=mixWet('#5B6B8C',wet); ctx.fillRect(149,py+1,5,14); ctx.fillRect(156,py+1,5,12);
+  ctx.fillStyle='#E0603A'; [70,90,103,115,127,137,151,158].forEach(x=>ctx.fillRect(x,py-3,2.5,6));
+  // しずく
+  if(wet>0.2){ ctx.fillStyle='rgba(60,110,170,.75)'; [80,92,108,132,152].forEach((x,k)=>{ const yy=py+38+((G.t*60+k*17)%40); ctx.beginPath(); ctx.ellipse(x,yy,1.4,2.6,0,0,Math.PI*2); ctx.fill(); }); }
+  // 人
+  drawPerson(STAGES[S.si].person,36,bh-6,0.6+0.4*Math.sin(G.t*1.3)*(1-wet));
+  // 雨
+  if(wet>0){ ctx.strokeStyle='rgba(70,90,110,'+(0.35+wet*0.4)+')'; ctx.lineWidth=1;
+    ctx.beginPath(); for(let k=0;k<40;k++){ const x=(k*37+G.t*90)%(bw+20)-10, y=(k*53+G.t*320)%(bh+20)-10; ctx.moveTo(x,y); ctx.lineTo(x-3,y+9); } ctx.stroke(); }
+  ctx.restore();
+}
+// 小窓の位置（論理座標）。地図の文字はこの枠と見出しに重ねない
+function balconyBox(){ const bw=170,bh=132,bx=10,by=H-bh-12; return {bx,by,bw,bh}; }
+
+// 気象庁発表のテロップ（失敗演出）: 画面が雨で暗くなる → 発表文の帯が右から入る
+function drawTelopDim(t){
+  ctx.fillStyle='rgba(60,66,72,'+(0.45*Math.min(1,t/0.5))+')'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(200,215,230,0.55)'; ctx.lineWidth=1.2; ctx.beginPath();
+  for(let k=0;k<90;k++){ const x=(k*53+t*140)%(W+40)-20, y=(k*97+t*900)%(H+40)-20; ctx.moveTo(x,y); ctx.lineTo(x-4,y+14); } ctx.stroke();
+}
+function drawTelop(S,t){
+  const a=Math.min(1,t/0.25), e=1-Math.pow(1-a,3);
+  const f=S.fail, r=REGI[f.reg];
+  const lines=f.type==='onset'?[r.jname+'は','梅雨入りしたと見られます。']:['前線が停滞し、',r.jname+'で','大雨となっています。'];
+  const head=f.type==='onset'?'気象庁発表　梅雨の時期に関する気象情報':'気象庁発表　大雨に関する気象情報';
+  const top=topY(), bh=40+lines.length*34, y0=top+Math.max(70,(H-top)*0.3), x0=(1-e)*W;
+  ctx.fillStyle='rgba(18,34,68,0.95)'; ctx.fillRect(x0,y0,W,bh);
+  ctx.fillStyle='#FBFBF7'; ctx.fillRect(x0,y0,W,2); ctx.fillRect(x0,y0+bh-2,W,2);
+  ctx.textAlign='left'; ctx.textBaseline='top';
+  const fit=(txt,w,size,min)=>{ ctx.font='800 '+size+'px '+FONT; const m=ctx.measureText(txt).width; return Math.max(min,Math.min(size,size*w/m)); };
+  ctx.font='700 '+fit(head,W-36,12,10).toFixed(1)+'px '+FONT; ctx.fillText(head,x0+18,y0+12);
+  const fs=Math.min(...lines.map(l=>fit(l,W-36,24,10)));
+  ctx.font='800 '+fs.toFixed(1)+'px '+FONT; lines.forEach((l,i)=>ctx.fillText(l,x0+18,y0+36+i*34));
+}
+
+function draw(){
+  const S=G.S, top=topY();
+  if(!S){ ctx.fillStyle=C.sea; ctx.fillRect(0,0,W,H); return; }
+  LB=[]; LQ=[]; LMISS=[];
+  const play=G.screen!=='title', B=balconyBox();
+  drawMap(S,top);
+  const lo=drawIsobars(S,top);
+  drawHigh(S,top);
+  drawFront(S,top);
+  drawLowMark(lo,top);
+  if(play) drawCityMark(S,top);
+  if(lo.x>=-10&&lo.x<=W+10) lbBlock(lo.x-5,lo.y+top-5,lo.x+5,lo.y+top+5,'low-mark');
+  // 文字の配置（優先度順）: 見出し → 小窓 → ガイド → 高 → 守る地点 → 梅雨入り・雨量 → 低 → 等圧線の値 → 緯度経度
+  const hd='地上天気図 '+dstr(S.day)+' 09時';
+  const tw=(t,f)=>{ ctx.font=f; return ctx.measureText(t).width; };
+  label({text:hd,font:'700 12.5px '+FONT,h:22,pad:7,bg:'rgba(251,251,247,0.94)',box:C.ink,fg:C.ink,kind:'head',req:true},[[8+tw(hd,'700 12.5px '+FONT)/2+7,top+19]]);
+  let guide=null;
+  if(play){
+    lbBlock(B.bx-4,B.by-4,B.bx+B.bw+4,B.by+B.bh+4,'balcony');
+    label({text:PLACES[S.si],font:'700 11px '+FONT,h:16,pad:5,bg:'rgba(251,251,247,0.94)',fg:C.ink,kind:'caption',req:true},[[B.bx-3+tw(PLACES[S.si],'700 11px '+FONT)/2+5,B.by-12]]);
+    if(G.guide>0&&!G.anim){ const gx0=B.bx+B.bw+12, gw=W-8-gx0, gy0=B.by+B.bh-58; guide={gx0,gw,gy0,a:Math.min(1,G.guide/0.6)}; lbBlock(gx0,gy0,gx0+gw,gy0+52,'guide'); }
+  }
+  labelHigh(S,top);
+  if(play){ labelCity(S,top); labelOthers(S,top); }
+  labelLow(lo,top);
+  labelHighRings(S,top);
+  for(const q of (S._isoLabels||[])) if(Math.hypot(q[1]-S.hx,q[2]-top-S.hy)>R_DISK+10) label({text:q[0],font:'600 10px '+FONT,h:12,pad:6,bg:C.sea,fg:C.iso,kind:'iso'},[[q[1],q[2]]]);
+  labelGrid(S,top,Math.min(ly(16)+top+8,(play?B.by-28:H-10)));
+  drawQueued();
+  if(play){
+    const failing=G.anim&&G.anim.kind==='fail';
+    if(failing) drawTelopDim(G.anim.t);
+    drawBalcony(S);
+    if(guide){ ctx.globalAlpha=guide.a; ctx.fillStyle='rgba(27,42,68,0.9)'; ctx.fillRect(guide.gx0,guide.gy0,guide.gw,52);
+      ctx.fillStyle='#FBFBF7'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      const l1='どこでもドラッグ', l2='→ 高気圧が動きます';
+      ctx.font='700 14px '+FONT; const fs=Math.max(10,Math.min(14,14*(guide.gw-16)/Math.max(ctx.measureText(l1).width,ctx.measureText(l2).width)));
+      ctx.font='700 '+fs.toFixed(1)+'px '+FONT; ctx.fillText(l1,guide.gx0+guide.gw/2,guide.gy0+16); ctx.fillText(l2,guide.gx0+guide.gw/2,guide.gy0+36); ctx.globalAlpha=1; }
+    if(failing) drawTelop(S,G.anim.t);
+  }
+  if(G.screen==='play'||G.screen==='pause'){
+    const st=STAGES[G.stage]; let mk=null,mv=0; for(const k in S.g) if(S.g[k]>mv){mv=S.g[k];mk=k;}
+    const left=Math.max(0,Math.ceil(S.end-S.day));
+    let c='あと'+left+'日';
+    if(mk&&mv>=40){ const t=REGI[mk].name+' '+Math.round(mv)+'mm'; c+=' '+(mv>GMAX*0.7?'<span class="warn">'+esc(t)+'</span>':esc(t)); }
+    UI.hud(REGI[st.r].name,(G.stage+1)+'/'+STAGES.length,c);
+  }
+  window.__lb={LB:LB.map(r=>r.slice()),miss:LMISS.slice(),top,H};
+}
+
+// ---- メインループ ----
+function frame(ts){
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.05):0; lastTs=ts;
+  if(G.screen==='play') update(dt); else G.t+=dt;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle=getComputedStyle(document.body).backgroundColor; ctx.fillRect(0,0,VW,VH);
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR,TY*DPR);
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,H); ctx.clip(); draw(); ctx.restore();   // 横長の画面でも地図は論理幅 W の中だけに描く
+  requestAnimationFrame(frame);
+}
+window.addEventListener('resize',resize); resize();
+showTitle();
+requestAnimationFrame(frame);
+</script>
 </body>
 </html>
