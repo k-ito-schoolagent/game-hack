@@ -543,10 +543,27 @@ function seal(x,y,r,name,alpha,rot){
   ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
   const ch=[...name]; ctx.font='700 '+(r*0.74)+'px '+MIN; ctx.textAlign='center'; ctx.textBaseline='middle';
   if(ch.length===1) ctx.fillText(ch[0],0,0); else { ctx.fillText(ch[0],0,-r*0.38); ctx.fillText(ch[1],0,r*0.4); }
+  if(LAYOUT_LOG) LAYOUT_LOG.push({seal:name,chars:ch.length,cw:Math.max(...ch.map(c=>ctx.measureText(c).width)),r});
   ctx.restore(); ctx.textBaseline='alphabetic';
 }
 function txt(s,x,y,size,opt){
   opt=opt||{}; ctx.font=(opt.w||500)+' '+size+'px '+(opt.f||FF); ctx.fillStyle=opt.c||INK; ctx.textAlign=opt.a||'left'; ctx.fillText(s,x,y);
+}
+// 欄 [x0,x1] に収めて描く。入らなければ 10px まで縮小、それでも入らなければ横に詰める
+let LAYOUT_LOG=null;
+function ftxt(s,x0,x1,y,size,opt){
+  opt=opt||{}; const f=(opt.w||500)+' ', fam='px '+(opt.f||FF), maxW=x1-x0; const size0=size;
+  ctx.font=f+size+fam; let w=ctx.measureText(s).width;
+  if(w>maxW){ size=Math.max(10,Math.floor(size*maxW/w*10)/10); ctx.font=f+size+fam; w=ctx.measureText(s).width; }
+  const sx=w>maxW?maxW/w:1, a=opt.a||'left', ax=a==='left'?x0:a==='right'?x1:(x0+x1)/2;
+  ctx.fillStyle=opt.c||INK; ctx.textAlign=a;
+  ctx.save(); ctx.translate(ax,y); ctx.scale(sx,1); ctx.fillText(s,0,0); ctx.restore();
+  if(LAYOUT_LOG){ const L=a==='left'?ax:a==='right'?ax-w*sx:ax-w*sx/2; LAYOUT_LOG.push({s,x0,x1,l:L,r:L+w*sx,size,size0,sx}); }
+}
+// 見出し（灰）＋値。値は見出しの実測幅の右から書類の右余白まで
+function labeled(lab,val,y,size,wt){
+  ftxt(lab,16,120,y,12.5,{c:'#5E584D'}); ctx.font='500 12.5px '+FF;
+  const x=16+ctx.measureText(lab).width+10; ftxt(val,x,344,y,size,{w:wt});
 }
 function drawDoc(o,x,y,rot){
   const d=o.d,s=DS();
@@ -555,13 +572,13 @@ function drawDoc(o,x,y,rot){
   ctx.fillStyle='rgba(40,28,15,.28)'; ctx.fillRect(4,5,DW,DH);
   ctx.fillStyle='#FBFAF3'; ctx.fillRect(0,0,DW,DH);
   ctx.strokeStyle='#D6CFBD'; ctx.lineWidth=1; ctx.strokeRect(0.5,0.5,DW-1,DH-1);
-  txt(d.yoshiki,16,17,11,{c:'#5E584D'}); txt('No. '+d.no,344,17,11,{c:'#5E584D',a:'right'});
+  ftxt(d.yoshiki,16,210,17,11,{c:'#5E584D'}); ftxt('No. '+d.no,220,344,17,11,{c:'#5E584D',a:'right'});
   // 決裁欄
   ctx.strokeStyle=INK; ctx.lineWidth=1;
   ctx.strokeRect(16,24,328,66); ctx.beginPath(); ctx.moveTo(34,24); ctx.lineTo(34,90); ctx.moveTo(34,40); ctx.lineTo(344,40);
   for(let k=1;k<5;k++){ ctx.moveTo(34+62*k,24); ctx.lineTo(34+62*k,90); } ctx.stroke();
-  txt('決',25,52,12,{a:'center',w:700}); txt('裁',25,70,12,{a:'center',w:700});
-  for(let k=0;k<5;k++) txt(BOXN[k],34+62*k+31,36,12,{a:'center',w:k===0?700:500});
+  ftxt('決',17,33,52,12,{a:'center',w:700}); ftxt('裁',17,33,70,12,{a:'center',w:700});
+  for(let k=0;k<5;k++) ftxt(BOXN[k],34+62*k+4,34+62*k+58,36,12,{a:'center',w:k===0?700:500});
   for(let k=1;k<5;k++){ const nm=d.seals[BOXK[k]]; if(nm) seal(34+62*k+31,65,17,nm,0.86,((k*7+o.i*3)%9-4)*0.03); }
   if(d.seals.kocho) seal(65,65,17,d.seals.kocho,0.86,-0.05);
   // 校長欄のハイライト（ハンコが重なっているとき）
@@ -569,27 +586,26 @@ function drawDoc(o,x,y,rot){
   if(o.mark){ const m=o.mark, cx=34+62*m.box+31;
     if(m.k==='smear'){ for(let j=0;j<3;j++) seal(cx+8+j*7,65+j*3,17,'大森',0.32,m.rot+j*0.12); }
     else seal(cx,65,17,'大森',0.9,m.rot); }
-  // 本文
-  txt(d.form.split('').join(' '),DW/2,122,22,{a:'center',w:700,f:MIN});
-  txt('起案日　令和8年'+fmtD(d.kian),344,148,13.5,{a:'right'});
-  txt(d.to+'　様',16,170,13.5);
-  txt('所属　'+d.dept+'　'+(d.form==='出張命令伺'?'出張者':'起案者')+'　'+d.who,16,192,13.5);
-  txt('件名',16,217,12.5,{c:'#5E584D'}); txt(d.subj,50,217,14,{w:700});
-  txt('伺額',16,240,12.5,{c:'#5E584D'}); txt('金 '+yen(d.amount)+' 円',50,240,14,{w:700});
+  // 本文（すべて ftxt: 欄の幅に収まらなければ縮小→字間を詰める。崩れが不備に見えないように）
+  ftxt(d.form.split('').join(' '),16,344,122,22,{a:'center',w:700,f:MIN});
+  ftxt('起案日　令和8年'+fmtD(d.kian),16,344,148,13.5,{a:'right'});
+  ftxt(d.to+'　様',16,344,170,13.5);
+  ftxt('所属　'+d.dept+'　'+(d.form==='出張命令伺'?'出張者':'起案者')+'　'+d.who,16,344,192,13.5);
+  labeled('件名',d.subj,217,14,700); labeled('伺額','金 '+yen(d.amount)+' 円',240,14,700);
   // 明細表
-  const T=252, cx=[16,172,218,280,344];
+  const T=252, cx=[16,148,190,258,344];
   ctx.strokeStyle=INK; ctx.lineWidth=1; ctx.strokeRect(16,T,328,114);
   ctx.beginPath(); ctx.moveTo(16,T+18); ctx.lineTo(344,T+18);
   for(let j=1;j<=3;j++){ ctx.moveTo(16,T+18+24*j); ctx.lineTo(344,T+18+24*j); }
   for(let j=1;j<4;j++){ ctx.moveTo(cx[j],T); ctx.lineTo(cx[j],T+90); } ctx.moveTo(cx[3],T+90); ctx.lineTo(cx[3],T+114); ctx.stroke();
   ctx.fillStyle='rgba(34,32,28,.06)'; ctx.fillRect(16.5,T+0.5,327,17.5);
-  ['品名','数量','単価','金額'].forEach((h,j)=>txt(h,(cx[j]+cx[j+1])/2,T+13.5,12,{a:'center',c:'#5E584D'}));
+  ['品名','数量','単価','金額'].forEach((h,j)=>ftxt(h,cx[j]+4,cx[j+1]-4,T+13.5,12,{a:'center',c:'#5E584D'}));
   d.rows.forEach((r,j)=>{ const yy=T+18+24*j+17;
-    txt(r[0],cx[0]+6,yy,13.5); txt(r[1]+r[2],cx[2]-5,yy,13.5,{a:'right'}); txt(yen(r[3]),cx[3]-5,yy,13.5,{a:'right'}); txt(yen(r[4]),cx[4]-5,yy,13.5,{a:'right'}); });
-  txt('合　計',cx[3]-12,T+108,13.5,{a:'right',w:700}); txt('¥'+yen(d.total),cx[4]-5,T+108,14,{a:'right',w:700});
-  txt('予算科目',16,390,12.5,{c:'#5E584D'}); txt(d.budget||BUDGET[d.cat],76,390,13.5,{w:600});
-  txt(d.when.l,16,412,12.5,{c:'#5E584D'});
-  txt('令和8年'+fmtD(d.when.a)+(d.when.b?' 〜 '+fmtD(d.when.b):''),d.when.l.length>3?86:58,412,13.5,{w:600});
+    ftxt(r[0],cx[0]+6,cx[1]-4,yy,13.5); ftxt(r[1]+r[2],cx[1]+4,cx[2]-4,yy,13.5,{a:'right'});
+    ftxt(yen(r[3]),cx[2]+4,cx[3]-4,yy,13.5,{a:'right'}); ftxt(yen(r[4]),cx[3]+4,cx[4]-4,yy,13.5,{a:'right'}); });
+  ftxt('合　計',cx[0]+6,cx[3]-12,T+108,13.5,{a:'right',w:700}); ftxt('¥'+yen(d.total),cx[3]+4,cx[4]-4,T+108,14,{a:'right',w:700});
+  labeled('予算科目',d.budget||BUDGET[d.cat],390,13.5,600);
+  labeled(d.when.l,'令和8年'+fmtD(d.when.a)+(d.when.b?' 〜 '+fmtD(d.when.b):''),412,13.5,600);
   // 付箋（監査メモ）
   if(o.tag){ ctx.save(); ctx.translate(300,96); ctx.rotate(0.12); ctx.fillStyle='#F3A9B6'; ctx.fillRect(0,0,58,72);
     ctx.fillStyle='rgba(0,0,0,.08)'; ctx.fillRect(0,0,58,10); txt('監査',29,34,14,{a:'center',w:700,c:'#7A2430'}); txt('メモ',29,54,14,{a:'center',w:700,c:'#7A2430'}); ctx.restore(); }
