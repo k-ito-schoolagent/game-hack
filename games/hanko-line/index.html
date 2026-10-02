@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>ハンコ決裁ライン | GAME HACK</title>
-<meta name="description" content="中学校の事務室。ベルトで流れてくる本物そっくりの伺い書（物品購入伺・支出伺・出張命令伺）を読み、合計違い・ありえない日付・押印漏れを見抜いて差し戻す。校長印を預かった臨時職員の1週間。監査が入ると付箋まみれ。">
+<meta name="description" content="中学校の事務室。ベルトで流れてくる本物そっくりの伺い書（物品購入伺・支出伺・出張命令伺）を読み、件名と合わない品物・公費で買えない物・ありえない日付・押印漏れを見抜いて差し戻す。校長印を預かった臨時職員の1週間。監査が入ると付箋まみれ。">
 <meta name="theme-color" content="#F3EFE4">
 <!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>決</text></svg>">
@@ -229,6 +229,25 @@ const B={
   toner:mk({no:'R8-0426',kian:[10,6],dept:'事務室',who:'森 健太',subj:'複合機トナーの購入について',amount:85700,
     rows:[['トナー 黒',2,'本',14800,29600],['トナー カラー',3,'本',18700,56100]],total:85700,cat:'consumable',when:{l:'納品予定日',a:[10,12]}}),
 };
+// 訂正印つきで日付を直した、正しい書類（直した跡があるだけでは差し戻さない）
+B.taifix={...B.tai,fix:{old:14,seal:'佐野'}};
+B.yoshifix={...B.yoshi,when:{l:'納品予定日',a:[10,9]},fix:{old:8,seal:'森'}};
+// 明細の品物 → それが載るべき件名（正しい書類から自動で作る）＋よその件名の品物
+const ITEM={};
+Object.values(B).forEach(d=>d.rows.forEach(r=>{ ITEM[r[0]]=d.subj; }));
+Object.assign(ITEM,{'カラープリンター':'プリンターの購入について','サッカーボール':'体育用品の購入について'});
+// 公費では買えない物（指摘は事務長の言葉）
+const PRIV={
+  '黒毛和牛 5kg':'和牛は教材ではありません',
+  '家庭用ゲーム機':'ゲーム機は体育用品ではありません',
+  'マッサージチェア':'マッサージチェアは衛生材料ではありません。校長室にも置きません',
+  '温泉旅館 延泊':'大会は23日で終わりです。温泉の延泊は出張ではありません',
+};
+// 書類の種類ごとの様式
+const FORMOF={consumable:'物品購入伺',equipment:'物品購入伺',repair:'修繕伺',rental:'支出伺',fee:'支出伺',travel:'出張命令伺'};
+// 5万円を超える購入・修繕・借上げは見積書2社を添付
+const needAtt=d=>d.amount>50000&&d.cat!=='travel'&&d.cat!=='fee';
+const ATT=d=>d.att||{chk:true,n:2};
 // 不備のある書類 = 基本形を1か所だけ書き換えたもの（want は検証用の意図）
 function V(base,want,patch){
   const r={...B[base],...patch,want};
@@ -236,55 +255,56 @@ function V(base,want,patch){
   return r;
 }
 const X={
-  // 月: 目で見て分かる不備
-  sum1:V('rika','sum',{amount:15000,total:15000}),
+  // 月: 見れば分かる（品物・押印）
+  wagyu:V('yoshi','shibutsu',{rows:[['PPC用紙 A4',5,'箱',3280,16400],['黒毛和牛 5kg',1,'箱',54000,54000]],amount:70400,total:70400}),
   noseal1:V('bus','noseal',{seals:{kian:null}}),
   done1:V('shutcho','done',{seals:{kocho:'大森'}}),
-  // 火: 計算と日付
-  mult1:V('tai','mult',{rows:[['ソフトバレーボール',6,'個',2500,15000],['ラインテープ',4,'巻',1650,6060]],amount:21060,total:21060}),
-  bad1:V('yoshi','baddate',{when:{l:'納品予定日',a:[11,31]}}),
-  done2:V('shuzen','done',{seals:{kocho:'大森'}}),
+  // 火: 件名と明細・訂正印・日付
+  subj1:V('yoshi','subj',{rows:[['カラープリンター',1,'台',32800,32800]]}),
   bad2:V('cam','baddate',{kian:[9,31]}),
-  // 水: 決裁の順番・宛先・所属
+  teisei1:V('rika','teisei',{when:{l:'納品予定日',a:[10,15]},fix:{old:14,seal:null}}),
+  done2:V('shuzen','done',{seals:{kocho:'大森'}}),
+  // 水: 決裁欄・宛先・所属・見積書
   skip1:V('toner','skip',{seals:{kyoto:null}}),
   addr1:V('rika','addr',{to:'みなと市立青葉小学校長'}),
-  mult2:V('hoken','mult',{rows:[['絆創膏',10,'箱',680,6800],['冷却シート',12,'箱',390,4580],['消毒用アルコール',6,'本',1180,7080]],amount:18460,total:18460}),
+  mitsu1:V('toner','mitsu',{att:{chk:false,n:0}}),
   grade1:V('shara','grade',{dept:'第4学年'}),
-  sum2:V('shuzen','sum',{amount:98000,total:98000}),
-  // 木: 予算科目・日付の前後
+  game1:V('tai','shibutsu',{rows:[['ソフトバレーボール',6,'個',2500,15000],['家庭用ゲーム機',1,'台',49980,49980]],amount:64980,total:64980}),
+  // 木: 予算科目・様式・相見積・日付の前後
   bud1:V('cam','budget',{budget:BUDGET.consumable}),
+  form1:V('shutcho','form',{form:'物品購入伺',yoshiki:'様式第3号（第8条関係）'}),
+  massage1:V('hoken','shibutsu',{rows:[['絆創膏',10,'箱',680,6800],['マッサージチェア',1,'台',298000,298000]],amount:304800,total:304800,att:{chk:true,n:2}}),
+  aimitsu1:V('shuzen','aimitsu',{att:{chk:true,n:1}}),
   ord1:V('shutcho','order',{when:{l:'期間',a:[10,22],b:[10,21]}}),
-  skip2:V('bus','skip',{seals:{jimu:null}}),
-  bud2:V('bus','budget',{budget:BUDGET.equipment}),
-  ord2:V('tai','order',{when:{l:'納品予定日',a:[10,1]}}),
-  // 金: 桁・印の名前・巧妙な版
-  digit1:V('yoshi','digit',{amount:328000}),
+  // 金: 印の名前・紛れた品物・桁
+  digit1:V('yoshi','digit',{amount:3280000}),
   name1:V('hoken','sealname',{seals:{kian:'松田'}}),
-  mult3:V('toner','mult',{rows:[['トナー 黒',2,'本',14800,29600],['トナー カラー',3,'本',18700,56700]],amount:86300,total:86300}),
-  bad3:V('shara','baddate',{when:{l:'実施日',a:[11,31]}}),
+  subj2:V('rika','subj',{rows:[['ビーカー 200mL',10,'個',450,4500],['試験管',30,'本',120,3600],['サッカーボール',1,'個',3900,3900]]}),
+  onsen1:V('shutcho','shibutsu',{rows:[['交通費（往復）',1,'式',23000,23000],['宿泊料',1,'泊',10900,10900],['日当',2,'日',2200,4400],['温泉旅館 延泊',1,'泊',18000,18000]],amount:56300,total:56300}),
   addr2:V('tai','addr',{to:'みなと市立緑ヶ丘中学校長'}),
-  done3:V('bus','done',{seals:{kocho:'大森'}}),
 };
 const DOC=k=>B[k]||X[k];
 // 面 = 曜日。並びは固定。iv = 書類が1枚流れてくる間隔（秒）
 const DAYS=[
-  {name:'月曜日',md:[10,5],iv:12.0,note:'事務長「校長印は左下です。不備のある書類は、書類ごと右の差戻箱へ」',
-    docs:['yoshi','tai','sum1','hoken','noseal1','cam','done1']},
-  {name:'火曜日',md:[10,6],iv:10.5,note:'事務長「今日は単価×数量の計算と、日付も確かめてください」',
-    docs:['rika','mult1','bus','bad1','hoken','done2','shara','bad2','toner']},
-  {name:'水曜日',md:[10,7],iv:9.6,note:'事務長「決裁欄の印がそろっているか。宛先と所属も見てくださいね」',
-    docs:['shutcho','skip1','tai','addr1','mult2','yoshi','grade1','bus','sum2','cam']},
-  {name:'木曜日',md:[10,8],iv:8.8,note:'事務長「予算科目は品物に合っていますか。日付の前後もです」',
-    docs:['hoken','bud1','rika','ord1','toner','skip2','shara','bud2','yoshi','ord2','shuzen']},
-  {name:'金曜日',md:[10,9],iv:8.0,note:'事務長「金曜は伺額の桁と、起案者の印の名前まで。監査は来週です」',
-    docs:['toner','digit1','bus','name1','shara','mult3','rika','bad3','cam','addr2','done3','shuzen']},
+  {name:'月曜日',md:[10,5],iv:12.0,note:'事務長「校長印は左下です。不備のある書類は、書類ごと右の差戻箱へ。品物もよく見てくださいね」',
+    docs:['yoshi','tai','wagyu','hoken','noseal1','cam','done1']},
+  {name:'火曜日',md:[10,6],iv:10.5,note:'事務長「件名と明細の品物は合っていますか。直した跡には訂正印があるかも」',
+    docs:['rika','subj1','bus','bad2','taifix','teisei1','shara','done2','toner']},
+  {name:'水曜日',md:[10,7],iv:9.6,note:'事務長「決裁欄の印がそろっているか。5万円を超える物は見積書の添付も見てください」',
+    docs:['shutcho','skip1','tai','addr1','cam','mitsu1','yoshi','grade1','bus','game1']},
+  {name:'木曜日',md:[10,8],iv:8.8,note:'事務長「予算科目と様式は中身に合っていますか。見積は2社からです。日付の前後も」',
+    docs:['hoken','bud1','rika','form1','toner','massage1','shara','aimitsu1','yoshifix','ord1','shuzen']},
+  {name:'金曜日',md:[10,9],iv:8.0,note:'事務長「金曜は起案者の印の名前まで。監査は来週です」',
+    docs:['toner','digit1','bus','name1','shara','subj2','taifix','onsen1','cam','addr2','shuzen','hoken']},
 ];
-const KIND={sum:'合計違い',mult:'計算違い',digit:'桁違い',baddate:'ありえない日付',order:'日付の前後',noseal:'起案者印なし',sealname:'印の名前違い',skip:'順番飛ばし',done:'押印済み',addr:'宛先違い',grade:'所属違い',budget:'予算科目違い'};
+const KIND={sum:'合計違い',mult:'計算違い',digit:'桁違い',baddate:'ありえない日付',order:'日付の前後',noseal:'起案者印なし',sealname:'印の名前違い',skip:'順番飛ばし',done:'押印済み',addr:'宛先違い',grade:'所属違い',budget:'予算科目違い',
+  subj:'件名と明細違い',shibutsu:'公費で買えない物',teisei:'訂正印なし',mitsu:'見積書なし',aimitsu:'相見積なし',form:'様式違い'};
 // 書類の不備をデータから計算する（指摘文はそのまま事務長・監査の言葉になる）
 function audit(d){
   const f=[]; const add=(t,msg)=>f.push({t,msg});
-  if(d.to!==SCHOOL) add('addr','宛先が「'+d.to+'」です。本校は'+SCHOOL.replace(/長$/,'')+'です');
+  if(d.to!==SCHOOL) add('addr','宛先が「'+d.to+'」です。うちは'+SCHOOL.replace(/長$/,'')+'です');
   if(!DEPTS.includes(d.dept)) add('grade','中学校に「'+d.dept+'」はありません');
+  if(d.form!==FORMOF[d.cat]) add('form',CATNAME[d.cat]+'は「'+FORMOF[d.cat]+'」で出してください。「'+d.form+'」の様式になっています');
   if(!okDate(d.kian)) add('baddate','起案日の'+fmtD(d.kian)+'は存在しない日付です');
   for(const k of ['a','b']) if(d.when[k]&&!okDate(d.when[k])) add('baddate',d.when.l+'の'+fmtD(d.when[k])+'は存在しない日付です');
   if(okDate(d.kian)&&okDate(d.when.a)&&dnum(d.when.a)<dnum(d.kian)) add('order',d.when.l+' '+fmtD(d.when.a)+'が起案日 '+fmtD(d.kian)+'より前です（事後の伺い）');
@@ -294,12 +314,19 @@ function audit(d){
   else if(d.seals.kian!==sur) add('sealname','起案者は'+d.who+'なのに、起案欄の印は「'+d.seals.kian+'」です');
   for(const [k,n] of [['shunin','主任'],['jimu','事務長'],['kyoto','教頭']]) if(!d.seals[k]) add('skip',n+'の印が抜けたまま校長に回っています');
   if(d.seals.kocho) add('done','校長欄にもう印があります（二重決裁）');
+  if(d.fix&&d.fix.seal!==sur) add('teisei',d.when.l+'を二重線で直してありますが、'+(d.fix.seal?'訂正印が「'+d.fix.seal+'」です':'訂正印がありません'));
   let s=0;
-  for(const r of d.rows){ s+=r[4]; if(r[2]&&r[3]*r[1]!==r[4]) add('mult',r[0]+' '+yen(r[3])+'円×'+r[1]+'は ¥'+yen(r[3]*r[1])+'。¥'+yen(r[4])+'と書かれています'); }
+  for(const r of d.rows){ s+=r[4];
+    if(PRIV[r[0]]) add('shibutsu',PRIV[r[0]]);
+    else if(ITEM[r[0]]!==d.subj) add('subj','件名は「'+d.subj+'」なのに、明細に「'+r[0]+'」があります');
+    if(r[2]&&r[3]*r[1]!==r[4]) add('mult',r[0]+' '+yen(r[3])+'円×'+r[1]+'は ¥'+yen(r[3]*r[1])+'。¥'+yen(r[4])+'と書かれています'); }
   if(s!==d.total) add('sum','合計 ¥'+yen(d.total)+'が明細の和 ¥'+yen(s)+'と合いません');
-  if(d.amount!==d.total) add('digit','伺額 金'+yen(d.amount)+'円と合計 ¥'+yen(d.total)+'の桁が違います');
+  if(d.amount!==d.total) add('digit','伺額が金'+yen(d.amount)+'円。明細の合計は ¥'+yen(d.total)+'です。桁が違います');
   const bud=d.budget||BUDGET[d.cat];
   if(bud!==BUDGET[d.cat]) add('budget',d.rows[0][0]+'は'+CATNAME[d.cat]+'なので'+BUDGET[d.cat]+'。「'+bud+'」になっています');
+  if(needAtt(d)){ const t=ATT(d);
+    if(!t.chk) add('mitsu','5万円を超えるのに、添付の見積書にチェックがありません');
+    else if(t.n<2) add('aimitsu','見積書が1社分だけです。5万円を超える物は2社から取ってください'); }
   return f;
 }
 /*DATA-END*/
@@ -561,9 +588,21 @@ function ftxt(s,x0,x1,y,size,opt){
   if(LAYOUT_LOG){ const L=a==='left'?ax:a==='right'?ax-w*sx:ax-w*sx/2; LAYOUT_LOG.push({s,x0,x1,l:L,r:L+w*sx,size,size0,sx}); }
 }
 // 見出し（灰）＋値。値は見出しの実測幅の右から書類の右余白まで
-function labeled(lab,val,y,size,wt){
+function labeled(lab,val,y,size,wt,x1){
   ftxt(lab,16,120,y,12.5,{c:'#5E584D'}); ctx.font='500 12.5px '+FF;
-  const x=16+ctx.measureText(lab).width+10; ftxt(val,x,344,y,size,{w:wt});
+  const x=16+ctx.measureText(lab).width+10; ftxt(val,x,x1||344,y,size,{w:wt}); return x;
+}
+// 日付の訂正: 旧い日を二重線で消し、新しい日を続けて書く。訂正印はその右
+function fixedDate(d,y){
+  const x=labeled(d.when.l,'',y,13.5,600), a=d.when.a, F='600 13.5px '+FF;
+  const pre='令和8年'+a[0]+'月', old=String(d.fix.old);
+  ctx.font=F; const w0=ctx.measureText(pre).width; ftxt(pre,x,x+w0,y,13.5,{w:600});
+  ctx.font=F; const w1=ctx.measureText(old).width; ftxt(old,x+w0+2,x+w0+2+w1,y,13.5,{w:600});
+  ctx.strokeStyle=INK; ctx.lineWidth=1; ctx.beginPath();
+  for(const dy of [-6.5,-3.5]){ ctx.moveTo(x+w0,y+dy); ctx.lineTo(x+w0+4+w1,y+dy); } ctx.stroke();
+  const nw=a[1]+'日'; ctx.font=F; const w2=ctx.measureText(nw).width, x2=x+w0+w1+8;
+  ftxt(nw,x2,x2+w2,y,13.5,{w:600});
+  if(d.fix.seal) seal(x2+w2+18,y-4,13.5,d.fix.seal,0.86,0.08);
 }
 function drawDoc(o,x,y,rot){
   const d=o.d,s=DS();
@@ -604,8 +643,14 @@ function drawDoc(o,x,y,rot){
     ftxt(r[0],cx[0]+6,cx[1]-4,yy,13.5); ftxt(r[1]+r[2],cx[1]+4,cx[2]-4,yy,13.5,{a:'right'});
     ftxt(yen(r[3]),cx[2]+4,cx[3]-4,yy,13.5,{a:'right'}); ftxt(yen(r[4]),cx[3]+4,cx[4]-4,yy,13.5,{a:'right'}); });
   ftxt('合　計',cx[0]+6,cx[3]-12,T+108,13.5,{a:'right',w:700}); ftxt('¥'+yen(d.total),cx[3]+4,cx[4]-4,T+108,14,{a:'right',w:700});
-  labeled('予算科目',d.budget||BUDGET[d.cat],390,13.5,600);
-  labeled(d.when.l,'令和8年'+fmtD(d.when.a)+(d.when.b?' 〜 '+fmtD(d.when.b):''),412,13.5,600);
+  const att=needAtt(d);
+  labeled('予算科目',d.budget||BUDGET[d.cat],390,13.5,600,att?206:344);
+  if(att){ const t=ATT(d);
+    ftxt('添付',214,240,390,12.5,{c:'#5E584D'});
+    ctx.strokeStyle=INK; ctx.lineWidth=1; ctx.strokeRect(244.5,379.5,11,11);
+    if(t.chk){ ctx.lineWidth=1.8; ctx.beginPath(); ctx.moveTo(246.5,384.5); ctx.lineTo(249.5,388); ctx.lineTo(254.5,380.5); ctx.stroke(); }
+    ftxt(t.chk?'見積書 '+t.n+'社':'見積書',260,344,390,13.5,{w:600}); }
+  if(d.fix) fixedDate(d,412); else labeled(d.when.l,'令和8年'+fmtD(d.when.a)+(d.when.b?' 〜 '+fmtD(d.when.b):''),412,13.5,600);
   // 付箋（監査メモ）
   if(o.tag){ ctx.save(); ctx.translate(300,96); ctx.rotate(0.12); ctx.fillStyle='#F3A9B6'; ctx.fillRect(0,0,58,72);
     ctx.fillStyle='rgba(0,0,0,.08)'; ctx.fillRect(0,0,58,10); txt('監査',29,34,14,{a:'center',w:700,c:'#7A2430'}); txt('メモ',29,54,14,{a:'center',w:700,c:'#7A2430'}); ctx.restore(); }
