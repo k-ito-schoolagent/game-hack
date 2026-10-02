@@ -43,7 +43,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 #sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
 @keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 #sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
-#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px;word-break:auto-phrase;text-wrap:balance}
 #sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
 #sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
 #sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
@@ -65,11 +65,13 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 
 :root{--scene:#d9d4bd}
 /* 区分棚のケース（DOM）。位置は JS が決める */
-.basket{position:absolute;z-index:2;margin:0;padding:15px 4px 4px;border:2px solid #3f2c1a;border-radius:2px;background:#a67a49;color:#2a1d10;text-align:center;line-height:1.2;overflow:hidden;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;align-items:center;touch-action:none}
+.basket{position:absolute;z-index:2;pointer-events:none;margin:0;padding:15px 4px 4px;border:2px solid #3f2c1a;border-radius:2px;background:#a67a49;color:#2a1d10;text-align:center;line-height:1.2;overflow:hidden;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;align-items:center;touch-action:none}
 .basket::before{content:'';position:absolute;left:0;right:0;top:0;height:11px;background:#2b1f14}
-.basket b{display:block;font-size:15px;font-weight:800;background:#f1ead2;border:1.5px solid #b08d3c;padding:2px 6px;margin-bottom:2px;white-space:nowrap}
-.basket small{display:block;white-space:nowrap;font-size:9px;font-weight:600;color:#3a2a18}
-.basket .plate{position:absolute;left:3px;top:13px;width:16px;height:16px;border-radius:50%;background:#c9a64a;border:1px solid #6b5420;color:#2a1d10;font:800 10px/14px var(--font);font-style:normal;text-align:center}
+.basket b{display:block;font-size:1.5em;font-weight:800;background:#f1ead2;border:1.5px solid #b08d3c;padding:2px 6px;margin-bottom:2px;white-space:nowrap}
+.basket small{display:block;white-space:pre-line;font-size:.9em;font-weight:600;color:#3a2a18}
+.basket .plate{position:absolute;left:3px;top:13px;width:1.6em;height:1.6em;border-radius:50%;background:#c9a64a;border:1px solid #6b5420;color:#2a1d10;font:800 1em/1.4em var(--font);font-style:normal;text-align:center}
+.basket.side{padding-left:2px;padding-right:2px}
+.basket.side b{font-size:1.35em;padding:2px 2px}
 .basket.tsujo{background:#77756f;border-color:#2e2d2a}
 .basket.tsujo b{background:#e6e3da;border-color:#8f8d88}
 .basket.hot{outline:3px solid #f2d36b;outline-offset:1px;transform:translateY(-3px)}
@@ -204,9 +206,9 @@ const TAG='年賀状仕分け';
 const FONT=getComputedStyle(document.body).fontFamily;
 const BK={
   north:{n:1,name:'北日本',sub:'北海道・東北'},
-  kanto:{n:2,name:'関東',sub:'茨城〜神奈川'},
+  kanto:{n:2,name:'関東',sub:'茨城〜\n神奈川'},
   mid:{n:3,name:'中部・近畿',sub:'新潟〜和歌山・山梨'},
-  west:{n:4,name:'西日本',sub:'中国・四国・九州・沖縄'},
+  west:{n:4,name:'西日本',sub:'中国・四国\n九州・沖縄'},
   mourning:{n:5,name:'通常便',sub:'喪中はがき'},
 };
 const ORDER=['north','kanto','mid','west','mourning'];
@@ -247,29 +249,29 @@ const DAYS=[
   {name:'12月24日',limit:5.4,script:['m:愛知県','富山県','佐賀県','茨城県','和歌山県','m:宮城県','鳥取県','岐阜県','沖縄県','m:千葉県','高知県','滋賀県','岩手県','愛媛県']},
   {name:'12月25日',limit:4.8,script:['奈良県','m:神奈川県','宮崎県','福井県','島根県','m:埼玉県','徳島県','山形県','m:広島県','岡山県','新潟県','m:東京都','鹿児島県','福井県','兵庫県']},
 ];
-const MAX_MISS=3, TH=26, CW=300, CH=203;
+const MAX_MISS=3, TH=26, CW=244, CH=165;
 const G={screen:'title',stage:0,idx:0,card:null,miss:0,done:0,combo:0,best:0,missList:[],timer:0,next:0,
   flying:[],stamps:[],notes:[],bubble:null,ring:0,fxT:0,shake:0,clock:0,home:{x:W/2,y:380},drag:null,hot:null,
   run:{done:0,best:0,miss:[]},lastMiss:null};
 let lastTs=0;
 
-// ---- 区分棚（カゴ）: DOM ボタン。位置は home を中心に五角形 ----
+// ---- 区分棚（カゴ）: 表示だけの DOM。はがきから見た棚の方角を日本地図の向きに合わせる
+// 北日本=右上 / 関東=右 / 中部・近畿=上（やや左）/ 西日本=左下 / 通常便=真下
 ORDER.forEach(id=>{
-  const b=BK[id]; const el=document.createElement('button');
-  el.className='basket'+(id==='mourning'?' tsujo':''); el.dataset.b=id;
+  const b=BK[id]; const el=document.createElement('div');
+  el.className='basket'+(id==='mourning'?' tsujo':'')+(id==='kanto'||id==='west'?' side':''); el.dataset.b=id;
   el.innerHTML='<i class="plate">'+b.n+'</i><b>'+b.name+'</b><small>'+b.sub+'</small>';
-  el.addEventListener('pointerdown',e=>{ e.preventDefault(); judge(id); });
   $('wrap').appendChild(el); b.el=el;
 });
 function onResize(){
-  const T=topY(), full=(H-78)-(T+52), ry=Math.min(full/1.8,340), top=T+52+(full-1.8*ry)*0.8, cy=top+ry;
-  G.home={x:W/2,y:cy}; G.ry=ry;
-  const slots={north:[210,top,150,76],kanto:[360,cy-ry*0.5,100,76],mid:[305,cy+ry*0.8,132,76],
-               west:[115,cy+ry*0.8,132,76],mourning:[60,cy-ry*0.5,100,76]};
+  const T=topY(), hy=Math.max(T+380,H-240), U=hy-200;
+  G.home={x:W/2,y:hy}; G.U=U;
+  const slots={north:[356,U,112,76],kanto:[381,hy-4,66,118],mid:[160,U,142,76],
+               west:[39,hy+40,66,118],mourning:[210,hy+166,150,76]};
   for(const id of ORDER){
     const s=slots[id], b=BK[id];
     b.cx=s[0]; b.cy=s[1]; b.w=s[2]; b.h=s[3]; b.x=s[0]-s[2]/2; b.y=s[1]-s[3]/2;
-    const st=b.el.style; st.left=(TX+b.x*SC)+'px'; st.top=(TY+b.y*SC)+'px'; st.width=(b.w*SC)+'px'; st.height=(b.h*SC)+'px';
+    const st=b.el.style; st.fontSize=(10*SC)+'px'; st.left=(TX+b.x*SC)+'px'; st.top=(TY+b.y*SC)+'px'; st.width=(b.w*SC)+'px'; st.height=(b.h*SC)+'px';
   }
 }
 function setHot(id){
@@ -287,7 +289,7 @@ function remaining(){ return DAYS[G.stage].script.length-G.idx+(G.card?1:0); }
 function startStage(i){
   G.stage=i; G.idx=0; G.card=null; G.miss=0; G.done=0; G.combo=0; G.best=0; G.missList=[]; G.next=0;
   G.flying=[]; G.stamps=[]; G.notes=[]; G.ring=0; G.shake=0; G.fxT=0; G.drag=null; setHot(null); G.lastMiss=null;
-  G.bubble=i===0?{text:'宛名の県を読め。\n弾いた向きの棚へ飛ぶ。',t:5}:null;
+  G.bubble=i===0?{text:'班長「宛名の県を見て、\nその方角の棚へ放ってくれ」',t:3.5}:null;
   if(i===0)G.run={done:0,best:0,miss:[]};
   G.screen='play'; UI.close(); lastTs=0; nextCard();
 }
@@ -298,7 +300,7 @@ function nextCard(){
   G.card=makeCard(D.script[G.idx],G.idx); G.idx++; G.timer=D.limit;
 }
 
-// ---- はがきを棚へ送る（タップもフリックも同じ1操作）----
+// ---- はがきを棚へ送る（フリック。PC はキー 1〜5 でも）----
 function judge(id){
   if(G.screen!=='play')return; const c=G.card; if(!c||c.state!=='idle')return;
   const b=BK[id], ok=id===c.basket;
@@ -357,7 +359,7 @@ function showTitle(){
   UI.sheet({no:'区分課 作業指示 · '+GAME_NO,title:'年賀状仕分け',
     lead:'十二月、郵便局の区分作業場。はがきが一枚ずつ回ってくる。宛名を読んで、担当の棚へ。',
     rows:[['あなたの権限','はがきを指で弾けば、日本中どこの区分棚にも一投で届く'],
-          ['操作','宛先の県がある向きへ指で弾く（棚のタップでも入る）。薄墨の枠の喪中はがきは通常便の棚へ'],
+          ['操作','はがきを宛先の県の方角へ指で弾く。薄墨の枠の喪中はがきは真下の通常便へ'],
           ['失敗','誤配や滞留が3回で、電話が鳴りやまず付箋に埋もれる'],
           ['出典','郵便番号・住所は各都道府県庁（uub.jp/prf/office.html）。宛名・差出人は架空']],
     main:['作業にかかる',()=>startStage(0)],subs:[['一覧へ',toPortal]]});
@@ -377,11 +379,11 @@ function dragMove(p){
   const d=G.drag, c=G.card; if(!d||!c||c.state!=='idle')return;
   const vx=p.x-d.x0, vy=p.y-d.y0, len=Math.hypot(vx,vy);
   if(len>TH){ d.cand=bestBasket(vx,vy); setHot(d.cand); }else{ d.cand=null; setHot(null); }
-  const lim=Math.min(len,64), k=len?lim/len:0;
+  const lim=Math.min(len,40), k=len?lim/len:0;
   c.x=G.home.x+vx*k; c.y=G.home.y+vy*k; c.rot=Math.max(-0.35,Math.min(0.35,vx/260));
 }
 $('wrap').addEventListener('pointerdown',e=>{
-  if(G.screen!=='play'||!G.card||G.card.state!=='idle'||e.target.closest('.basket')||e.target.closest('#hud'))return;
+  if(G.screen!=='play'||!G.card||G.card.state!=='idle'||e.target.closest('#hud'))return;
   const p=toGame(e); G.drag={id:e.pointerId,x0:p.x,y0:p.y,cand:null};
   try{$('wrap').setPointerCapture(e.pointerId);}catch(_){}
 });
@@ -514,11 +516,54 @@ function drawNote(x,y,rot,sz,kind,pref){
 }
 function drawBubble(text,cx,cy){
   const lines=text.split('\n'); ctx.font='700 13px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
-  const w=Math.min(196,Math.max(...lines.map(l=>ctx.measureText(l).width))+22), h=lines.length*18+14;
+  const w=Math.min(212,Math.max(...lines.map(l=>ctx.measureText(l).width))+22), h=lines.length*18+14;
   ctx.fillStyle='#fffdf3'; ctx.strokeStyle='#3a3226'; ctx.lineWidth=1.5;
   ctx.beginPath(); ctx.rect(cx-w/2,cy-h/2,w,h); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cx-8,cy+h/2); ctx.lineTo(cx,cy+h/2+9); ctx.lineTo(cx+8,cy+h/2); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.fillStyle='#1c1814'; lines.forEach((l,i)=>ctx.fillText(l,cx,cy-h/2+7+9+i*18));
+}
+// 壁の区分図: 都道府県の地方を緯度経度の簡略ポリゴンで（[経度,緯度]）。番号は棚の番号
+const MAP=[
+ ['north',[[141.2,41.4],[140.0,41.5],[139.9,42.6],[140.5,43.2],[141.4,43.3],[141.6,45.4],[142.0,45.5],[143.5,44.2],[145.3,44.3],[145.8,43.4],[145.2,43.0],[143.3,42.0],[141.8,42.6],[141.0,42.3]]],
+ ['north',[[140.0,40.6],[140.35,41.25],[140.9,41.0],[141.2,41.5],[141.5,40.5],[142.05,39.5],[141.5,38.3],[141.0,38.0],[140.8,36.9],[139.4,36.95],[139.6,37.4],[139.8,38.0],[139.55,38.55],[139.8,39.0],[139.85,39.9]]],
+ ['kanto',[[140.8,36.9],[140.6,36.3],[140.85,35.75],[140.4,35.1],[139.8,34.9],[139.85,35.3],[139.6,35.2],[139.15,35.15],[139.0,35.5],[138.7,35.9],[138.7,36.6],[139.4,36.95]]],
+ ['mid',[[139.55,38.55],[139.8,38.0],[139.6,37.4],[139.4,36.95],[138.7,36.6],[138.7,35.9],[139.0,35.5],[139.15,35.15],[138.8,34.6],[138.5,34.9],[138.2,34.6],[137.3,34.65],[137.0,34.7],[136.9,35.05],[136.6,34.75],[136.9,34.3],[136.3,34.0],[135.8,33.45],[135.4,33.6],[135.1,34.25],[135.4,34.6],[135.0,34.65],[134.3,34.7],[134.4,35.65],[135.4,35.55],[136.0,35.9],[136.7,36.6],[136.7,37.3],[137.3,37.5],[137.0,36.85],[137.3,36.75],[138.2,37.1],[138.9,37.8]]],
+ ['west',[[134.4,35.65],[134.3,34.7],[133.9,34.5],[133.0,34.35],[132.5,34.3],[132.2,33.95],[131.3,34.0],[130.9,33.95],[131.4,34.4],[131.9,34.9],[132.6,35.45],[133.3,35.55]]],
+ ['west',[[132.9,34.05],[133.6,34.3],[134.2,34.35],[134.6,34.2],[134.75,33.8],[134.2,33.25],[133.6,33.5],[133.0,32.75],[132.5,32.9],[132.3,33.3],[132.0,33.35],[132.3,33.5],[132.7,33.85]]],
+ ['west',[[130.9,33.95],[131.6,33.6],[131.7,33.2],[131.9,32.95],[131.5,32.0],[131.3,31.4],[131.1,31.0],[130.7,31.0],[130.6,31.4],[130.2,31.25],[130.2,31.8],[130.6,32.5],[130.4,33.0],[129.8,32.75],[129.6,33.2],[129.9,33.5],[130.4,33.6]]],
+];
+const OKINAWA=[[127.65,26.1],[127.85,26.2],[127.95,26.45],[128.3,26.85],[128.2,26.9],[127.85,26.6],[127.7,26.4]];
+const MAP_TINT={north:'#cdd7d8',kanto:'#e2cfa8',mid:'#d9c2b8',west:'#c9d3b5'};
+const MAP_NO=[['north',142.9,43.3],['north',140.9,39.4],['kanto',139.95,35.95],['mid',137.3,35.7],['west',132.9,34.85],['west',130.9,32.2]];
+function drawMap(x,y,w,h){
+  // 掲示: 紙と画鋲、上に「区分図」
+  ctx.fillStyle='rgba(40,28,14,.16)'; ctx.fillRect(x+2,y+3,w,h);
+  ctx.fillStyle='#f4efdd'; ctx.fillRect(x,y,w,h); ctx.strokeStyle='#a69a7c'; ctx.lineWidth=1; ctx.strokeRect(x+.5,y+.5,w-1,h-1);
+  ctx.fillStyle='#5a4a38'; ctx.font='700 11px '+FONT; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText('区分図',x+7,y+11);
+  // 経度 129.4〜146.0 / 緯度 30.8〜45.7 を枠に収める（緯度37°の正距円筒）
+  const lx=0.8, mx=x+6, my=y+20, mw=w-12, mh=h-26, k=Math.min(mw/((146-129.4)*lx),mh/(45.7-30.8));
+  const ox=mx+(mw-(146-129.4)*lx*k)/2, oy=my+(mh-(45.7-30.8)*k)/2;
+  const P=(lo,la)=>[ox+(lo-129.4)*lx*k, oy+(45.7-la)*k];
+  ctx.lineWidth=0.8; ctx.strokeStyle='#7d725c';
+  for(const [r,poly] of MAP){ ctx.fillStyle=MAP_TINT[r]; ctx.beginPath(); poly.forEach(([lo,la],i)=>{ const q=P(lo,la); i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]); }); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  // 沖縄は右下の囲みに（はめ込み）
+  const bx=x+w-6-w*0.2, by=y+h-6-h*0.2, bw=w*0.2, bh=h*0.2;
+  ctx.setLineDash([2,2]); ctx.strokeRect(bx,by,bw,bh); ctx.setLineDash([]);
+  const s=Math.min(bw/1.2,bh/1.2)*0.85;
+  ctx.fillStyle=MAP_TINT.west; ctx.beginPath(); OKINAWA.forEach(([lo,la],i)=>{ const q=[bx+bw/2+(lo-128.0)*lx*s, by+bh/2+(26.5-la)*s]; i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]); }); ctx.closePath(); ctx.fill(); ctx.stroke();
+  const pr=Math.max(5.5,Math.min(8,k*0.75));
+  ctx.font='800 '+Math.max(10,Math.round(pr*1.5))+'px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(const [r,lo,la] of MAP_NO){ const q=P(lo,la);
+    ctx.fillStyle='#c9a64a'; ctx.beginPath(); ctx.arc(q[0],q[1],pr,0,7); ctx.fill(); ctx.strokeStyle='#6b5420'; ctx.stroke();
+    ctx.fillStyle='#2a1d10'; ctx.fillText(BK[r].n,q[0],q[1]+0.5); }
+  ctx.fillStyle='#8a6540'; ctx.beginPath(); ctx.arc(x+w/2,y+4,2.5,0,7); ctx.fill();
+}
+// 区分図の位置（壁の空き: 電話・日めくりの下〜上段の棚の上）
+function mapRect(){
+  const T=topY(), bot=G.U-38-12-6;
+  if(bot-(T+80)>=150){ const top=T+80, h=Math.min(bot-top,190), w=Math.min(h*1.05,190); return {x:W/2-w/2,y:top+(bot-top-h)/2,w,h}; }
+  // 壁が低いとき（横長の画面）は電話と日めくりの間まで上げる
+  const top=T+8, h=bot-top; if(h<110)return null;
+  const w=Math.min(h*1.05,128); return {x:244-w/2,y:top,w,h};
 }
 // 失敗演出の付箋（決め打ちの位置）
 const AVAL=Array.from({length:16},(_,i)=>({x:30+((i*83)%360),y:150+((i*127)%420),r:((i*37)%50-25)/100}));
@@ -529,20 +574,22 @@ function draw(){
   // 壁
   ctx.fillStyle='#d9d4bd'; ctx.fillRect(-20,-20,W+40,H+40);
   ctx.strokeStyle='#cdc7ae'; ctx.lineWidth=1; for(let y=T+30;y<H;y+=44){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  // 区分図（壁の掲示）
+  const mr=mapRect(); G.map=mr; if(mr)drawMap(mr.x,mr.y,mr.w,mr.h);
+  // 作業台
+  const tx=10,ty=hy-CH/2-16,tw=W-20,th=CH+32;
+  ctx.fillStyle='#b78b59'; ctx.fillRect(tx,ty,tw,th);
+  ctx.strokeStyle='rgba(120,84,46,.35)'; ctx.lineWidth=1; for(let y=ty+14;y<ty+th;y+=17){ ctx.beginPath(); ctx.moveTo(tx,y+((y*7)%5)); ctx.lineTo(tx+tw,y-((y*3)%5)); ctx.stroke(); }
+  ctx.fillStyle='#8f6a40'; ctx.fillRect(tx,ty+th,tw,9);
   // 区分棚の枠板
   for(const id of ORDER){ const b=BK[id]; if(!b.w)continue;
     ctx.fillStyle='#6e4f2e'; ctx.fillRect(b.x-6,b.y-6,b.w+12,b.h+12);
     ctx.fillStyle='#8a6540'; ctx.fillRect(b.x-10,b.y+b.h+6,b.w+20,7); }
-  // 作業台
-  const tx=10,ty=Math.max(hy-CH/2-24,hy-G.ry*0.5+48),tw=W-20,th=hy+CH/2+24-ty;
-  ctx.fillStyle='#b78b59'; ctx.fillRect(tx,ty,tw,th);
-  ctx.strokeStyle='rgba(120,84,46,.35)'; ctx.lineWidth=1; for(let y=ty+14;y<ty+th;y+=17){ ctx.beginPath(); ctx.moveTo(tx,y+((y*7)%5)); ctx.lineTo(tx+tw,y-((y*3)%5)); ctx.stroke(); }
-  ctx.fillStyle='#8f6a40'; ctx.fillRect(tx,ty+th,tw,9);
   // 残りの束
   if(G.screen==='play'||G.screen==='pause'||G.screen==='fail'||G.screen==='clear'){
     const r=Math.max(0,remaining()-(G.card?1:0)); const n=Math.min(5,r);
     for(let i=n;i>=1;i--){
-      ctx.save(); ctx.translate(hx+i*2.4,hy+i*2.4); ctx.rotate(i%2?0.012:-0.012);
+      ctx.save(); ctx.translate(hx+i*1.2,hy+i*2.4); ctx.rotate(i%2?0.012:-0.012);
       ctx.fillStyle='#f1ecda'; ctx.fillRect(-CW/2,-CH/2,CW,CH); ctx.strokeStyle='#cfc6ad'; ctx.strokeRect(-CW/2+.5,-CH/2+.5,CW-1,CH-1); ctx.restore();
     }
   }
@@ -552,9 +599,9 @@ function draw(){
   ctx.fillStyle='#5a4a38'; ctx.fillRect(316,T+8,92,16);
   ctx.fillStyle='#f4f0e2'; ctx.font='700 11px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('12月',362,T+16);
   ctx.fillStyle='#1c1814'; ctx.font='800 32px '+FONT; ctx.fillText(DAYS[G.stage].name.replace(/12月|日/g,''),362,T+47);
-  // 付箋（ミスのたびに机の下に貼られる）
-  const nyB=hy-G.ry*0.5-68;
-  G.notes.forEach((n,i)=>{ const p=Math.min(1,n.t/0.18), P=[[44,nyB,-0.12],[106,nyB-3,0.1],[368,nyB,0.14]][i]||[368,nyB,0];
+  // 付箋（ミスのたびに壁に貼られる。区分図の左右）
+  const nyB=G.U-38-40;
+  G.notes.forEach((n,i)=>{ const p=Math.min(1,n.t/0.18), P=[[40,nyB,-0.12],G.map&&G.map.x>140?[104,nyB-4,0.1]:[40,nyB-58,0.1],[378,nyB,0.14]][i]||[378,nyB,0];
     drawNote(P[0],P[1]-(1-p)*30,P[2],0.85+0.3*(1-p),n.kind,n.pref); });
   // 札
   for(const c of G.flying)drawCard(c);
@@ -562,11 +609,12 @@ function draw(){
   // 制限時間（作業台の手前に細い帯）
   if(G.screen==='play'&&G.card){
     const f=Math.max(0,G.timer/DAYS[G.stage].limit);
-    ctx.fillStyle='rgba(60,40,20,.35)'; ctx.fillRect(tx,ty+th+12,tw,5);
-    ctx.fillStyle=f>0.35?'#3d6b3a':'#d9822b'; ctx.fillRect(tx,ty+th+12,tw*f,5);
+    const bx=hx-CW/2, by=ty+th+11;
+    ctx.fillStyle='rgba(60,40,20,.35)'; ctx.fillRect(bx,by,CW,5);
+    ctx.fillStyle=f>0.35?'#3d6b3a':'#d9822b'; ctx.fillRect(bx,by,CW*f,5);
   }
   // 吹き出し
-  if(G.bubble)drawBubble(G.bubble.text,hx,ty-34);
+  if(G.bubble)drawBubble(G.bubble.text,hx,(G.U+38+ty)/2);
   // 棚の誤配判子
   for(const s of G.stamps)drawStamp(s.x,s.y,s.text,22,Math.max(0,1-s.t/1.1));
   // 演出

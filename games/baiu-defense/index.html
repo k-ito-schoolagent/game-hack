@@ -43,7 +43,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 #sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
 @keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 #sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
-#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px;word-break:auto-phrase;text-wrap:balance}
 #sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
 #sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
 #sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
@@ -54,7 +54,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 .btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .btn:active{transform:translateY(1px);opacity:.9}
 .sub{display:flex;flex-wrap:wrap;justify-content:center;gap:0 4px}
-.sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
+.sub button{min-height:44px;min-width:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
 /* 判子: 結果シートの右上に押される。中身は最大4字 */
 .stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
 .stamp.round{border-radius:50%}
@@ -357,7 +357,7 @@ let lastTs=0;
 const PLACES=['那覇市のベランダ','鹿児島市の物干し台','大阪市のベランダ','東京都内のベランダ','新潟市の物干し台','盛岡市の庭'];
 
 function startStage(i){
-  G.stage=i; G.S=simInit(i); G.tx=G.S.hx; G.ty=G.S.hy; G.anim=null; G.guide=3.4; G.pops=[]; G.wet=0;
+  G.stage=i; G.S=simInit(i); G.tx=G.S.hx; G.ty=G.S.hy; G.anim=null; G.guide=i===0?3.4:0; G.pops=[]; G.wet=0;
   G.screen='play'; UI.close(); lastTs=0;
 }
 function restart(){ startStage(G.stage); }
@@ -475,7 +475,7 @@ function lbBlock(x0,y0,x1,y1,kind){ LB.push([x0,y0,x1,y1,kind||'block']); }
 function label(o,cands){
   ctx.font=o.font; const w=ctx.measureText(o.text).width+2*(o.pad??3), h=o.h;
   for(const [cx,cy] of cands){ const r=[cx-w/2,cy-h/2,cx+w/2,cy+h/2];
-    if(lbIn(r)&&!lbHit(r)){ LB.push([...r,o.kind||'label',o.text]); LQ.push({...o,r}); return r; } }
+    if(lbIn(r)&&!lbHit(r)&&!(o.avoid&&o.avoid(r))){ LB.push([...r,o.kind||'label',o.text]); LQ.push({...o,r}); return r; } }
   if(o.req) LMISS.push(o.text);
   return null;
 }
@@ -613,12 +613,15 @@ function drawLowMark(lo,top){
 // 低気圧の「低」「1002」: ×の北側に「低」、その横に気圧。左右の端では文字だけ画面内に寄せる。置けなければ南側、それでもだめなら省く
 function labelLow(lo,top){
   if(lo.x<-10||lo.x>W+10) return;
-  const y=lo.y+top;
+  const y=lo.y+top, S=G.S;
   const x=Math.max(13,Math.min(W-13,lo.x));
-  const a=label({text:'低',font:'800 22px '+FONT,h:24,pad:1,fg:C.lo,kind:'low'},[[x,y-19],[x,y+19]]);
+  // 高気圧の円の内側には置かない（円に重なると「低」「1002」が等圧線に埋もれる）
+  const avoid=r=>{ if(!S) return false; const dx=Math.max(r[0]-S.hx,0,S.hx-r[2]), dy=Math.max(r[1]-(S.hy+top),0,(S.hy+top)-r[3]); return Math.hypot(dx,dy)<R_DISK+3; };
+  const cands=[[x,y-19],[x,y+19]]; [26,40,58].forEach(d=>[0,1,2,3,4,5,6,7].forEach(k=>cands.push([x+d*Math.cos(k*Math.PI/4),y+d*Math.sin(k*Math.PI/4)])));
+  const a=label({text:'低',font:'800 22px '+FONT,h:24,pad:1,fg:C.lo,kind:'low',avoid},cands);
   if(!a) return;
   const cy=(a[1]+a[3])/2+4, f='700 11px '+FONT; ctx.font=f; const hw=ctx.measureText('1002').width/2+2;
-  label({text:'1002',font:f,h:12,pad:1,fg:C.lo,kind:'low'},[[a[2]+hw+1,cy],[a[0]-hw-1,cy]]);
+  label({text:'1002',font:f,h:12,pad:1,fg:C.lo,kind:'low',avoid},[[a[2]+hw+1,cy],[a[0]-hw-1,cy],[(a[0]+a[2])/2,a[3]+8],[(a[0]+a[2])/2,a[1]-8]]);
 }
 
 // 守る地方の代表地点・ほかの地方の雨量
@@ -795,7 +798,7 @@ function draw(){
     drawBalcony(S);
     if(guide){ ctx.globalAlpha=guide.a; ctx.fillStyle='rgba(27,42,68,0.9)'; ctx.fillRect(guide.gx0,guide.gy0,guide.gw,52);
       ctx.fillStyle='#FBFBF7'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      const l1='どこでもドラッグ', l2='→ 高気圧が動きます';
+      const l1='「高気圧さん、', l2='こっちに寄せて！」';
       ctx.font='700 14px '+FONT; const fs=Math.max(10,Math.min(14,14*(guide.gw-16)/Math.max(ctx.measureText(l1).width,ctx.measureText(l2).width)));
       ctx.font='700 '+fs.toFixed(1)+'px '+FONT; ctx.fillText(l1,guide.gx0+guide.gw/2,guide.gy0+16); ctx.fillText(l2,guide.gx0+guide.gw/2,guide.gy0+36); ctx.globalAlpha=1; }
     if(failing) drawTelop(S,G.anim.t);

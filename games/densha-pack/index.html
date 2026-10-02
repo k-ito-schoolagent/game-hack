@@ -43,7 +43,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 #sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
 @keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 #sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
-#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px;word-break:auto-phrase;text-wrap:balance}
 #sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
 #sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
 #sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
@@ -87,6 +87,37 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 .btn{border-radius:0;background:#1B1B1D;color:#F2EEE2}
 /* 判子: 失敗は駅長の朱の角印、発車は駅スタンプの紺の丸印 */
 .stamp.round{color:var(--eki);border-color:var(--eki);box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--eki)}
+/* 遅延証明書: 改札で渡す紙片。淡い地紋・中央の表題・定型文・駅長の丸印・切り取り線と控 */
+.cert{margin:0 0 4px;padding:10px 14px 10px;border:1px solid var(--ink2);background-color:#F4F6EF;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M0 12L12 0M-3 3L3-3M9 15L15 9' stroke='%232E4A7A' stroke-opacity='.08' stroke-width='1'/%3E%3Cpath d='M0 0L12 12' stroke='%232E4A7A' stroke-opacity='.05' stroke-width='1'/%3E%3C/svg%3E")}
+.cert-h{margin:0;text-align:center;font-size:20px;font-weight:800;letter-spacing:.5em;text-indent:.5em}
+.cert-d{margin:0 0 4px;text-align:right;font-size:13px;color:var(--ink2);font-feature-settings:"tnum"}
+.cert table,.rep table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13.5px;line-height:1.5}
+.cert th,.cert td{border-bottom:1px solid var(--rule);padding:4px 0;text-align:left;vertical-align:baseline;overflow-wrap:anywhere}
+.cert th{width:5.2em;font-weight:500;color:var(--ink2)}
+.cert td{font-weight:600}
+.cert-min{font-size:26px;font-weight:800;line-height:1;margin:0 2px;font-feature-settings:"tnum"}
+.cert-s{margin:8px 0 2px;font-size:14px;font-weight:600}
+.cert-f{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:0;font-size:14px;font-weight:700;letter-spacing:.08em}
+.seal{width:48px;height:48px;border:2px solid var(--shu);border-radius:50%;color:var(--shu);display:grid;place-content:center;font-style:normal;font-size:11px;font-weight:800;line-height:1.2;text-align:center;letter-spacing:0;transform:rotate(-6deg);opacity:.9}
+.seal.long span:first-child{font-size:9.5px}
+.cut{display:flex;align-items:center;gap:8px;margin:2px 0;font-size:10.5px;color:var(--ink2);letter-spacing:.3em}
+.cut::before,.cut::after{content:"";flex:1;border-top:1px dashed var(--ink2)}
+.stub{display:flex;flex-wrap:wrap;gap:4px 16px;margin:4px 0 16px;font-size:13px;font-weight:600;font-feature-settings:"tnum"}
+.stub b{font-weight:800;border:1px solid var(--ink);padding:0 5px;margin-right:-4px}
+/* 乗務報告書: 罫で区切った記入欄。特記事項は同じ表の最下段 */
+.rep{margin:0 0 16px}
+.rep-h{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 6px;font-size:13px;color:var(--ink2)}
+.rep-h b{font-size:17px;color:var(--ink);letter-spacing:.2em}
+.rep table{border:1px solid var(--ink)}
+.rep th,.rep td{border:1px solid var(--rule);padding:6px 6px;text-align:left;vertical-align:baseline;overflow-wrap:anywhere;font-feature-settings:"tnum"}
+.rep th{width:4.6em;background:var(--paper2);font-weight:500;font-size:12px;color:var(--ink2)}
+.rep td{font-weight:600}
+.rep th.rep-nh{width:auto}
+.rep .rep-note{font-weight:500;line-height:1.65;padding:8px}
+.rep .warn{color:var(--shu);font-weight:800}
+.rep-by{margin:6px 0 0;text-align:right;font-size:12px;color:var(--ink2)}
+/* 幅320px級の端末: 発車標の文字を詰めて1行に収める */
+@media (max-width:340px){#hudL{font-size:13px;padding-left:10px}#hudL small{font-size:11px;margin-left:3px}#hudC{font-size:12px;padding:0 6px}}
 </style>
 </head>
 <body>
@@ -268,7 +299,7 @@ const STAGES=[
    poles:[[112,150],[308,134]],
    base:[["stu",364],["pack",111],["sal",201],["big",267],["stu",64],["stu",40],["pack",327],["kid",389],["sal",207],["sal",99],["sal",267],["pack",153],["sal",39],["pack",381],["sal",249],["stu",202],["sal",303],["big",63],["stu",166],["big",345],["eld",252],["pack",51],["pack",177],["sal",123],["sal",321]]},
 ];
-const SOURCE="混雑率＝国土交通省「東京圏における主要区間の混雑率」令和7年度 中央線快速 中野→新宿 7:35〜8:35 158%／番線＝Wikipedia各駅記事（概略値）／発車時刻は架空、人と車内の寸法は概略値";
+const SOURCE="混雑率＝国土交通省「東京圏における主要区間の混雑率」令和7年度 中央線快速 中野→新宿 7:35〜8:35 158%／番線＝Wikipedia各駅記事（概略値）／発車時刻・列車番号は架空、人と車内の寸法は概略値";
 
 const G={screen:'title',stage:0,time:0,queue:[],cur:null,placed:[],base:[],sky:null,fx:null,shake:0,guide:0,total:0,lineup:[]};
 let lastTs=0;
@@ -376,41 +407,79 @@ function boardedNow(){ return G.placed.length; }
 function marginCm(){ let m=SD; for(const s of G.sky)m=Math.min(m,SD-s[2]); return Math.round(m*PX_CM); }
 function trainOf(st){ return '快速 東京行 10両　'+st.dep+'発'; }
 function stTrack(st){ return st.track?st.track+'番線':''; }
+function trainNo(st){ return st.dep.replace(':','')+'T'; }   // 列車番号も架空（発車時刻から作る）
+function wareki(){ const d=new Date(); return '令和'+(d.getFullYear()-2018)+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日'; }
+// 結果の帳票（遅延証明書・乗務報告書）は共通シートの rows の代わりに、ボタンの上へ差し込む
+function sheetDoc(o,html){ UI.sheet(o); const a=$('sheet').querySelector('.acts'); if(a)a.insertAdjacentHTML('beforebegin',html); }
+const tr=cells=>'<tr>'+cells.map(c=>c[0]==='th'?'<th>'+esc(c[1])+'</th>':'<td'+(c[2]?' colspan="'+c[2]+'"':'')+'>'+c[1]+'</td>').join('')+'</tr>';
+// 乗務報告書: 列車番号・時刻・乗車人員・特記事項の表
+function report(rows,note){
+  return '<div class="rep"><p class="rep-h"><b>乗 務 報 告 書</b><span>'+esc(wareki())+'</span></p><table>'+rows.map(tr).join('')+
+    '<tr><th colspan="4" class="rep-nh">特記事項</th></tr><tr><td colspan="4" class="rep-note">'+note+'</td></tr></table>'+
+    '<p class="rep-by">報告者　ホーム整理係（押し屋）</p></div>';
+}
 
 function failDoor(){
   const st=STAGES[G.stage], o=G.over, n=KIND[o.k].n;
+  const min=Math.min(5,1+Math.ceil(o.cm/20));   // 閉め直し2回＋はみ出しの大きさ
+  const seal=[...st.name].length>=4?' long':'';
   G.screen='result';
-  UI.sheet({no:GAME_NO+' · 遅延証明書',title:'ドアが閉まりません',stamp:'閉扉不能',
-    lead:'「'+st.name+'、'+(st.track?stTrack(st)+'、':'')+'ドアが閉まりません。無理なご乗車はおやめください」\n最後に押し込んだ'+n+'が、ドアラインから '+o.cm+'cm はみ出していました。',
-    rows:[['列車',trainOf(st)],['駅',st.name+'（'+(G.stage+1)+'/'+STAGES.length+'）'],['乗せた人数',boardedNow()+' / '+st.seq.split(' ').length+' 人'],['はみ出し',n+' '+o.cm+'cm'],['累計乗車',(G.total+boardedNow())+' 人']],
+  sheetDoc({no:GAME_NO+' · 遅延証明書',title:'ドアが閉まりません',stamp:'閉扉不能',
+    lead:'「'+st.name+'、'+(st.track?stTrack(st)+'、':'')+'ドアが閉まりません。無理なご乗車はおやめください」',
     main:['この駅をやり直す',restart],
-    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+'で'+n+'がドアラインから'+o.cm+'cmはみ出して「ドアが閉まりません」。乗せた人数 '+boardedNow()+'人',TAG)],['一覧へ',toPortal]]});
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+'で'+n+'がドアラインから'+o.cm+'cmはみ出して「ドアが閉まりません」。乗せた人数 '+boardedNow()+'人',TAG)],['一覧へ',toPortal]]},
+    '<div class="cert"><p class="cert-h">遅延証明書</p><p class="cert-d">'+esc(wareki())+'</p><table>'+
+      tr([['th','線区'],['td','中央線快速　上り']])+tr([['th','列車'],['td',esc(trainOf(st))]])+
+      tr([['th','区間'],['td',esc(st.name+' → '+st.next)]])+
+      tr([['th','遅延時分'],['td','約 <b class="cert-min">'+min+'</b> 分']])+
+      tr([['th','事由'],['td','閉扉不能（'+esc(n)+'がドアラインから '+esc(o.cm)+'cm はみ出し）']])+
+    '</table><p class="cert-s">上記列車が遅れたことを証明します。</p>'+
+    '<p class="cert-f"><span>'+esc(st.name)+'駅長</span><i class="seal'+seal+'"><span>'+esc(st.name)+'</span><span>駅長</span></i></p></div>'+
+    '<p class="cut">切り取り線</p>'+
+    '<p class="stub"><b>控</b><span>乗せた人数 '+boardedNow()+' / '+st.seq.split(' ').length+' 人</span><span>累計乗車 '+(G.total+boardedNow())+' 人</span></p>');
 }
 function failBell(){
-  const st=STAGES[G.stage], left=G.fx.left;
+  const st=STAGES[G.stage], left=G.fx.left, all=st.seq.split(' ').length;
   const names=[...new Set(G.lineup.map(p=>KIND[p.k].n))].slice(0,2).join('・');
   G.screen='result';
-  UI.sheet({no:GAME_NO+' · 乗務報告',title:'積み残しのまま発車',stamp:'積残',
-    lead:'発車ベルが鳴り終わりました。\n「'+st.name+'、ホームに '+left+' 人残っています。次の電車をお待ちください」\n'+names+'が乗れませんでした。',
-    rows:[['列車',trainOf(st)],['駅',st.name+'（'+(G.stage+1)+'/'+STAGES.length+'）'],['乗せた人数',boardedNow()+' / '+st.seq.split(' ').length+' 人'],['積み残し',left+' 人'],['累計乗車',(G.total+boardedNow())+' 人']],
+  sheetDoc({no:GAME_NO+' · 乗務報告',title:'積み残しのまま発車',stamp:'積残',
+    lead:'発車ベルが鳴り終わりました。\n「'+st.name+'、次の電車をお待ちください」',
     main:['この駅をやり直す',restart],
-    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+'でホームに'+left+'人積み残して発車。乗せた人数 '+boardedNow()+'人',TAG)],['一覧へ',toPortal]]});
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+'でホームに'+left+'人積み残して発車。乗せた人数 '+boardedNow()+'人',TAG)],['一覧へ',toPortal]]},
+    report([
+      [['th','列車番号'],['td',esc(trainNo(st))],['th','両数'],['td','10両']],
+      [['th','種別'],['td','中央線快速 上り　快速 東京行',3]],
+      [['th','発車駅'],['td',esc(st.name+' '+st.dep)],['th','駅順'],['td',(G.stage+1)+' / '+STAGES.length]],
+      [['th','乗車人員'],['td',boardedNow()+' / '+all+' 人'],['th','積残'],['td','<span class="warn">'+left+' 人</span>']],
+    ],'発車ベル鳴動終了時、ホームに '+left+' 人（'+esc(names)+'）を残して発車。累計乗車 '+(G.total+boardedNow())+' 人。'));
 }
 function stageClear(){
   const st=STAGES[G.stage], last=G.stage>=STAGES.length-1, n=boardedNow(), m=marginCm();
   G.total+=n; G.screen='result';
-  const rows=[['列車',trainOf(st)],['駅',st.name+'（'+(G.stage+1)+'/'+STAGES.length+'）'],['乗せた人数',n+' 人'],['発車まで',Math.ceil(G.time)+' 秒残し'],['ドア前の余裕','最も出ている人で あと '+m+'cm'],['累計乗車',G.total+' 人']];
   if(last){
-    UI.sheet({no:GAME_NO+' · 乗務報告',title:'中野 発車　東京行',stamp:'発車',round:true,
+    sheetDoc({no:GAME_NO+' · 乗務報告',title:'中野 発車　東京行',stamp:'発車',round:true,
       lead:'国分寺から中野まで 8駅、ひとりも積み残さずに押し込みました。\n「この先、新宿まで止まりません」',
-      rows:[['乗せた人数','合計 '+G.total+' 人（8駅）'],['最後の駅',st.name+'　ドアラインまで あと '+m+'cm'],['この先の混雑','中野→新宿 158%（国土交通省 令和7年度 7:35〜8:35）']],
       main:['国分寺からもう一度',()=>{G.total=0;startStage(0);}],
-      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】国分寺〜中野の8駅で '+G.total+'人を押し込んで発車させた。最後の中野はドアラインまで'+m+'cm',TAG)],['一覧へ',toPortal]]});
+      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】国分寺〜中野の8駅で '+G.total+'人を押し込んで発車させた。最後の中野はドアラインまで'+m+'cm',TAG)],['一覧へ',toPortal]]},
+      report([
+        [['th','列車番号'],['td',esc(trainNo(st))],['th','両数'],['td','10両']],
+        [['th','区間'],['td','国分寺 → 中野（'+STAGES.length+'駅）',3]],
+        [['th','乗車人員'],['td','合計 '+G.total+' 人'],['th','積残'],['td','0 人']],
+        [['th','中野 発車'],['td',esc(st.dep)],['th','ドア前'],['td','あと '+m+'cm']],
+      ],'この先 新宿まで停車なし。中野→新宿の混雑率 158%（国土交通省 令和7年度 7:35〜8:35）。'));
   } else {
-    UI.sheet({no:GAME_NO+' · 乗務報告',title:st.name+' 発車',stamp:'発車',round:true,
-      lead:'「ドアが閉まります。ご注意ください」\n次の持ち場は '+STAGES[G.stage+1].name+' 駅。',
-      rows, main:['次の駅へ',()=>startStage(G.stage+1)],
-      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+'で '+n+'人を押し込んで発車。ドアラインまで'+m+'cm',TAG)],['一覧へ',toPortal]]});
+    const nx=STAGES[G.stage+1];
+    sheetDoc({no:GAME_NO+' · 乗務報告',title:st.name+' 発車',stamp:'発車',round:true,
+      lead:'「ドアが閉まります。ご注意ください」',
+      main:['次の駅へ',()=>startStage(G.stage+1)],
+      subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+st.name+'で '+n+'人を押し込んで発車。ドアラインまで'+m+'cm',TAG)],['一覧へ',toPortal]]},
+      report([
+        [['th','列車番号'],['td',esc(trainNo(st))],['th','両数'],['td','10両']],
+        [['th','種別'],['td','中央線快速 上り　快速 東京行',3]],
+        [['th','発車駅'],['td',esc(st.name+' '+st.dep)],['th','駅順'],['td',(G.stage+1)+' / '+STAGES.length]],
+        [['th','乗車人員'],['td',n+' 人'],['th','積残'],['td','0 人']],
+        [['th','発車まで'],['td',Math.ceil(G.time)+' 秒残し'],['th','ドア前'],['td','あと '+m+'cm']],
+      ],'積み残しなし。累計乗車 '+G.total+' 人。次の持ち場は '+esc(nx.name)+' 駅（'+esc(nx.dep)+'発）。'));
   }
 }
 function showTitle(){
@@ -420,7 +489,7 @@ function showTitle(){
   UI.sheet({no:GAME_NO+' · 業務内容',title:'満員電車パッキング',
     lead:'平日朝の中央線快速、東京行。\nあなたは駅の押し屋。ホームに並んだ人を、発車までに全員車内へ。',
     rows:[['あなたの権限','乗客を指でつまんで、車内の好きな位置へ押し込める'],
-          ['操作','指を置いて左右にずらし、離すと乗り込む（キーは ←→ と ↓）'],
+          ['操作','指を置いて左右にずらし、離すと乗り込む'+(matchMedia('(pointer:fine)').matches?'（キーは ←→ と ↓）':'')],
           ['失敗','ドアラインからはみ出すとドアが閉まらない。発車ベルまでに乗せきれないと積み残し'],
           ['出典',SOURCE]],
     main:['国分寺から乗務する',()=>{G.total=0;startStage(0);}],subs:[['一覧へ',toPortal]]});

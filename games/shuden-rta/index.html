@@ -43,7 +43,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointe
 #sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
 @keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 #sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
-#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px;word-break:auto-phrase;text-wrap:balance}
 #sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
 #sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
 #sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
@@ -609,7 +609,7 @@ function showTitle(){
     rows:[['あなたの権限','全社・全路線の電車の現在位置が、1枚の路線図でリアルタイムに見える'],
       ['操作','発車標の電車をタップして乗り、車内では降りる駅をタップする'],
       ['失敗','乗換の歩き時間を読み違える・乗り過ごす・迷っているうちに、帰れる最後の電車が出る'],
-      ['出典','路線・駅ナンバリング・ラインカラー: JR東日本・東京メトロ・東急の公式案内。ダイヤ: 平日の実際の終電（新橋 山手線外回り0:50品川行・内回り0:34池袋行、東京 中央線快速0:06／新宿0:21武蔵小金井行、新橋 銀座線0:15渋谷行、東京 丸ノ内線0:11新宿行、渋谷 東横線0:21元住吉行。Yahoo!乗換案内 transit.yahoo.co.jp、2026年10月確認）を参考にした簡略ダイヤ。途中の時刻・番線・乗換時間は概略値。タクシー: 東京都特別区・武三地区の運賃（2026年4月20日改定 初乗1.0km 500円・232mごと100円・深夜2割増。taxi-tokyo.or.jp）で計算した概算']],
+      ['出典','終電: Yahoo!路線情報（2026年10月確認）・タクシー運賃: 東京ハイヤー・タクシー協会（2026年4月改定）・途中駅の時刻と乗換時間は概略']],
     main:['はじめる',()=>startStage(0)],subs:[['一覧へ',toPortal]]});
 }
 
