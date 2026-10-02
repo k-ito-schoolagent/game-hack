@@ -4,280 +4,750 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>ハンコ決裁ライン | GAME HACK</title>
-<meta name="description" content="流れてくる決裁文書の不備を見抜いて差し戻し、正しい書類にはハンコをまっすぐ押す。斜め押しはにじんでミス。校務あるある×物理の技術介入型ゲーム。">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📄</text></svg>">
+<meta name="description" content="中学校の事務室。ベルトで流れてくる本物そっくりの伺い書（物品購入伺・支出伺・出張命令伺）を読み、合計違い・ありえない日付・押印漏れを見抜いて差し戻す。校長印を預かった臨時職員の1週間。監査が入ると付箋まみれ。">
+<meta name="theme-color" content="#F3EFE4">
+<!-- ファビコン: GAME HACK 共通の朱の角印。文字（1字）だけ差し替える -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%226%22 fill=%22none%22 stroke=%22%23C8372D%22 stroke-width=%226%22/><text x=%2232%22 y=%2244%22 font-size=%2234%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23C8372D%22>決</text></svg>">
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#0d1526;font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:#eaf3fc}
-  #wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
-  canvas{display:block;width:100%;height:100%}
-  #hud{position:absolute;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));display:flex;justify-content:space-between;pointer-events:none;font-size:14px}
-  #hud div{background:rgba(6,26,52,.78);border-radius:8px;padding:6px 10px}
-  #day{font-size:16px;font-weight:700}
-  /* 親指操作ゾーン（下部・大きめタップ領域） */
-  #controls{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:flex-end;padding:0 18px;pointer-events:none}
-  #reject{pointer-events:auto;width:132px;height:96px;border:none;border-radius:16px;background:#e24b4a;color:#fff;font-size:19px;font-weight:800;font-family:inherit;box-shadow:0 4px 0 #a83230}
-  #reject:active{transform:translateY(3px);box-shadow:none}
-  #stampHint{pointer-events:none;font-size:11.5px;color:#a9c2de;text-align:center;width:150px}
-  #popup{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:min(86vw,340px);background:rgba(255,255,255,.97);color:#12233f;border-radius:16px;padding:24px 20px;text-align:center;box-shadow:0 10px 34px rgba(0,0,0,.5)}
-  #popup.hidden{display:none}
-  #popup h1{margin:0 0 10px;font-size:20px}
-  #popup p{margin:0 0 16px;font-size:14px;line-height:1.8;white-space:pre-line}
-  #popup button{display:block;width:100%;min-height:52px;margin-top:8px;font-size:16px;font-weight:700;border:none;border-radius:12px;background:#ffb300;color:#12233f;cursor:pointer}
-  #popup button.ghost{background:#e8eef6;font-weight:500}
+/* ================================================================
+ * GAME HACK 共通UI（ここから）— 全ゲームで同じものをコピーして使う
+ * 世界観: 業務帳票。紙 × 墨 × 朱（ハンコの赤）。
+ * - 朱は「判子」と「失敗」にだけ使う。ボタンや装飾には使わない
+ * - 角丸は 2px まで。影・グラデーション・絵文字は使わない
+ * ================================================================ */
+:root{
+  --paper:#F3EFE4; --paper2:#E8E1CF; --ink:#22201C; --ink2:#5E584D; --rule:#CDC3AC; --shu:#C8372D;
+  --font:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDGothic","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--scene,#2b2a27);font-family:var(--font);color:var(--ink);-webkit-text-size-adjust:100%}
+#wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+canvas{display:block;width:100%;height:100%}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+/* HUD: 帳票の見出し帯。左=どこ / 中=いまの数値 / 右=一時停止 */
+#hud{position:absolute;left:0;right:0;top:0;padding-top:var(--safe-t);background:var(--paper);border-bottom:1px solid var(--ink);display:none;grid-template-columns:1fr auto 52px;align-items:center;height:calc(48px + var(--safe-t));box-sizing:border-box;font-feature-settings:"tnum";z-index:5}
+#hud.on{display:grid}
+#hudL{padding-left:14px;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hudL small{font-weight:500;color:var(--ink2);font-size:12px;margin-left:6px}
+#hudC{padding:0 12px;font-size:15px;font-weight:700;text-align:right;white-space:nowrap}
+#hudC .warn{color:var(--shu)}
+#pauseBtn{width:52px;height:48px;border:0;border-left:1px solid var(--rule);background:transparent;display:grid;place-items:center}
+#pauseBtn i{display:block;width:12px;height:14px;border-left:4px solid var(--ink);border-right:4px solid var(--ink);box-sizing:border-box}
+/* シート: 下から出る帳票。親指で押せる位置にボタンを置く */
+#sheetBg{position:absolute;inset:0;background:rgba(34,32,28,.5);display:none;z-index:10}
+#sheetBg.on{display:block}
+#sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,460px);max-height:calc(100% - 24px - var(--safe-t));overflow:auto;box-sizing:border-box;background:var(--paper);border-top:3px solid var(--ink);padding:22px 20px calc(18px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes sheetIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#sheet .no{font-size:11.5px;letter-spacing:.14em;color:var(--ink2);margin:0 0 6px}
+#sheet h1{font-size:26px;line-height:1.3;margin:0 0 4px;letter-spacing:.02em;padding-right:96px}
+#sheet .lead{font-size:15px;line-height:1.75;margin:14px 0 14px;white-space:pre-line}
+#sheet dl{margin:0 0 18px;border-top:1px solid var(--ink)}
+#sheet dl div{display:grid;grid-template-columns:7.5em 1fr;border-bottom:1px solid var(--rule);padding:9px 0;font-size:14px;line-height:1.6}
+#sheet dt{color:var(--ink2)}
+#sheet dd{margin:0;font-weight:600;font-feature-settings:"tnum"}
+#sheet .acts{display:grid;gap:8px}
+.btn{height:54px;border:0;border-radius:2px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;letter-spacing:.06em}
+.btn:focus-visible,.sub button:focus-visible,#pauseBtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn:active{transform:translateY(1px);opacity:.9}
+.sub{display:flex;justify-content:center;gap:4px}
+.sub button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:3px}
+/* 判子: 結果シートの右上に押される。中身は最大4字 */
+.stamp{position:absolute;top:12px;right:16px;width:76px;height:76px;border:4px solid var(--shu);border-radius:6px;color:var(--shu);display:grid;place-items:center;font-weight:800;line-height:1.05;text-align:center;transform:rotate(-8deg);opacity:.92;box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 4px var(--shu);animation:stampIn .32s cubic-bezier(.3,1.6,.5,1) .12s both}
+.stamp.round{border-radius:50%}
+.stamp span{display:block}
+@keyframes stampIn{from{transform:rotate(-8deg) scale(1.9);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:.92}}
+@media (prefers-reduced-motion:reduce){#sheet,.stamp{animation:none}}
+/* ===== GAME HACK 共通UI（ここまで）===== */
+</style>
+<style>
+/* ===== ゲーム固有の見た目: 学校事務室の起案用紙・監査報告書 ===== */
+:root{--scene:#8F6139;--paper:#FCFBF6;--paper2:#EEEBE0;--ink:#1F1E1B;--ink2:#56524A;--rule:#B9B3A3;
+  --mincho:"Hiragino Mincho ProN","Yu Mincho","BIZ UDMincho",serif}
+#hud{border-bottom:3px double var(--ink)}
+#hudL{font-family:var(--mincho);letter-spacing:.06em;margin:7px 0 7px 10px;padding:0 10px;line-height:32px;border:1px solid var(--ink);background:var(--paper2)}
+#hudL small{font-family:var(--font)}
+#hudC{align-self:stretch;display:flex;align-items:center;border-left:1px solid var(--rule)}
+#sheet{border-top:5px double var(--ink);padding-top:20px}
+#sheet .no{font-family:var(--mincho);letter-spacing:.04em;font-size:12px;line-height:1.5;padding-right:92px}
+#sheet h1{font-family:var(--mincho);font-weight:700;letter-spacing:.18em;font-size:25px}
+#sheet .lead{line-height:1.7;font-family:var(--mincho)}
+#sheet dl{border:1px solid var(--ink)}
+#sheet dl div{grid-template-columns:7.8em 1fr;padding:0;border-bottom:1px solid var(--ink)}
+#sheet dl div:last-child{border-bottom:0}
+#sheet dt{background:var(--paper2);border-right:1px solid var(--ink);padding:8px 10px;font-family:var(--mincho);color:var(--ink)}
+#sheet dd{padding:8px 10px}
+.btn{border-radius:0;letter-spacing:.24em}
+.stamp{font-family:var(--mincho);border-width:3px;opacity:.86}
 </style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="cv"></canvas>
-  <div id="hud">
-    <div id="day">-</div>
-    <div id="score">-</div>
-  </div>
-  <div id="controls">
-    <button id="reject">差し戻し<br><span style="font-size:11px;font-weight:500">不備あり</span></button>
-    <div id="stampHint">右下のハンコを<br>書類の欄にそっと押す</div>
-  </div>
-  <div id="popup">
-    <h1 id="ptitle"></h1><p id="ptext"></p>
-    <button id="pbtnMain"></button>
-    <button id="pbtnSub" class="ghost"></button>
-  </div>
+  <!-- 共通UI: ここから -->
+  <div id="hud"><div id="hudL"></div><div id="hudC"></div><button id="pauseBtn" aria-label="一時停止"><i></i></button></div>
+  <div id="sheetBg"><div id="sheet" role="dialog" aria-modal="true"></div></div>
+  <!-- 共通UI: ここまで -->
 </div>
 <script>
 'use strict';
-/* ハンコ決裁ライン
- * 型: 現実(校務の決裁) × 物理化(書類=ベルトコンベア、ハンコ=傾く物理) × 技術(固定台本の暗記+押印精度) × 見せ場(監査崩壊)
- * 乱数なし。日ごとの書類シーケンスは固定。 */
-const W=420,H=700;
+/* ============================================================
+ * GAME HACK 雛形
+ * 型: 題材(○○) × 物理化(○○=○○) × 権限(○○できる) × 技術(○○) × 見せ場(○○)
+ * ← この1行を自分のゲームに書き換えることから始める
+ *
+ * 約束:
+ *  - 乱数で勝敗を決めない（固定シーケンスか実データ）
+ *  - 失敗はプレイヤーの操作・判断に帰因できる
+ *  - 操作は1つに絞る。スマホ縦持ち・親指操作・タップ領域44px以上
+ *  - 単一ファイル・外部依存なし・ビルド不要
+ * ============================================================ */
+
+// ================================================================
+// GAME HACK 共通UI（ここから）— 書き換えずにコピーする
+// ================================================================
+// 論理座標: 横幅 W=420 固定。高さ H は端末の縦横比に合わせて 700〜920 で伸びる（上下の黒帯を出さない）
+// 描画は H を見てレイアウトする（上端=HUD 下、下端=親指ゾーン）
+const W=420; let H=760;
+const HUD_H=48;
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
-let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0;
+let DPR=1,SC=1,TX=0,TY=0,VW=0,VH=0,SAFE_T=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=window.innerWidth; VH=window.innerHeight;
+  cv.width=Math.round(VW*DPR); cv.height=Math.round(VH*DPR);
+  H=Math.max(700,Math.min(920,Math.round(W*VH/VW)));
+  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
+  SAFE_T=(parseFloat(getComputedStyle($('hud')).paddingTop)||0)/SC;
+  if(typeof onResize==='function')onResize();
+}
+// 画面座標 → 論理座標
+function toGame(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left-TX)/SC, y:(e.clientY-r.top-TY)/SC}; }
+// DOM 要素の中心 → 論理座標（下部ボタンとの距離判定などに使う）
+function elCenter(el){ const r=el.getBoundingClientRect(); return toGame({clientX:r.left+r.width/2,clientY:r.top+r.height/2}); }
+// HUD の下端（論理座標）。ゲームの描画はここから下に置く
+function topY(){ return HUD_H+SAFE_T; }
+// 振動（対応端末のみ）
+function buzz(ms){ try{ navigator.vibrate&&navigator.vibrate(ms); }catch(_){} }
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-const BELT={y0:250,y1:470,zoneX0:110,zoneX1:310}; // zone=判定ゾーン
-const DOC_W=168,DOC_H=150;
-
-// 不備パターン（固定ライブラリ＝覚えられる）
-// kind: ok=押印 / price=桁違い / date=存在しない日付 / addr=宛先違い / used=押印済み
-const DOC_LIB={
-  ok1:{title:'備品購入（乾電池）',price:'¥3,000',date:'10月2日',to:'総務部',kind:'ok'},
-  ok2:{title:'修学旅行 バス代',price:'¥480,000',date:'10月6日',to:'総務部',kind:'ok'},
-  ok3:{title:'印刷用紙 10箱',price:'¥24,800',date:'10月3日',to:'総務部',kind:'ok'},
-  ok4:{title:'非常食 入替',price:'¥96,000',date:'10月8日',to:'総務部',kind:'ok'},
-  ok5:{title:'図書購入費',price:'¥152,000',date:'10月9日',to:'総務部',kind:'ok'},
-  price1:{title:'備品購入（乾電池）',price:'¥3,000,000',date:'10月2日',to:'総務部',kind:'price'},
-  price2:{title:'コピー用紙',price:'¥40',date:'10月7日',to:'総務部',kind:'price'},
-  date1:{title:'体育祭 協賛品',price:'¥58,000',date:'2月30日',to:'総務部',kind:'date'},
-  date2:{title:'卒業アルバム',price:'¥720,000',date:'13月1日',to:'総務部',kind:'date'},
-  addr1:{title:'部活動 遠征費',price:'¥210,000',date:'10月5日',to:'経理部',kind:'addr'},
-  addr2:{title:'空調修理',price:'¥88,000',date:'10月4日',to:'教頭室',kind:'addr'},
-  used1:{title:'消耗品補充',price:'¥12,400',date:'10月2日',to:'総務部',kind:'used'},
+const UI={
+  hud(l,lSmall,c){ $('hud').classList.add('on'); $('hudL').innerHTML=esc(l)+(lSmall?'<small>'+esc(lSmall)+'</small>':''); $('hudC').innerHTML=c||''; },
+  hideHud(){ $('hud').classList.remove('on'); },
+  /* シートを開く
+   * o = { no:'No.01 · 乗務報告', title, lead, rows:[[ラベル,値],...], stamp:'不可'|'発車'(最大4字), round:true(丸印),
+   *       main:[ラベル,fn], subs:[[ラベル,fn],...] } */
+  sheet(o){
+    const s=$('sheet');
+    let h='';
+    if(o.stamp){ const t=[...o.stamp]; const lines=t.length===4?[t.slice(0,2).join(''),t.slice(2).join('')]:t.length===3?[t.join('')]:[t.join('')];
+      const fs=t.length<=2?27:t.length===3?20:22;
+      h+='<div class="stamp'+(o.round?' round':'')+'" style="font-size:'+fs+'px">'+lines.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'; }
+    if(o.no)h+='<p class="no">'+esc(o.no)+'</p>';
+    h+='<h1>'+esc(o.title)+'</h1>';
+    if(o.lead)h+='<p class="lead">'+esc(o.lead)+'</p>';
+    if(o.rows&&o.rows.length)h+='<dl>'+o.rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl>';
+    h+='<div class="acts">';
+    if(o.main)h+='<button class="btn" data-k="main">'+esc(o.main[0])+'</button>';
+    if(o.subs&&o.subs.length)h+='<div class="sub">'+o.subs.map((b,i)=>'<button data-k="s'+i+'">'+esc(b[0])+'</button>').join('')+'</div>';
+    h+='</div>';
+    s.innerHTML=h; s.scrollTop=0;
+    s.querySelectorAll('button').forEach(b=>{
+      const k=b.dataset.k, fn=k==='main'?o.main[1]:o.subs[+k.slice(1)][1];
+      b.addEventListener('click',e=>{ e.stopPropagation(); fn(); });
+    });
+    $('sheetBg').classList.add('on');
+    const m=s.querySelector('.btn'); if(m)setTimeout(()=>m.focus({preventScroll:true}),50);
+  },
+  close(){ $('sheetBg').classList.remove('on'); },
+  open(){ return $('sheetBg').classList.contains('on'); },
 };
-// 日ごとの固定台本（月〜金）
-const DAYS=[
-  {name:'月曜日',speed:52,gap:2.6,script:['ok1','ok3','price1','ok2','date1','ok4','addr1','ok5']},
-  {name:'火曜日',speed:60,gap:2.3,script:['ok2','price2','ok1','used1','ok3','date2','ok5','addr2','ok4']},
-  {name:'水曜日',speed:68,gap:2.1,script:['price1','ok1','addr1','ok2','used1','ok3','date1','ok4','price2','ok5']},
-  {name:'木曜日',speed:78,gap:1.9,script:['ok3','date2','ok1','price1','addr2','ok2','used1','ok5','date1','ok4','price2']},
-  {name:'金曜日',speed:90,gap:1.7,script:['price2','ok4','addr1','ok1','date1','ok2','used1','price1','ok3','addr2','date2','ok5']},
-];
-const MAX_MISS=3;
+// 共有（𝕏）とポータルへ
+function shareX(text,tag){ window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#'+tag+' #GAMEHACK\n'+location.href.split('#')[0]),'_blank','noopener'); }
+function toPortal(){ location.href='../../'; }
+// 一時停止: HUD 右の ‖ / タブ切替で自動停止 / Esc
+let pausedFrom=null;
+function pause(){
+  if(G.screen!=='play')return;
+  pausedFrom='play'; G.screen='pause';
+  UI.sheet({no:GAME_NO+' · 一時停止中',title:'一時停止',main:['再開する',resume],subs:[['この面をやり直す',()=>{UI.close();restart();}],['一覧へ戻る',toPortal]]});
+}
+function resume(){ if(G.screen!=='pause')return; UI.close(); G.screen='play'; lastTs=0; }
+$('pauseBtn').addEventListener('click',e=>{ e.stopPropagation(); G.screen==='pause'?resume():pause(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden)pause(); });
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ G.screen==='pause'?resume():pause(); } });
+// ===== GAME HACK 共通UI（ここまで）=====
 
-const G={screen:'title',day:0,docs:[],spawnT:0,idx:0,miss:0,done:0,stamp:{x:W-84,y:H-170,rot:0,held:false},flying:[],shake:0};
+
+// ---- ゲーム固有 ----------------------------------------------
+/* ハンコ決裁ライン
+ * 型: 題材(学校事務室の決裁) × 物理化(決裁=ベルトで流れてくる伺い書) × 権限(臨時採用2日目で校長印を預かる) × 技術(書式を読む＋そっと押す) × 見せ場(監査で付箋まみれ)
+ * 乱数なし: 曜日ごとの書類の並びは固定。不備は書類データから audit() が計算する（表示と指摘が必ず一致する）。 */
+const GAME_NO='No.02';
+const TAG='ハンコ決裁ライン';
+const FF=getComputedStyle(document.body).fontFamily;
+const MIN='"Hiragino Mincho ProN","Yu Mincho","BIZ UDMincho",serif';
+const INK='#22201C', SHU='#C8372D';
+
+/*DATA-BEGIN*/
+const SCHOOL='みなと市立青葉中学校長';
+const DEPTS=['第1学年','第2学年','第3学年','事務室','保健室'];
+const CHIEF={'第1学年':'加藤','第2学年':'中村','第3学年':'吉田','事務室':'木村','保健室':'加藤','第4学年':'吉田'};
+// 予算科目（地方自治法施行規則 別記「歳出予算に係る節の区分」の節名。需用費は細節つき）
+const BUDGET={consumable:'需用費（消耗品費）',repair:'需用費（修繕料）',equipment:'備品購入費',travel:'旅費',rental:'使用料及び賃借料',fee:'報償費'};
+const CATNAME={consumable:'消耗品',repair:'修繕',equipment:'備品',travel:'出張の旅費',rental:'借上げ',fee:'謝礼'};
+const MDAYS=[0,31,28,31,30,31,30,31,31,30,31,30,31]; // 令和8年(2026)は平年
+const okDate=a=>a[0]>=1&&a[0]<=12&&a[1]>=1&&a[1]<=MDAYS[a[0]];
+const dnum=a=>a[0]*100+a[1];
+const fmtD=a=>a[0]+'月'+a[1]+'日';
+const yen=n=>n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
+function mk(o){
+  const r={form:'物品購入伺',yoshiki:'様式第3号（第8条関係）',to:SCHOOL,...o};
+  r.seals={kocho:null,kyoto:'渡辺',jimu:'小林',shunin:CHIEF[o.dept],kian:o.who.split(' ')[0],...(o.seals||{})};
+  return r;
+}
+// 正しい書類（基本形）
+const B={
+  rika:mk({no:'R8-0412',kian:[10,1],dept:'第2学年',who:'山田 花子',subj:'理科実験用消耗品の購入について',amount:12000,
+    rows:[['ビーカー 200mL',10,'個',450,4500],['試験管',30,'本',120,3600],['ろ紙',5,'箱',780,3900]],total:12000,cat:'consumable',when:{l:'納品予定日',a:[10,14]}}),
+  tai:mk({no:'R8-0415',kian:[10,2],dept:'第1学年',who:'佐野 健',subj:'体育用品の購入について',amount:21600,
+    rows:[['ソフトバレーボール',6,'個',2500,15000],['ラインテープ',4,'巻',1650,6600]],total:21600,cat:'consumable',when:{l:'納品予定日',a:[10,16]}}),
+  yoshi:mk({no:'R8-0409',kian:[10,1],dept:'事務室',who:'森 健太',subj:'印刷用紙の購入について',amount:32800,
+    rows:[['PPC用紙 A4',10,'箱',3280,32800]],total:32800,cat:'consumable',when:{l:'納品予定日',a:[10,8]}}),
+  hoken:mk({no:'R8-0416',kian:[10,2],dept:'保健室',who:'松本 由紀',subj:'保健室衛生材料の購入について',amount:18560,
+    rows:[['絆創膏',10,'箱',680,6800],['冷却シート',12,'箱',390,4680],['消毒用アルコール',6,'本',1180,7080]],total:18560,cat:'consumable',when:{l:'納品予定日',a:[10,13]}}),
+  cam:mk({no:'R8-0421',kian:[10,5],dept:'第3学年',who:'井上 美咲',subj:'書画カメラの購入について',amount:68000,
+    rows:[['書画カメラ',1,'台',68000,68000]],total:68000,cat:'equipment',when:{l:'納品予定日',a:[10,20]}}),
+  bus:mk({form:'支出伺',yoshiki:'様式第1号（第5条関係）',no:'R8-0403',kian:[10,1],dept:'第3学年',who:'井上 美咲',subj:'校外学習のバス借上げについて',amount:264000,
+    rows:[['大型バス借上げ',2,'台',132000,264000]],total:264000,cat:'rental',when:{l:'実施日',a:[10,23]}}),
+  shutcho:mk({form:'出張命令伺',yoshiki:'様式第7号（第14条関係）',no:'R8-0418',kian:[10,2],dept:'第2学年',who:'山田 花子',subj:'理科教育研究大会への出張について',amount:38300,
+    rows:[['交通費（往復）',1,'式',23000,23000],['宿泊料',1,'泊',10900,10900],['日当',2,'日',2200,4400]],total:38300,cat:'travel',when:{l:'期間',a:[10,22],b:[10,23]}}),
+  shuzen:mk({form:'修繕伺',yoshiki:'様式第4号（第9条関係）',no:'R8-0422',kian:[10,5],dept:'事務室',who:'森 健太',subj:'体育館照明の修繕について',amount:96000,
+    rows:[['照明器具交換',4,'灯',18500,74000],['高所作業車',1,'式',22000,22000]],total:96000,cat:'repair',when:{l:'施工予定日',a:[10,17]}}),
+  shara:mk({form:'支出伺',yoshiki:'様式第1号（第5条関係）',no:'R8-0425',kian:[10,6],dept:'第3学年',who:'石川 直人',subj:'進路講演会の講師謝礼について',amount:30000,
+    rows:[['講師謝礼',1,'回',30000,30000]],total:30000,cat:'fee',when:{l:'実施日',a:[10,27]}}),
+  toner:mk({no:'R8-0426',kian:[10,6],dept:'事務室',who:'森 健太',subj:'複合機トナーの購入について',amount:85700,
+    rows:[['トナー 黒',2,'本',14800,29600],['トナー カラー',3,'本',18700,56100]],total:85700,cat:'consumable',when:{l:'納品予定日',a:[10,12]}}),
+};
+// 不備のある書類 = 基本形を1か所だけ書き換えたもの（want は検証用の意図）
+function V(base,want,patch){
+  const r={...B[base],...patch,want};
+  r.seals={...B[base].seals,...(patch.seals||{})};
+  return r;
+}
+const X={
+  // 月: 目で見て分かる不備
+  sum1:V('rika','sum',{amount:15000,total:15000}),
+  noseal1:V('bus','noseal',{seals:{kian:null}}),
+  done1:V('shutcho','done',{seals:{kocho:'大森'}}),
+  // 火: 計算と日付
+  mult1:V('tai','mult',{rows:[['ソフトバレーボール',6,'個',2500,15000],['ラインテープ',4,'巻',1650,6060]],amount:21060,total:21060}),
+  bad1:V('yoshi','baddate',{when:{l:'納品予定日',a:[11,31]}}),
+  done2:V('shuzen','done',{seals:{kocho:'大森'}}),
+  bad2:V('cam','baddate',{kian:[9,31]}),
+  // 水: 決裁の順番・宛先・所属
+  skip1:V('toner','skip',{seals:{kyoto:null}}),
+  addr1:V('rika','addr',{to:'みなと市立青葉小学校長'}),
+  mult2:V('hoken','mult',{rows:[['絆創膏',10,'箱',680,6800],['冷却シート',12,'箱',390,4580],['消毒用アルコール',6,'本',1180,7080]],amount:18460,total:18460}),
+  grade1:V('shara','grade',{dept:'第4学年'}),
+  sum2:V('shuzen','sum',{amount:98000,total:98000}),
+  // 木: 予算科目・日付の前後
+  bud1:V('cam','budget',{budget:BUDGET.consumable}),
+  ord1:V('shutcho','order',{when:{l:'期間',a:[10,22],b:[10,21]}}),
+  skip2:V('bus','skip',{seals:{jimu:null}}),
+  bud2:V('bus','budget',{budget:BUDGET.equipment}),
+  ord2:V('tai','order',{when:{l:'納品予定日',a:[10,1]}}),
+  // 金: 桁・印の名前・巧妙な版
+  digit1:V('yoshi','digit',{amount:328000}),
+  name1:V('hoken','sealname',{seals:{kian:'松田'}}),
+  mult3:V('toner','mult',{rows:[['トナー 黒',2,'本',14800,29600],['トナー カラー',3,'本',18700,56700]],amount:86300,total:86300}),
+  bad3:V('shara','baddate',{when:{l:'実施日',a:[11,31]}}),
+  addr2:V('tai','addr',{to:'みなと市立緑ヶ丘中学校長'}),
+  done3:V('bus','done',{seals:{kocho:'大森'}}),
+};
+const DOC=k=>B[k]||X[k];
+// 面 = 曜日。並びは固定。iv = 書類が1枚流れてくる間隔（秒）
+const DAYS=[
+  {name:'月曜日',md:[10,5],iv:12.0,note:'事務長「校長印は左下です。不備のある書類は、書類ごと右の差戻箱へ」',
+    docs:['yoshi','tai','sum1','hoken','noseal1','cam','done1']},
+  {name:'火曜日',md:[10,6],iv:10.5,note:'事務長「今日は単価×数量の計算と、日付も確かめてください」',
+    docs:['rika','mult1','bus','bad1','hoken','done2','shara','bad2','toner']},
+  {name:'水曜日',md:[10,7],iv:9.6,note:'事務長「決裁欄の印がそろっているか。宛先と所属も見てくださいね」',
+    docs:['shutcho','skip1','tai','addr1','mult2','yoshi','grade1','bus','sum2','cam']},
+  {name:'木曜日',md:[10,8],iv:8.8,note:'事務長「予算科目は品物に合っていますか。日付の前後もです」',
+    docs:['hoken','bud1','rika','ord1','toner','skip2','shara','bud2','yoshi','ord2','shuzen']},
+  {name:'金曜日',md:[10,9],iv:8.0,note:'事務長「金曜は伺額の桁と、起案者の印の名前まで。監査は来週です」',
+    docs:['toner','digit1','bus','name1','shara','mult3','rika','bad3','cam','addr2','done3','shuzen']},
+];
+const KIND={sum:'合計違い',mult:'計算違い',digit:'桁違い',baddate:'ありえない日付',order:'日付の前後',noseal:'起案者印なし',sealname:'印の名前違い',skip:'順番飛ばし',done:'押印済み',addr:'宛先違い',grade:'所属違い',budget:'予算科目違い'};
+// 書類の不備をデータから計算する（指摘文はそのまま事務長・監査の言葉になる）
+function audit(d){
+  const f=[]; const add=(t,msg)=>f.push({t,msg});
+  if(d.to!==SCHOOL) add('addr','宛先が「'+d.to+'」です。本校は'+SCHOOL.replace(/長$/,'')+'です');
+  if(!DEPTS.includes(d.dept)) add('grade','中学校に「'+d.dept+'」はありません');
+  if(!okDate(d.kian)) add('baddate','起案日の'+fmtD(d.kian)+'は存在しない日付です');
+  for(const k of ['a','b']) if(d.when[k]&&!okDate(d.when[k])) add('baddate',d.when.l+'の'+fmtD(d.when[k])+'は存在しない日付です');
+  if(okDate(d.kian)&&okDate(d.when.a)&&dnum(d.when.a)<dnum(d.kian)) add('order',d.when.l+' '+fmtD(d.when.a)+'が起案日 '+fmtD(d.kian)+'より前です（事後の伺い）');
+  if(d.when.b&&okDate(d.when.a)&&okDate(d.when.b)&&dnum(d.when.b)<dnum(d.when.a)) add('order','帰着の'+fmtD(d.when.b)+'が出発の'+fmtD(d.when.a)+'より前です');
+  const sur=d.who.split(' ')[0];
+  if(!d.seals.kian) add('noseal','起案者 '+d.who+' の印がありません');
+  else if(d.seals.kian!==sur) add('sealname','起案者は'+d.who+'なのに、起案欄の印は「'+d.seals.kian+'」です');
+  for(const [k,n] of [['shunin','主任'],['jimu','事務長'],['kyoto','教頭']]) if(!d.seals[k]) add('skip',n+'の印が抜けたまま校長に回っています');
+  if(d.seals.kocho) add('done','校長欄にもう印があります（二重決裁）');
+  let s=0;
+  for(const r of d.rows){ s+=r[4]; if(r[2]&&r[3]*r[1]!==r[4]) add('mult',r[0]+' '+yen(r[3])+'円×'+r[1]+'は ¥'+yen(r[3]*r[1])+'。¥'+yen(r[4])+'と書かれています'); }
+  if(s!==d.total) add('sum','合計 ¥'+yen(d.total)+'が明細の和 ¥'+yen(s)+'と合いません');
+  if(d.amount!==d.total) add('digit','伺額 金'+yen(d.amount)+'円と合計 ¥'+yen(d.total)+'の桁が違います');
+  const bud=d.budget||BUDGET[d.cat];
+  if(bud!==BUDGET[d.cat]) add('budget',d.rows[0][0]+'は'+CATNAME[d.cat]+'なので'+BUDGET[d.cat]+'。「'+bud+'」になっています');
+  return f;
+}
+/*DATA-END*/
+
+// ---- 幾何: H を見て決める ----
+const DW=360, DH=424;             // 書類（ローカル座標）
+const PANEL=160;                  // 手前の机（メモ・ハンコ・トレイ）
+const TH=520;                     // これより速く押すと斜め押し・にじみ（論理px/秒・80ms平滑）
+function BE(){ return H-PANEL; }  // ベルトの手前端
+function DS(){ return Math.max(0.78,Math.min(1,(BE()-topY()-150)/DH)); }
+function DX(){ return (W-DW*DS())/2; }
+function SP(){ return (DH+40)*DS(); }
+function restPos(){ return {x:62,y:BE()+146}; }   // 印面の位置（柄はここから上に伸びる）
+function beltV(D){ return Math.min(SP()/D.iv,(BE()-DH*DS()-topY())/4.2); }
+function stampOverDoc(){
+  const st=G.stamp; if(!st||!st.held)return false;
+  return G.docs.some(o=>{ if(o.st!=='belt')return false; const q=docPos(o); return st.x>=q.x&&st.x<=q.x+DW*DS()&&st.y>=q.y&&st.y<=q.y+DH*DS(); });
+}
+const BOX={x0:34,y0:40,w:62,h:50}; // 決裁欄の箱（ローカル）。0=校長 1=教頭 2=事務長 3=主任 4=起案
+const BOXN=['校長','教頭','事務長','主任','起案'];
+const BOXK=['kocho','kyoto','jimu','shunin','kian'];
+
+const G={screen:'title',day:0,docs:[],s:0,k:1,miss:0,misses:[],caught:{},ok:0,rej:0,note:null,stamp:null,grab:null,fx:null,week:null,shake:0,t:0};
 let lastTs=0;
 
 function startDay(i){
-  G.day=i; G.docs=[]; G.idx=0; G.spawnT=0.5; G.miss=0; G.done=0; G.flying=[];
-  G.stamp={x:W-84,y:H-170,rot:0,held:false};
-  G.screen='play'; $('popup').classList.add('hidden');
+  if(i===0||!G.week) G.week={done:0,ok:0,rej:0,caught:{},miss:0};
+  G.day=i; G.t=0; G.miss=0; G.misses=[]; G.caught={}; G.ok=0; G.rej=0; G.fx=null; G.shake=0; G.k=1; G.grab=null;
+  G.s=topY();
+  G.docs=DAYS[i].docs.map((k,j)=>({key:k,i:j,d:DOC(k),f:audit(DOC(k)),st:'belt',hx:0,hy:0,ret:0,mark:null,fly:null,tag:null}));
+  const r=restPos(); G.stamp={x:r.x,y:r.y,held:false,ox:0,oy:0,v:0,vx:0,vy:0,samples:[],down:0};
+  G.note={text:DAYS[i].note,t:5.5,kind:'boss'};
+  G.screen='play'; UI.close(); lastTs=0;
 }
-function zoneDoc(){
-  // 判定ゾーン内の最も左の未処理書類
+function restart(){ startDay(G.day); }
+
+function docTop(o){ return G.s-o.i*SP()-DH*DS(); }
+function docPos(o){ // 描画位置（つかまれている・戻り中を含む）
+  const bx=DX(), by=docTop(o);
+  if(o.st==='held') return {x:o.hx,y:o.hy};
+  if(o.ret>0) return {x:bx+(o.hx-bx)*o.ret,y:by+(o.hy-by)*o.ret};
+  return {x:bx,y:by};
+}
+function boxRect(o,k){ const p=docPos(o),s=DS(); return {x:p.x+(BOX.x0+BOX.w*k)*s,y:p.y+BOX.y0*s,w:BOX.w*s,h:BOX.h*s}; }
+function inR(p,r,m){ m=m||0; return p.x>=r.x-m&&p.x<=r.x+r.w+m&&p.y>=r.y-m&&p.y<=r.y+r.h+m; }
+
+// ---- 判定 ----
+function say(text,kind,t){ G.note={text,t:t||3.6,kind}; }
+function miss(o,msg){
+  G.miss++; G.misses.push(msg); G.shake=0.35; buzz(60);
+  if(o){ o.tag='指摘'; }
+  say('監査メモ: '+msg,'bad',4.2);
+  if(G.miss>=3) startAudit();
+}
+function approve(o,speed){
+  if(speed>TH){ o.mark={k:'smear',box:0,rot:0.5}; o.st='flag'; return miss(o,'勢いよく押して校長印がにじみました（'+o.d.subj+'）'); }
+  o.mark={k:'ok',box:0,rot:-0.06+((o.i*37)%10)/80};
+  if(o.f.length){ o.st='flag'; return miss(o,o.f[0].msg+'。それでも押印しました'); }
+  o.st='ok'; G.ok++; buzz(15);
+}
+function reject(o){
+  o.st='rej'; o.inTray=true;
+  if(!o.f.length) return miss(o,o.d.who+'さんの'+o.d.form+'「'+o.d.subj+'」に不備はありません（誤って差戻し）');
+  G.rej++;
+  const t=o.f[0].t; G.caught[t]=(G.caught[t]||0)+1;
+  say('差戻: '+o.f[0].msg,'ok',3.4);
+}
+function pendingDocs(){ return G.docs.filter(o=>o.st==='belt'||o.st==='held'); }
+// キーボード用: いちばん手前で押印できる書類
+function frontDoc(){
   let best=null;
-  for(const d of G.docs){
-    if(d.state!=='belt')continue;
-    const cx=d.x;
-    if(cx-DOC_W/2<BELT.zoneX1&&cx+DOC_W/2>BELT.zoneX0){ if(!best||d.x<best.x)best=d; }
-  }
+  for(const o of G.docs){ if(o.st!=='belt')continue; const r=boxRect(o,0); if(r.y<topY()||r.y+r.h>BE())continue; if(!best||o.i<best.i)best=o; }
   return best;
 }
-function miss(why,d){
-  G.miss++; G.shake=0.5;
-  if(d){d.state='fly';d.vx=-140;d.vy=-260;d.vr=4;G.flying.push(d);}
-  if(G.miss>=MAX_MISS)return gameOver(why);
-}
-function gameOver(why){
-  G.screen='over';
-  for(const d of G.docs)if(d.state==='belt'){d.state='fly';d.vx=-80-Math.random()*160;d.vy=-200-Math.random()*200;d.vr=(Math.random()-0.5)*10;G.flying.push(d);}
-  setTimeout(()=>showPopup('監査崩壊',
-    why+'\n'+DAYS[G.day].name+'・処理 '+G.done+' 件でミス3回。\n監査法人が黙っていません。',
-    'その日をやり直す',()=>startDay(G.day),true),900);
-}
-function dayClear(){
-  G.screen='clear';
-  const last=G.day>=DAYS.length-1;
-  showPopup(DAYS[G.day].name+' 終業！',
-    last?'今週の決裁をすべて処理しました。\nミス '+G.miss+' 回。総務部の柱。':'処理 '+G.done+' 件・ミス '+G.miss+' 回。\n翌日はもっと速く流れます。',
-    last?'タイトルへ':'翌日へ',()=>{last?(G.screen='title',showTitle()):startDay(G.day+1);},true);
-}
-function showTitle(){
-  G.screen='title';
-  showPopup('ハンコ決裁ライン',
-    'あなたは総務部の決裁者。\n\n・書類を読み、不備があれば「差し戻し」\n・正しければ右下のハンコを押印欄へ\n・勢いよく押すと斜めになってミス\n・見逃しもミス。3ミスで監査崩壊\n\n不備: 桁違い／ありえない日付／宛先違い／押印済み',
-    '着席する',()=>startDay(0),false);
-}
-function showPopup(t,x,btn,fn,share){
-  $('ptitle').textContent=t;$('ptext').textContent=x;
-  const m=$('pbtnMain');m.textContent=btn;m.onclick=fn;
-  const s=$('pbtnSub');s.textContent=share?'𝕏 で共有':'ポータルへ';
-  s.onclick=share?shareX:()=>location.href='../../';
-  $('popup').classList.remove('hidden');
-}
-function shareX(){
-  const text=G.screen==='clear'
-    ?'【ハンコ決裁ライン】'+DAYS[G.day].name+'の決裁を完遂。ミス '+G.miss+' 回。'
-    :'【ハンコ決裁ライン】'+DAYS[G.day].name+'、処理 '+G.done+' 件で監査崩壊。';
-  window.open('https://x.com/intent/post?text='+encodeURIComponent(text+'\n\n#ハンコ決裁ライン #GAMEHACK\n'+location.href),'_blank');
-}
-
-// 押印判定
-function tryStamp(speed){
-  const d=zoneDoc();
-  if(!d)return;
-  const cx=d.x+DOC_W/2-34, cy=BELT.y1-42; // 押印欄
-  const dist=Math.hypot(G.stamp.x-cx,G.stamp.y-cy);
-  if(dist>70)return;
-  if(speed>900){ miss('勢いよく押しすぎて、ハンコがにじみました。',d); return; }
-  if(d.kind!=='ok'){ miss('不備のある書類に押印してしまいました。（'+defectName(d.kind)+'）',d); return; }
-  d.state='fly'; d.vx=60; d.vy=-320; d.vr=2.5; d.stamped=true; G.flying.push(d); G.done++;
-}
-function defectName(k){return {price:'金額の桁違い',date:'存在しない日付',addr:'宛先違い',used:'押印済み'}[k]||'';}
-$('reject').addEventListener('pointerdown',e=>{
-  e.preventDefault();
-  if(G.screen!=='play')return;
-  const d=zoneDoc();
-  if(!d)return;
-  if(d.kind==='ok'){ miss('正しい書類を差し戻してしまいました。',d); }
-  else { d.state='fly'; d.vx=-200; d.vy=-240; d.vr=-5; d.rejected=true; G.flying.push(d); G.done++; }
-});
-
-// ハンコのドラッグ（親指想定・右下）
-let stampPid=null,lastMove=null;
-function toGame(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left-TX)/SC,y:(e.clientY-r.top-TY)/SC};}
-$('wrap').addEventListener('pointerdown',e=>{
-  if(G.screen!=='play')return;
-  const g=toGame(e);
-  if(Math.hypot(g.x-G.stamp.x,g.y-G.stamp.y)<64){
-    stampPid=e.pointerId; G.stamp.held=true; lastMove={x:g.x,y:g.y,t:performance.now()};
-    e.preventDefault();
-  }
-});
-$('wrap').addEventListener('pointermove',e=>{
-  if(e.pointerId!==stampPid)return;
-  const g=toGame(e);
-  G.stamp.x=Math.max(30,Math.min(W-30,g.x));
-  G.stamp.y=Math.max(60,Math.min(H-30,g.y));
-  const now=performance.now();
-  if(lastMove){const dt=(now-lastMove.t)/1000; if(dt>0){G.stamp.vx=(g.x-lastMove.x)/dt; G.stamp.vy=(g.y-lastMove.y)/dt;}}
-  lastMove={x:g.x,y:g.y,t:now};
-  G.stamp.rot=Math.max(-0.5,Math.min(0.5,(G.stamp.vx||0)/1200));
-});
-$('wrap').addEventListener('pointerup',e=>{
-  if(e.pointerId!==stampPid)return;
-  const sp=Math.hypot(G.stamp.vx||0,G.stamp.vy||0);
-  tryStamp(sp);
-  G.stamp.held=false; stampPid=null;
-});
 
 function update(dt){
   const D=DAYS[G.day];
-  // 出現
-  if(G.idx<D.script.length){
-    G.spawnT-=dt;
-    if(G.spawnT<=0){ G.spawnT=D.gap; G.docs.push({...DOC_LIB[D.script[G.idx]],x:W+DOC_W/2+20,state:'belt',rot:0}); G.idx++; }
+  G.t+=dt;
+  G.k+=((stampOverDoc()?0.4:1)-G.k)*Math.min(1,dt*8);    // ハンコが書類の上にある間だけベルト減速
+  G.s+=beltV(D)*G.k*dt;
+  for(const o of G.docs){
+    if(o.ret>0) o.ret=Math.max(0,o.ret-dt*5);
+    if(o.st==='belt'){
+      const r=boxRect(o,0);
+      if(r.y+r.h/2>BE()){ o.st='flag'; miss(o,o.f.length?o.f[0].msg+'。見逃して流れました':o.d.who+'さんの「'+o.d.subj+'」が未決裁のまま流れました'); if(G.screen!=='play')return; }
+    }
+    if(o.st==='rej'){
+      if(!o.fly){ const p=docPos(o); o.fly={x:p.x,y:p.y,vx:0,vy:0,r:0}; }
+      const f=o.fly, tx=330, ty=BE()+70;
+      f.x+=(tx-DW*DS()*0.2-f.x)*Math.min(1,dt*7); f.y+=(ty-f.y)*Math.min(1,dt*7); f.r+=(0.35-f.r)*Math.min(1,dt*7);
+      if(Math.abs(ty-f.y)<4||f.t>1.2) o.st='gone'; f.t=(f.t||0)+dt;
+    }
+    if((o.st==='ok'||o.st==='flag')&&docTop(o)>H) o.st='gone';
   }
-  for(const d of G.docs){
-    if(d.state!=='belt')continue;
-    d.x-=D.speed*dt;
-    if(d.x<-DOC_W/2){ d.state='gone'; miss('書類を見逃しました。（'+d.title+'）',null); }
-  }
-  G.docs=G.docs.filter(d=>d.state!=='gone');
-  // 飛んでいく書類
-  for(const d of G.flying){ d.vy+=1500*dt; d.x+=d.vx*dt; d.y0=(d.y0??(BELT.y0+BELT.y1)/2)+d.vy*dt; d.rot+=d.vr*dt; }
-  G.flying=G.flying.filter(d=>(d.y0??0)<H+200);
-  if(G.idx>=D.script.length&&!G.docs.length&&!G.flying.length&&G.screen==='play')dayClear();
+  if(G.note&&(G.note.t-=dt)<=0) G.note=null;
+  if(G.shake>0) G.shake=Math.max(0,G.shake-dt);
+  if(G.docs.every(o=>o.st==='gone'||((o.st==='ok'||o.st==='flag')&&docTop(o)>BE()))) dayClear();
 }
 
-// 描画
-function drawDoc(d){
-  const y=d.state==='fly'?(d.y0??(BELT.y0+BELT.y1)/2):(BELT.y0+BELT.y1)/2;
-  ctx.save(); ctx.translate(d.x,y); ctx.rotate(d.rot||0);
-  ctx.fillStyle='#fdfdf7'; ctx.strokeStyle='#c9c4b0'; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.roundRect(-DOC_W/2,-DOC_H/2,DOC_W,DOC_H,6); ctx.fill(); ctx.stroke();
-  ctx.fillStyle='#12233f'; ctx.textAlign='left';
-  ctx.font='700 13px system-ui'; ctx.fillText(d.title,-DOC_W/2+12,-DOC_H/2+24);
-  ctx.font='12px system-ui'; ctx.fillStyle='#3a4a63';
-  ctx.fillText('金額: '+d.price,-DOC_W/2+12,-DOC_H/2+48);
-  ctx.fillText('日付: '+d.date,-DOC_W/2+12,-DOC_H/2+68);
-  ctx.fillText('宛先: '+d.to,-DOC_W/2+12,-DOC_H/2+88);
-  // 押印欄
-  ctx.strokeStyle='#8a94a8'; ctx.setLineDash([3,3]);
-  ctx.beginPath(); ctx.arc(DOC_W/2-34,DOC_H/2-34,18,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
-  if(d.kind==='used'||d.stamped){
-    ctx.fillStyle='rgba(226,60,50,.75)';
-    ctx.beginPath(); ctx.arc(DOC_W/2-34,DOC_H/2-34,15,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#fff'; ctx.font='700 10px system-ui'; ctx.textAlign='center'; ctx.fillText('印',DOC_W/2-34,DOC_H/2-30);
+// ---- 入力（ドラッグだけ）----
+function track(st,p){ const t=performance.now(); st.samples.push({x:p.x,y:p.y,t}); while(st.samples.length>2&&t-st.samples[1].t>200) st.samples.shift(); }
+// 直近80msの移動から速度を出す（1フレームの揺れで判定しない）
+function speedOf(st){
+  const s=st.samples, now=performance.now(); if(s.length<2) return {v:0,vx:0,vy:0};
+  const last=s[s.length-1]; if(now-last.t>80) return {v:0,vx:0,vy:0};
+  let a=s[0]; for(const q of s){ if(last.t-q.t>=80) a=q; }
+  const dt=Math.max(16,last.t-a.t)/1000, vx=(last.x-a.x)/dt, vy=(last.y-a.y)/dt;
+  return {v:Math.hypot(vx,vy),vx,vy};
+}
+let PID=null;
+$('wrap').addEventListener('pointerdown',e=>{
+  if(G.screen!=='play'||PID!==null)return;
+  const p=toGame(e), st=G.stamp;
+  if(Math.hypot(p.x-st.x,p.y-(st.y-30))<64){
+    PID=e.pointerId; st.held=true; st.ox=st.x-p.x; st.oy=st.y-p.y; st.samples=[]; st.down=performance.now(); track(st,p);
+  }else if(p.y<BE()){
+    const hit=G.docs.filter(o=>o.st==='belt').find(o=>{ const q=docPos(o); return p.x>=q.x&&p.x<=q.x+DW*DS()&&p.y>=q.y&&p.y<=q.y+DH*DS(); });
+    if(!hit)return;
+    const q=docPos(hit);
+    PID=e.pointerId; hit.st='held'; hit.hx=q.x; hit.hy=q.y;
+    G.grab={o:hit,gx:p.x-q.x,gy:p.y-q.y,sx:p.x,samples:[]}; track(G.grab,p);
+  }else return;
+  try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+  e.preventDefault();
+});
+$('wrap').addEventListener('pointermove',e=>{
+  if(e.pointerId!==PID)return;
+  const p=toGame(e), st=G.stamp;
+  if(st.held){
+    track(st,p);
+    st.ox*=0.7; st.oy+=(-62-st.oy)*0.3;   // 指で印面が隠れないよう、持ち上げると指の少し上に来る
+    st.x=Math.max(20,Math.min(W-20,p.x+st.ox)); st.y=Math.max(topY()+10,Math.min(H-20,p.y+st.oy));
+  }else if(G.grab){
+    track(G.grab,p);
+    const o=G.grab.o; o.hx=p.x-G.grab.gx; o.hy=p.y-G.grab.gy;
   }
-  if(d.rejected){ ctx.fillStyle='rgba(226,75,74,.9)'; ctx.font='800 16px system-ui'; ctx.textAlign='center'; ctx.fillText('差戻',0,0); }
+});
+function endPointer(e){
+  if(e.pointerId!==PID)return;
+  PID=null;
+  const st=G.stamp;
+  if(st.held){
+    const sp=speedOf(st).v; st.held=false;
+    if(G.screen==='play') dropStamp({x:st.x,y:st.y},sp);
+    const r=restPos(); st.x=r.x; st.y=r.y; st.samples=[];
+  }else if(G.grab){
+    const g=G.grab, o=g.o, v=speedOf(g); G.grab=null;
+    if(o.st!=='held')return;
+    const p=g.samples[g.samples.length-1];
+    if(p.x-g.sx>90||v.vx>450){ o.fly={x:o.hx,y:o.hy,vx:0,vy:0,r:0}; reject(o); }
+    else { o.st='belt'; o.ret=1; }
+  }
+}
+$('wrap').addEventListener('pointerup',endPointer);
+$('wrap').addEventListener('pointercancel',endPointer);
+function dropStamp(p,sp){
+  for(const o of G.docs){
+    if(o.st!=='belt')continue;
+    for(let k=0;k<5;k++){
+      const r=boxRect(o,k);
+      if(r.y+r.h/2>BE())continue;
+      if(inR(p,r,k===0?8:0)){
+        if(k===0) return approve(o,sp);
+        o.mark={k:'wrong',box:k,rot:0.2}; o.st='flag';
+        return miss(o,BOXN[k]+'の欄に校長印を押しました（'+o.d.subj+'）');
+      }
+    }
+  }
+}
+window.addEventListener('keydown',e=>{
+  if(G.screen!=='play')return;
+  const o=frontDoc(); if(!o)return;
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); approve(o,0); }
+  else if(e.key==='ArrowRight'){ e.preventDefault(); reject(o); }
+});
+
+// ---- 結果 ----
+function caughtText(c){ const a=Object.keys(c).map(k=>KIND[k]+' '+c[k]); return a.length?a.join('・'):'なし'; }
+function dayClear(){
+  G.screen='result'; G.note=null;
+  const D=DAYS[G.day], last=G.day>=DAYS.length-1, n=D.docs.length;
+  const nd=D.docs.filter(k=>audit(DOC(k)).length).length;
+  const w=G.week; w.done+=n; w.ok+=G.ok; w.rej+=G.rej; w.miss+=G.miss; for(const k in G.caught) w.caught[k]=(w.caught[k]||0)+G.caught[k];
+  setTimeout(()=>{
+    if(!last){
+      UI.sheet({no:GAME_NO+' · 令和8年度 決裁済綴 第'+(41+G.day)+'冊 · 事務室 · 令和8年'+fmtD(D.md)+'（'+D.name[0]+'）',title:'決裁済綴',stamp:'決裁',round:true,
+        lead:'事務長「お疲れさまでした。差戻しの分は起案者に返しておきます」',
+        rows:[['処理',n+' 件（決裁 '+G.ok+'・差戻 '+G.rej+'）'],['見抜いた不備',G.rej+' / '+nd+' 件　'+caughtText(G.caught)],['監査メモ',G.miss+' 件'+(G.misses.length?'　'+G.misses[0]:'')]],
+        main:['翌日（'+DAYS[G.day+1].name+'）へ',()=>startDay(G.day+1)],
+        subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+D.name+'の決裁 '+n+'件を処理。差戻 '+G.rej+'件（'+caughtText(G.caught)+'）',TAG)],['一覧へ',toPortal]]});
+    }else{
+      UI.sheet({no:GAME_NO+' · 事務室 週報 · 令和8年10月5日（月）〜9日（金）',title:'事務室 週報',stamp:'決裁',round:true,
+        lead:'校長（出張先から）「印、ちゃんと預かってくれてありがとう。……全部押してないよね？」',
+        rows:[['今週の処理',w.done+' 件（決裁 '+w.ok+'・差戻 '+w.rej+'）'],['見抜いた不備',caughtText(w.caught)],['監査メモ',w.miss+' 件']],
+        main:['月曜日からやり直す',()=>startDay(0)],
+        subs:[['𝕏で共有',()=>shareX('【'+TAG+'】1週間で決裁 '+w.done+'件。見抜いた不備: '+caughtText(w.caught)+'。監査メモ '+w.miss+'件',TAG)],['一覧へ',toPortal]]});
+    }
+  },700);
+}
+// 失敗: 監査が入る（付箋が降り、書類の山が崩れ、監査印）→ 結果シート
+function startAudit(){
+  G.screen='result'; buzz([40,60,90]);
+  const fx={t:0,notes:[],sheet:false};
+  const cols=['#F2D45C','#F3A9B6','#9CCBE6','#B9DE8E'];
+  for(let i=0;i<46;i++) fx.notes.push({x:20+Math.random()*380,y:topY()+Math.random()*(H-topY()-60),r:(Math.random()-0.5)*0.9,c:cols[i%4],d:i*0.016+Math.random()*0.2,w:46+Math.random()*16});
+  for(const o of G.docs){ const p=docPos(o); o.cx=p.x; o.cy=p.y; o.vx=(Math.random()-0.5)*300; o.vy=-80-Math.random()*160; o.vr=(Math.random()-0.5)*3; o.rr=0; }
+  for(const o of G.docs) if(o.st==='held') o.st='belt';
+  G.fx=fx; G.grab=null; G.stamp.held=false; PID=null;
+}
+function auditSheet(){
+  const D=DAYS[G.day], done=G.docs.filter(o=>o.st!=='belt'&&o.st!=='held').length;
+  UI.sheet({no:GAME_NO+' · 様式第21号 · 教監第'+(1005+G.day)+'号 · 令和8年'+fmtD(D.md),title:'監査結果通知書',stamp:'監査',
+    lead:SCHOOL+'　様\nみなと市教育委員会 教育長\n令和8年'+fmtD(D.md)+'（'+D.name[0]+'）に実施した決裁事務の監査について、下記のとおり指摘します。',
+    rows:[['指摘事項 一',G.misses[0]],['指摘事項 二',G.misses[1]],['指摘事項 三',G.misses[2]],['処理状況',done+' / '+D.docs.length+' 件（決裁 '+G.ok+'・差戻 '+G.rej+'）']],
+    main:['この日をやり直す',restart],
+    subs:[['𝕏で共有',()=>shareX('【'+TAG+'】'+D.name+'、'+done+'件目で監査。「'+G.misses[0]+'」',TAG)],['一覧へ',toPortal]]});
+}
+function updateFx(dt){
+  const fx=G.fx; if(!fx)return;
+  fx.t+=dt;
+  for(const o of G.docs){ if(o.st==='gone')continue; o.vy+=900*dt; o.cx+=o.vx*dt; o.cy+=o.vy*dt; o.rr+=o.vr*dt; }
+  if(fx.t>0.55&&!fx.slam){ fx.slam=true; G.shake=0.5; }
+  if(G.shake>0) G.shake=Math.max(0,G.shake-dt);
+  if(fx.t>1.6&&!fx.sheet){ fx.sheet=true; auditSheet(); }
+}
+function showTitle(){
+  G.screen='title'; UI.hideHud();
+  UI.sheet({no:GAME_NO+' · 業務内容',title:'ハンコ決裁ライン',
+    lead:'みなと市立青葉中学校 事務室。校長は今週ずっと出張。\nベルトで流れてくる伺い書を読み、不備のないものだけに校長印を押す。',
+    rows:[['あなたの権限','臨時採用2日目なのに、校長印を一人で預かっている'],
+      ['操作','ドラッグ（ハンコは校長欄へ運んでそっと離す／不備のある書類は右の差戻箱へ払う）'],
+      ['失敗','不備への押印・正しい書類の差戻し・見逃し・にじみは監査メモ。1日3件で監査'],
+      ['出典','予算科目は地方自治法施行規則 別記「歳出予算に係る節の区分」の節名。様式・校名・人名・金額は架空（概略値）']],
+    main:['月曜日から始める',()=>startDay(0)],subs:[['一覧へ',toPortal]]});
+}
+
+// ---- 描画 ----
+function seal(x,y,r,name,alpha,rot){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot||0); ctx.globalAlpha=alpha==null?0.88:alpha;
+  ctx.strokeStyle=SHU; ctx.fillStyle=SHU; ctx.lineWidth=r*0.13;
+  ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
+  const ch=[...name]; ctx.font='700 '+(r*0.74)+'px '+MIN; ctx.textAlign='center'; ctx.textBaseline='middle';
+  if(ch.length===1) ctx.fillText(ch[0],0,0); else { ctx.fillText(ch[0],0,-r*0.38); ctx.fillText(ch[1],0,r*0.4); }
+  ctx.restore(); ctx.textBaseline='alphabetic';
+}
+function txt(s,x,y,size,opt){
+  opt=opt||{}; ctx.font=(opt.w||500)+' '+size+'px '+(opt.f||FF); ctx.fillStyle=opt.c||INK; ctx.textAlign=opt.a||'left'; ctx.fillText(s,x,y);
+}
+function drawDoc(o,x,y,rot){
+  const d=o.d,s=DS();
+  ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+  if(rot){ ctx.translate(DW/2,DH/2); ctx.rotate(rot); ctx.translate(-DW/2,-DH/2); }
+  ctx.fillStyle='rgba(40,28,15,.28)'; ctx.fillRect(4,5,DW,DH);
+  ctx.fillStyle='#FBFAF3'; ctx.fillRect(0,0,DW,DH);
+  ctx.strokeStyle='#D6CFBD'; ctx.lineWidth=1; ctx.strokeRect(0.5,0.5,DW-1,DH-1);
+  txt(d.yoshiki,16,17,11,{c:'#5E584D'}); txt('No. '+d.no,344,17,11,{c:'#5E584D',a:'right'});
+  // 決裁欄
+  ctx.strokeStyle=INK; ctx.lineWidth=1;
+  ctx.strokeRect(16,24,328,66); ctx.beginPath(); ctx.moveTo(34,24); ctx.lineTo(34,90); ctx.moveTo(34,40); ctx.lineTo(344,40);
+  for(let k=1;k<5;k++){ ctx.moveTo(34+62*k,24); ctx.lineTo(34+62*k,90); } ctx.stroke();
+  txt('決',25,52,12,{a:'center',w:700}); txt('裁',25,70,12,{a:'center',w:700});
+  for(let k=0;k<5;k++) txt(BOXN[k],34+62*k+31,36,12,{a:'center',w:k===0?700:500});
+  for(let k=1;k<5;k++){ const nm=d.seals[BOXK[k]]; if(nm) seal(34+62*k+31,65,17,nm,0.86,((k*7+o.i*3)%9-4)*0.03); }
+  if(d.seals.kocho) seal(65,65,17,d.seals.kocho,0.86,-0.05);
+  // 校長欄のハイライト（ハンコが重なっているとき）
+  if(o.hot){ ctx.strokeStyle='#2E6FB0'; ctx.lineWidth=3; ctx.strokeRect(35.5,41.5,59,47); ctx.fillStyle='rgba(46,111,176,.12)'; ctx.fillRect(36,42,58,46); }
+  if(o.mark){ const m=o.mark, cx=34+62*m.box+31;
+    if(m.k==='smear'){ for(let j=0;j<3;j++) seal(cx+8+j*7,65+j*3,17,'大森',0.32,m.rot+j*0.12); }
+    else seal(cx,65,17,'大森',0.9,m.rot); }
+  // 本文
+  txt(d.form.split('').join(' '),DW/2,122,22,{a:'center',w:700,f:MIN});
+  txt('起案日　令和8年'+fmtD(d.kian),344,148,13.5,{a:'right'});
+  txt(d.to+'　様',16,170,13.5);
+  txt('所属　'+d.dept+'　'+(d.form==='出張命令伺'?'出張者':'起案者')+'　'+d.who,16,192,13.5);
+  txt('件名',16,217,12.5,{c:'#5E584D'}); txt(d.subj,50,217,14,{w:700});
+  txt('伺額',16,240,12.5,{c:'#5E584D'}); txt('金 '+yen(d.amount)+' 円',50,240,14,{w:700});
+  // 明細表
+  const T=252, cx=[16,172,218,280,344];
+  ctx.strokeStyle=INK; ctx.lineWidth=1; ctx.strokeRect(16,T,328,114);
+  ctx.beginPath(); ctx.moveTo(16,T+18); ctx.lineTo(344,T+18);
+  for(let j=1;j<=3;j++){ ctx.moveTo(16,T+18+24*j); ctx.lineTo(344,T+18+24*j); }
+  for(let j=1;j<4;j++){ ctx.moveTo(cx[j],T); ctx.lineTo(cx[j],T+90); } ctx.moveTo(cx[3],T+90); ctx.lineTo(cx[3],T+114); ctx.stroke();
+  ctx.fillStyle='rgba(34,32,28,.06)'; ctx.fillRect(16.5,T+0.5,327,17.5);
+  ['品名','数量','単価','金額'].forEach((h,j)=>txt(h,(cx[j]+cx[j+1])/2,T+13.5,12,{a:'center',c:'#5E584D'}));
+  d.rows.forEach((r,j)=>{ const yy=T+18+24*j+17;
+    txt(r[0],cx[0]+6,yy,13.5); txt(r[1]+r[2],cx[2]-5,yy,13.5,{a:'right'}); txt(yen(r[3]),cx[3]-5,yy,13.5,{a:'right'}); txt(yen(r[4]),cx[4]-5,yy,13.5,{a:'right'}); });
+  txt('合　計',cx[3]-12,T+108,13.5,{a:'right',w:700}); txt('¥'+yen(d.total),cx[4]-5,T+108,14,{a:'right',w:700});
+  txt('予算科目',16,390,12.5,{c:'#5E584D'}); txt(d.budget||BUDGET[d.cat],76,390,13.5,{w:600});
+  txt(d.when.l,16,412,12.5,{c:'#5E584D'});
+  txt('令和8年'+fmtD(d.when.a)+(d.when.b?' 〜 '+fmtD(d.when.b):''),d.when.l.length>3?86:58,412,13.5,{w:600});
+  // 付箋（監査メモ）
+  if(o.tag){ ctx.save(); ctx.translate(300,96); ctx.rotate(0.12); ctx.fillStyle='#F3A9B6'; ctx.fillRect(0,0,58,72);
+    ctx.fillStyle='rgba(0,0,0,.08)'; ctx.fillRect(0,0,58,10); txt('監査',29,34,14,{a:'center',w:700,c:'#7A2430'}); txt('メモ',29,54,14,{a:'center',w:700,c:'#7A2430'}); ctx.restore(); }
   ctx.restore();
+}
+function wood(x,y,w,h,base){
+  ctx.fillStyle=base; ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle='rgba(60,35,15,.16)'; ctx.lineWidth=1.2;
+  for(let i=0;i<h;i+=9){ ctx.beginPath(); ctx.moveTo(x,y+i); for(let j=0;j<=w;j+=30) ctx.lineTo(x+j,y+i+Math.sin((j+i*7)*0.02)*2.2); ctx.stroke(); }
+}
+function drawBelt(){
+  const be=BE(), ty=topY();
+  wood(0,0,W,H,'#A8774A');
+  ctx.fillStyle='#8E979A'; ctx.fillRect(8,ty,10,be-ty); ctx.fillRect(W-18,ty,10,be-ty);
+  ctx.fillStyle='#3E4644'; ctx.fillRect(18,ty,W-36,be-ty);
+  ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=2;
+  const off=G.s%22;
+  for(let y=ty+off-22;y<be;y+=22){ ctx.beginPath(); ctx.moveTo(18,y); ctx.lineTo(W-18,y); ctx.stroke(); }
+  ctx.fillStyle='#6E7678';
+  for(let y=ty+(G.s*0.5)%40;y<be;y+=40){ ctx.beginPath(); ctx.arc(13,y,3,0,Math.PI*2); ctx.arc(W-13,y,3,0,Math.PI*2); ctx.fill(); }
+}
+function drawPanel(){
+  const be=BE();
+  wood(0,be,W,H-be,'#8F6139');
+  ctx.fillStyle='#5A3A20'; ctx.fillRect(0,be,W,5);
+  // ハンコ立て・朱肉
+  inkpad(150,be+118);
+  // 印箱（校長印の置き場）
+  ctx.fillStyle='#4A3424'; ctx.fillRect(22,be+114,80,38); ctx.fillStyle='#2E2016'; ctx.fillRect(27,be+119,70,28);
+  // トレイ
+  tray(186,be+64,104,H-be-74,'決裁済',G.docs.filter(o=>o.mark&&o.mark.k==='ok'&&!o.f.length).length);
+  tray(302,be+64,108,H-be-74,'差戻',G.docs.filter(o=>o.inTray&&o.st==='gone').length);
+  // 伝言メモ（事務長・監査のひと言があるときだけ机に置かれる）
+  if(G.note){
+    const a=Math.min(1,G.note.t/0.3);
+    ctx.save(); ctx.globalAlpha=a; ctx.translate(0,(1-a)*8);
+    ctx.fillStyle='rgba(40,25,10,.25)'; ctx.fillRect(15,be+13,W-24,46);
+    ctx.fillStyle=G.note.kind==='bad'?'#FBEFF1':'#FBFAF3'; ctx.fillRect(12,be+10,W-24,46);
+    ctx.strokeStyle='#D6CFBD'; ctx.strokeRect(12.5,be+10.5,W-25,45);
+    const c=G.note.kind==='bad'?SHU:INK;
+    const lines=wrap(G.note.text,W-48,13.5);
+    lines.slice(0,2).forEach((l,j)=>txt(l,24,be+(lines.length>1?29:38)+j*19,13.5,{c,w:G.note.kind==='bad'?700:500}));
+    ctx.restore();
+  }
+}
+// 朱肉: 金属ケース入り・ふたが開いている
+function inkpad(x,y){
+  ctx.fillStyle='#8E9195'; ctx.beginPath(); ctx.ellipse(x,y-26,27,11,0,Math.PI,0); ctx.fill();          // 開いたふた
+  ctx.fillStyle='#B4B7BA'; ctx.beginPath(); ctx.ellipse(x,y-26,23,8,0,Math.PI,0); ctx.fill();
+  ctx.fillStyle='#7C7F83'; ctx.fillRect(x-27,y,54,10); ctx.beginPath(); ctx.ellipse(x,y+10,27,11,0,0,Math.PI); ctx.fill(); // 側面
+  ctx.fillStyle='#C3C6C9'; ctx.beginPath(); ctx.ellipse(x,y,27,11,0,0,Math.PI*2); ctx.fill();            // ふち
+  ctx.fillStyle='#A62F27'; ctx.beginPath(); ctx.ellipse(x,y,21,8,0,0,Math.PI*2); ctx.fill();             // 朱肉
+  ctx.fillStyle='#8E2620'; ctx.beginPath(); ctx.ellipse(x+5,y+2,11,4,0,0,Math.PI*2); ctx.fill();
+}
+// 印鑑（柘植の柄を斜め上から）。(x,y)=印面の中心。tilt=傾き、lift=持ち上げ量
+function hanko(x,y,tilt,lift,sc){
+  ctx.save(); ctx.translate(x,y-lift); ctx.rotate(tilt); ctx.scale(sc||1,sc||1);
+  ctx.fillStyle='#B8352B'; ctx.beginPath(); ctx.ellipse(0,0,16,6,0,0,Math.PI*2); ctx.fill();            // 印面の朱
+  ctx.fillStyle='#C99E57'; ctx.beginPath();
+  ctx.moveTo(-16,0); ctx.lineTo(-16,-14); ctx.quadraticCurveTo(-16,-26,-10,-34); ctx.lineTo(-10,-48);
+  ctx.lineTo(10,-48); ctx.lineTo(10,-34); ctx.quadraticCurveTo(16,-26,16,-14); ctx.lineTo(16,0);
+  ctx.ellipse(0,0,16,6,0,0,Math.PI); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#A9823F'; ctx.beginPath(); ctx.moveTo(5,0); ctx.lineTo(16,0); ctx.lineTo(16,-14); ctx.quadraticCurveTo(16,-26,10,-34); ctx.lineTo(10,-48); ctx.lineTo(4,-48); ctx.lineTo(4,-34); ctx.quadraticCurveTo(8,-24,5,-14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#D9B36C'; ctx.beginPath(); ctx.ellipse(0,-50,14,13,0,0,Math.PI*2); ctx.fill();          // 頭
+  ctx.fillStyle='#BE9450'; ctx.beginPath(); ctx.ellipse(4,-48,9,10,0,-0.6,1.9); ctx.fill();
+  ctx.fillStyle='#E6C98E'; ctx.beginPath(); ctx.ellipse(-4,-54,4,3,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#B8352B'; ctx.beginPath(); ctx.arc(0,-36,2.4,0,Math.PI*2); ctx.fill();                  // アタリ
+  ctx.fillStyle='#FBFAF3'; ctx.fillRect(-7,-27,13,22); ctx.fillStyle=INK; ctx.font='700 9px '+MIN; ctx.textAlign='center'; ctx.fillText('大',-0.5,-18); ctx.fillText('森',-0.5,-8); // 名前シール
+  ctx.strokeStyle='rgba(60,40,15,.45)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(-15,-6); ctx.ellipse(0,-6,15,5.5,0,Math.PI,0,true); ctx.stroke();
+  ctx.restore();
+}
+function tray(x,y,w,h,label,n){
+  ctx.fillStyle='#5F6B70'; ctx.fillRect(x,y,w,h);
+  ctx.fillStyle='#4B5559'; ctx.fillRect(x+5,y+5,w-10,h-10);
+  for(let i=0;i<Math.min(n,8);i++){ ctx.fillStyle=i%2?'#F4F1E6':'#FBFAF3'; ctx.save(); ctx.translate(x+w/2,y+h/2-i*1.5); ctx.rotate(((i*5)%7-3)*0.03); ctx.fillRect(-w/2+12,-h/2+10,w-24,h-20); ctx.restore(); }
+  ctx.fillStyle='#F3EFE4'; ctx.fillRect(x+w/2-30,y+h-24,60,20);
+  txt(label,x+w/2,y+h-9,13,{a:'center',w:700});
+}
+function wrap(s,maxW,size){
+  ctx.font='700 '+size+'px '+FF; const out=[]; let cur='';
+  for(const ch of s){ if(ctx.measureText(cur+ch).width>maxW){ out.push(cur); cur=ch; } else cur+=ch; }
+  if(cur) out.push(cur); return out;
+}
+function drawStamp(){
+  const st=G.stamp; if(!st)return;
+  if(st.held){
+    const sp=speedOf(st), k=Math.min(1.6,sp.v/TH), a=Math.atan2(sp.vy,sp.vx);
+    // 印面の予告（遅い=くっきり / 速い=にじむ）
+    if(k<0.75) seal(st.x,st.y,17*DS(),'大森',0.6,0);
+    else for(let j=0;j<3;j++) seal(st.x-Math.cos(a)*j*6*k,st.y-Math.sin(a)*j*6*k,17*DS(),'大森',0.24,j*0.15*k);
+    ctx.fillStyle='rgba(30,20,10,.22)'; ctx.beginPath(); ctx.ellipse(st.x+8,st.y+4,17,7,0,0,Math.PI*2); ctx.fill();
+    hanko(st.x,st.y,Math.max(-0.6,Math.min(0.6,sp.vx/TH*0.35)),14,1.2);   // 速いほど進行方向へ傾く
+    ctx.strokeStyle=k>=1?SHU:'rgba(255,255,255,.8)'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(st.x,st.y,26,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.min(1,k)); ctx.stroke();
+  }else{
+    hanko(st.x,st.y-6,0,0,1.3);
+  }
 }
 function draw(){
-  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='#0d1526'; ctx.fillRect(0,0,VW,VH);
-  const shx=G.shake>0?(Math.random()-0.5)*G.shake*16:0;
-  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR+shx*DPR,TY*DPR);
-  ctx.fillStyle='#101d33'; ctx.fillRect(0,0,W,H);
-  // ベルト
-  ctx.fillStyle='#22344f'; ctx.fillRect(0,BELT.y0,W,BELT.y1-BELT.y0);
-  ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.lineWidth=2;
-  for(let x=0;x<W;x+=34){ ctx.beginPath(); ctx.moveTo(x,BELT.y0+6); ctx.lineTo(x,BELT.y1-6); ctx.stroke(); }
-  // 判定ゾーン
-  ctx.fillStyle='rgba(255,179,0,.10)'; ctx.fillRect(BELT.zoneX0,BELT.y0,BELT.zoneX1-BELT.zoneX0,BELT.y1-BELT.y0);
-  ctx.strokeStyle='#ffb300'; ctx.setLineDash([6,5]);
-  ctx.strokeRect(BELT.zoneX0,BELT.y0+2,BELT.zoneX1-BELT.zoneX0,BELT.y1-BELT.y0-4); ctx.setLineDash([]);
-  ctx.fillStyle='#ffb300'; ctx.font='700 11px system-ui'; ctx.textAlign='center';
-  ctx.fillText('判定ゾーン',(BELT.zoneX0+BELT.zoneX1)/2,BELT.y0-8);
-  for(const d of G.docs)drawDoc(d);
-  for(const d of G.flying)drawDoc(d);
-  // ミス表示
-  ctx.fillStyle='#e24b4a'; ctx.font='700 14px system-ui'; ctx.textAlign='left';
-  ctx.fillText('ミス '+'●'.repeat(G.miss)+'○'.repeat(Math.max(0,MAX_MISS-G.miss)),16,H-140);
-  // ハンコ
-  const s=G.stamp;
-  ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(s.held?s.rot:0);
-  ctx.fillStyle='#8a5a3b'; ctx.beginPath(); ctx.roundRect(-13,-52,26,34,6); ctx.fill(); // 柄
-  ctx.fillStyle='#e23c32'; ctx.beginPath(); ctx.arc(0,0,26,0,Math.PI*2); ctx.fill(); // 印面
-  ctx.fillStyle='#fff'; ctx.font='800 15px system-ui'; ctx.textAlign='center'; ctx.fillText('決',0,5);
-  ctx.restore();
-  if(G.screen==='play'&&!s.held){
-    ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='11px system-ui'; ctx.textAlign='center';
-    ctx.fillText('そっと押すとキレイ',s.x,s.y+44);
+  const sh=G.shake>0?(Math.random()-0.5)*G.shake*22:0;
+  ctx.save(); ctx.translate(sh,sh*0.4);
+  drawBelt();
+  const fx=G.fx;
+  if(G.screen!=='title'){
+    // ハンコが校長欄に重なっているか
+    for(const o of G.docs) o.hot=false;
+    if(G.stamp&&G.stamp.held) for(const o of G.docs){ if(o.st==='belt'&&inR(G.stamp,boxRect(o,0),8)&&boxRect(o,0).y+BOX.h*DS()/2<BE()) o.hot=true; }
+    const vis=G.docs.filter(o=>o.st!=='gone'&&o.st!=='rej'&&o.st!=='held');
+    for(const o of vis){ if(fx){ drawDoc(o,o.cx,o.cy,o.rr); continue; } const p=docPos(o); if(p.y>H||p.y+DH*DS()<0)continue; drawDoc(o,p.x,p.y,0); }
   }
-  $('day').textContent=(G.screen==='play'||G.screen==='over'||G.screen==='clear')?DAYS[G.day].name:'-';
-  $('score').textContent=G.screen==='play'?('処理 '+G.done+' 件'):'-';
+  drawPanel();
+  if(G.screen!=='title'){
+    for(const o of G.docs) if(o.st==='rej'&&o.fly&&!fx) drawDoc(o,o.fly.x,o.fly.y,o.fly.r);
+    for(const o of G.docs) if(o.st==='held'&&!fx) drawDoc(o,o.hx,o.hy,(o.hx-DX())*0.0012);
+  }
+  if(!fx) drawStamp();
+  // 開始直後の案内（数秒で消える）
+  if(G.screen==='play'&&G.day===0&&G.t<4.5){
+    const be=BE(), a=Math.min(1,(4.5-G.t)/0.6);
+    ctx.save(); ctx.globalAlpha=a; ctx.strokeStyle='#F3EFE4'; ctx.lineWidth=2; ctx.setLineDash([6,5]);
+    ctx.beginPath(); ctx.moveTo(62,be-6); ctx.lineTo(62,be-130); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(240,be-150); ctx.lineTo(352,be+60); ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+  }
+  if(fx){
+    for(const n of fx.notes){ const t=fx.t-n.d; if(t<=0)continue; const a=Math.min(1,t/0.18), s=1+(1-a)*0.8;
+      ctx.save(); ctx.translate(n.x,n.y-(1-a)*40); ctx.rotate(n.r); ctx.scale(s,s);
+      ctx.fillStyle='rgba(0,0,0,.18)'; ctx.fillRect(-n.w/2+2,-n.w/2+3,n.w,n.w);
+      ctx.fillStyle=n.c; ctx.fillRect(-n.w/2,-n.w/2,n.w,n.w); ctx.fillStyle='rgba(0,0,0,.07)'; ctx.fillRect(-n.w/2,-n.w/2,n.w,8);
+      ctx.strokeStyle='rgba(34,32,28,.45)'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(-n.w/2+8,-4); ctx.lineTo(n.w/2-10,-4); ctx.moveTo(-n.w/2+8,6); ctx.lineTo(n.w/2-18,6); ctx.stroke();
+      ctx.restore(); }
+    if(fx.t>0.55){ const t=Math.min(1,(fx.t-0.55)/0.16), s=2.4-1.4*t;
+      ctx.save(); ctx.translate(W/2,H*0.42); ctx.rotate(-0.14); ctx.scale(s,s); ctx.globalAlpha=0.35+0.6*t;
+      ctx.strokeStyle=SHU; ctx.lineWidth=9; ctx.strokeRect(-72,-72,144,144); ctx.lineWidth=3; ctx.strokeRect(-60,-60,120,120);
+      ctx.fillStyle=SHU; ctx.font='800 50px '+MIN; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('監',0,-24); ctx.fillText('査',0,28); ctx.textBaseline='alphabetic'; ctx.restore(); }
+  }
+  ctx.restore();
+  if(G.screen==='play'||G.screen==='pause'||G.fx){
+    const D=DAYS[G.day], left=G.docs.filter(o=>o.st==='belt'||o.st==='held').length;
+    UI.hud(D.name,fmtD(D.md),'残り '+left+'件　監査メモ '+(G.miss?'<span class="warn">'+G.miss+'</span>':'0')+'/3');
+  }
 }
-function loop(ts){
-  const dt=Math.min(0.05,(ts-(lastTs||ts))/1000); lastTs=ts;
-  if(G.shake>0)G.shake=Math.max(0,G.shake-dt);
-  if(G.screen==='play')update(dt);
-  else if(G.screen==='over'){ for(const d of G.flying){ d.vy+=1500*dt; d.x+=d.vx*dt; d.y0=(d.y0??(BELT.y0+BELT.y1)/2)+d.vy*dt; d.rot+=d.vr*dt; } G.flying=G.flying.filter(d=>(d.y0??0)<H+200); }
-  draw(); requestAnimationFrame(loop);
+
+// ---- メインループ ----
+function frame(ts){
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.05):0; lastTs=ts;
+  if(G.screen==='play') update(dt);
+  else if(G.screen==='result'){ updateFx(dt); if(G.shake>0&&!G.fx)G.shake=Math.max(0,G.shake-dt); }
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle=getComputedStyle(document.body).backgroundColor; ctx.fillRect(0,0,VW,VH);
+  ctx.setTransform(DPR*SC,0,0,DPR*SC,TX*DPR,TY*DPR);
+  draw();
+  requestAnimationFrame(frame);
 }
-function resize(){
-  DPR=window.devicePixelRatio||1; VW=innerWidth; VH=innerHeight;
-  cv.width=VW*DPR; cv.height=VH*DPR;
-  SC=Math.min(VW/W,VH/H); TX=(VW-W*SC)/2; TY=(VH-H*SC)/2;
-}
-addEventListener('resize',resize); resize();
-showTitle(); requestAnimationFrame(loop);
+window.addEventListener('resize',resize); resize();
+showTitle();
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
